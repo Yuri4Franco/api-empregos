@@ -1,0 +1,422 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["omitApi"]
+  engineType      = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --- ENUMS ---
+
+enum TipoUsuario {
+  ADM
+  CANDIDATO
+  EMPRESA
+}
+
+enum StatusGeral {
+  ATIVO
+  PENDENTE
+  BLOQUEADO
+  INATIVO
+}
+
+enum TipoVinculoACI {
+  ASSOCIADA
+  NAO_ASSOCIADA
+}
+
+enum ModeloTrabalho {
+  PRESENCIAL
+  HIBRIDO
+  REMOTO
+}
+
+enum TipoContrato {
+  CLT
+  PJ
+  ESTAGIO
+  TEMPORARIO
+}
+
+enum StatusVaga {
+  RASCUNHO
+  EM_ANALISE
+  REPROVADA
+  ATIVA
+  PAUSADA
+  ENCERRADA
+  AGUARDANDO_PAGAMENTO
+}
+
+enum StatusCandidatura {
+  INSCRITO
+  TRIAGEM
+  ENTREVISTA
+  APROVADO
+  REPROVADO
+  DESISTENCIA
+}
+
+enum TipoEtapa {
+  INICIAL
+  INTERMEDIARIA
+  FINAL
+}
+
+// --- MODELOS ---
+
+model Usuario {
+  id_usuario      Int           @id @default(autoincrement())
+  nome            String
+  email           String        @unique
+  senha_hash      String
+  tipo_usuario    TipoUsuario
+  status          StatusGeral   @default(PENDENTE)
+  
+  is_master       Boolean       @default(false)
+  id_empresa      Int?          
+  empresa         Empresa?      @relation(fields: [id_empresa], references: [id_empresa])
+
+  data_exclusao   DateTime?     
+  criado_em       DateTime      @default(now())
+  atualizado_em   DateTime      @updatedAt
+  ultimo_login    DateTime?
+  exigir_troca_senha Boolean    @default(false)
+
+  candidato       Candidato?
+  notificacoes    Notificacao[]
+  logs_admin      LogAuditoria[]
+  tickets         TicketSuporte[]
+
+  @@map("usuarios")
+}
+
+model Candidato {
+  id_usuario              Int       @id
+  usuario                 Usuario   @relation(fields: [id_usuario], references: [id_usuario])
+  
+  cpf                     String    @unique
+  telefone                String?
+  whatsapp                String?
+  cidade                  String?
+  uf                      String?
+  logradouro              String?
+  numero                  String?
+  bairro                  String?
+  data_nascimento         DateTime?
+  genero                  String?
+  link_linkedin           String?
+  link_portfolio          String?
+  pcd                     Boolean   @default(false)
+  tipo_pcd                String?
+  perfil_visivel_empresas Boolean   @default(true)
+  objetivo_profissional   String?
+  pretensao_salarial      Decimal?  @db.Decimal(10, 2)
+  resumo_profissional     String?   @db.Text
+  disponibilidade_viagem  Boolean   @default(false)
+  disponibilidade_mudanca Boolean   @default(false)
+  turno_preferido         String?
+
+  experiencias            ExperienciaProfissional[]
+  formacoes               FormacaoAcademica[]
+  competencias            CandidatoCompetencia[]
+  candidaturas            Candidatura[]
+  avaliacoes_feitas       AvaliacaoEmpresa[]
+  relatos_ouvidoria       OuvidoriaRelato[]
+
+  @@map("candidatos")
+}
+
+model Empresa {
+  id_empresa          Int            @id @default(autoincrement())
+  cnpj                String         @unique
+  razao_social        String
+  nome_fantasia       String
+  email               String?        @unique
+  tipo_vinculo_aci    TipoVinculoACI @default(NAO_ASSOCIADA)
+  logotipo_url        String?
+  banner_url          String?
+  quem_somos          String?        @db.Text
+  site                String?
+  instagram           String?
+  linkedin            String?
+  facebook            String?
+  cidade              String?
+  uf                  String?
+  logradouro          String?
+  numero              String?
+  bairro              String?
+  creditos_vagas      Int            @default(0)
+  creditos_curriculos Int            @default(0)
+
+  usuarios             Usuario[]
+  vagas                Vaga[]
+  beneficios_padrao    EmpresaBeneficioPadrao[]
+  avaliacoes_recebidas AvaliacaoEmpresa[]
+
+  @@map("empresas")
+}
+
+model Vaga {
+ id_vaga           Int             @id @default(autoincrement())
+  id_empresa        Int
+  empresa           Empresa         @relation(fields: [id_empresa], references: [id_empresa])
+  
+  titulo                  String
+  area_profissional       String
+  nivel_hierarquico       String
+  cidade                  String
+  uf                      String
+  logradouro              String?
+  numero                  String?
+  bairro                  String?
+  modelo_trabalho         ModeloTrabalho
+  tipo_contrato           TipoContrato
+  faixa_salarial_de       Decimal?        @db.Decimal(10, 2)
+  faixa_salarial_ate      Decimal?        @db.Decimal(10, 2)
+  salario_a_combinar      Boolean         @default(false)
+  ocultar_salario         Boolean         @default(false)
+  descricao               String          @db.Text
+  responsabilidades       String?         @db.Text
+  requisitos_obrigatorios String?         @db.Text
+  diferenciais            String?         @db.Text
+  empresa_confidencial    Boolean         @default(false)
+  status                  StatusVaga      @default(RASCUNHO)
+  data_publicacao         DateTime?
+  data_encerramento       DateTime?
+  
+  beneficios              VagaBeneficio[]
+  etapas                  EtapaProcesso[]
+  candidaturas            Candidatura[]
+  perguntas_eliminatorias VagaPerguntaEliminatoria[]
+  competencias VagaCompetencia[]
+
+  @@map("vagas")
+}
+
+model EtapaProcesso {
+  id_etapa           Int           @id @default(autoincrement())
+  id_vaga            Int
+  vaga               Vaga          @relation(fields: [id_vaga], references: [id_vaga])
+  nome_etapa         String
+  ordem              Int
+  tipo               TipoEtapa     @default(INTERMEDIARIA)
+  requer_agendamento Boolean       @default(false)
+
+  @@map("etapas_processo")
+}
+
+model Candidatura {
+  id_candidatura   Int               @id @default(autoincrement())
+  id_vaga          Int
+  id_candidato     Int
+  id_etapa_atual   Int
+  status_atual     StatusCandidatura @default(INSCRITO)
+  data_candidatura DateTime          @default(now())
+  notificacao_pendente Boolean       @default(false)
+
+  vaga             Vaga              @relation(fields: [id_vaga], references: [id_vaga])
+  candidato        Candidato         @relation(fields: [id_candidato], references: [id_usuario])
+  movimentacoes    MovimentoCandidatura[]
+  respostas        RespostaPergunta[]
+
+  @@map("candidaturas")
+}
+
+model MovimentoCandidatura {
+  id_movimento   Int          @id @default(autoincrement())
+  id_candidatura Int
+  candidatura    Candidatura  @relation(fields: [id_candidatura], references: [id_candidatura])
+  etapa_origem   Int?
+  etapa_destino  Int
+  status_destino StatusCandidatura
+  motivo         String?
+  criado_em      DateTime     @default(now())
+
+  @@map("movimentos_candidatura")
+}
+
+model PerguntaEliminatoria {
+  id_pergunta       Int      @id @default(autoincrement())
+  descricao         String
+  vagas_vinculadas  VagaPerguntaEliminatoria[]
+
+  @@map("perguntas_eliminatorias")
+}
+
+model VagaPerguntaEliminatoria {
+  id_vaga           Int
+  id_pergunta       Int
+  resposta_esperada String 
+  
+  vaga              Vaga                 @relation(fields: [id_vaga], references: [id_vaga])
+  pergunta          PerguntaEliminatoria @relation(fields: [id_pergunta], references: [id_pergunta])
+
+  @@id([id_vaga, id_pergunta])
+  @@map("vaga_perguntas_eliminatorias")
+}
+
+model RespostaPergunta {
+  id_resposta     Int         @id @default(autoincrement())
+  id_candidatura  Int
+  id_pergunta     Int
+  resposta        String
+  fora_do_perfil  Boolean     @default(false)
+
+  candidatura     Candidatura @relation(fields: [id_candidatura], references: [id_candidatura])
+
+  @@map("respostas_perguntas")
+}
+
+model Beneficio {
+  id_beneficio Int      @id @default(autoincrement())
+  descricao    String   @unique
+  empresas     EmpresaBeneficioPadrao[]
+  vagas        VagaBeneficio[]
+
+  @@map("beneficios")
+}
+
+model AvaliacaoEmpresa {
+  id_avaliacao   Int       @id @default(autoincrement())
+  id_empresa     Int
+  id_candidato   Int
+  nota           Int 
+  motivos_tags   Json? 
+  criado_em      DateTime  @default(now())
+
+  empresa        Empresa   @relation(fields: [id_empresa], references: [id_empresa])
+  candidato      Candidato @relation(fields: [id_candidato], references: [id_usuario])
+
+  @@map("avaliacoes_empresa")
+}
+
+model LogAuditoria {
+  id_log      Int      @id @default(autoincrement())
+  id_usuario  Int
+  usuario     Usuario  @relation(fields: [id_usuario], references: [id_usuario])
+  entidade    String
+  id_entidade Int
+  acao        String
+  detalhes    Json?
+  criado_em   DateTime @default(now())
+
+  @@map("logs_auditoria")
+}
+
+model EmpresaBeneficioPadrao {
+  id_empresa   Int
+  id_beneficio Int
+  empresa      Empresa   @relation(fields: [id_empresa], references: [id_empresa])
+  beneficio    Beneficio @relation(fields: [id_beneficio], references: [id_beneficio])
+  
+  @@id([id_empresa, id_beneficio])
+  @@map("empresa_beneficios_padrao")
+}
+model VagaBeneficio {
+  id_vaga      Int
+  id_beneficio Int
+  vaga         Vaga      @relation(fields: [id_vaga], references: [id_vaga])
+  beneficio    Beneficio @relation(fields: [id_beneficio], references: [id_beneficio])
+  @@id([id_vaga, id_beneficio])
+  @@map("vaga_beneficios")
+}
+
+model ExperienciaProfissional {
+  id_experiencia Int       @id @default(autoincrement())
+  id_candidato   Int
+  candidato      Candidato @relation(fields: [id_candidato], references: [id_usuario])
+  empresa        String
+  cargo          String
+  atividades     String?   @db.Text
+  data_inicio    DateTime
+  data_fim       DateTime?
+  atual          Boolean   @default(false)
+  @@map("experiencias_profissionais")
+}
+
+model FormacaoAcademica {
+  id_formacao    Int       @id @default(autoincrement())
+  id_candidato   Int
+  candidato      Candidato @relation(fields: [id_candidato], references: [id_usuario])
+  instituicao    String
+  nivel          String
+  curso          String
+  status         String
+  data_conclusao DateTime?
+  @@map("formacoes_academicas")
+}
+
+model Competencia {
+  id_competencia Int                    @id @default(autoincrement())
+  nome           String                 @unique
+  candidatos     CandidatoCompetencia[]
+  vagas          VagaCompetencia[]
+
+  @@map("competencias")
+}
+
+model CandidatoCompetencia {
+  id_candidato   Int
+  id_competencia Int
+  nivel          NivelSkill @default(INTERMEDIARIO)
+
+  // O references deve apontar para id_usuario, que é a sua PK em Candidato
+  candidato      Candidato   @relation(fields: [id_candidato], references: [id_usuario])
+  competencia    Competencia @relation(fields: [id_competencia], references: [id_competencia])
+
+  @@id([id_candidato, id_competencia])
+  @@map("candidato_competencias")
+}
+
+model VagaCompetencia {
+  id_vaga        Int
+  id_competencia Int
+  obrigatoria    Boolean     @default(false)
+
+  vaga           Vaga        @relation(fields: [id_vaga], references: [id_vaga])
+  competencia    Competencia @relation(fields: [id_competencia], references: [id_competencia])
+
+  @@id([id_vaga, id_competencia])
+  @@map("vaga_competencias")
+}
+
+enum NivelSkill {
+  BASICO
+  INTERMEDIARIO
+  AVANCADO
+}
+
+model TicketSuporte {
+  id_ticket     Int      @id @default(autoincrement())
+  id_usuario    Int?
+  usuario       Usuario? @relation(fields: [id_usuario], references: [id_usuario])
+  assunto       String
+  mensagem      String   @db.Text
+  status        String   @default("ABERTO")
+  criado_em     DateTime @default(now())
+  @@map("tickets_suporte")
+}
+
+model Notificacao {
+  id_notificacao Int      @id @default(autoincrement())
+  id_usuario     Int
+  usuario        Usuario  @relation(fields: [id_usuario], references: [id_usuario])
+  titulo         String
+  mensagem       String
+  lida           Boolean  @default(false)
+  criado_em      DateTime @default(now())
+  @@map("notificacoes")
+}
+
+model OuvidoriaRelato {
+  id_relato    Int       @id @default(autoincrement())
+  id_candidato Int
+  candidato    Candidato @relation(fields: [id_candidato], references: [id_usuario])
+  texto        String    @db.Text
+  criado_em    DateTime  @default(now())
+  @@map("ouvidoria_relatos")
+}
