@@ -2,12 +2,7 @@ import type { Request, Response } from "express";
 import { AdminService } from "../services/AdminService.js";
 import { BaseUserService } from "../services/BaseUserService.js";
 
-import {
-  cadastroEmpresaPorAdminSchema,
-  cadastroCandidatoManualSchema,
-  EmpresaSchema,
-  QueryListagemSchema,
-} from "../schemas/auth.schema.js";
+import { EmpresaSchema, QueryListagemSchema } from "../schemas/auth.schema.js";
 import { z } from "zod";
 
 const adminService = new AdminService();
@@ -179,95 +174,82 @@ export class AdminController {
   // Obter detalhes completos de um usuário (incluindo logs e empresa)
   async obterDetalhesUsuario(req: Request, res: Response) {
     try {
-      const { id_usuario } = req.params;
-      const usuario = await adminService.buscarUsuarioPorId(Number(id_usuario));
+      // Pegamos o ID já validado e convertido para número pelo Zod
+      const { id_usuario } = req.params as any;
 
-      return res.status(200).json({ success: true, data: usuario });
+      const usuario = await baseUserService.buscarPorId(id_usuario);
+
+      return res.status(200).json(usuario);
     } catch (error: any) {
-      return res.status(404).json({ success: false, error: error.message });
+      return res.status(404).json({ error: error.message });
     }
   }
 
   async cadastrarCandidatoManual(req: Request, res: Response) {
     try {
-      // 1. Valida com o novo schema
-      const dadosValidados = cadastroCandidatoManualSchema.parse(req.body);
       const idAutor = req.user.id;
-
+      // O req.body já chega 100% validado e tipado
       const resultado = await adminService.cadastrarCandidatoManual(
-        dadosValidados,
+        req.body,
         idAutor,
       );
 
       return res.status(201).json({
-        success: true,
         message: "Candidato cadastrado com sucesso.",
         data: resultado,
       });
     } catch (error: any) {
-      return res.status(400).json({ success: false, error: error.message });
+      return res.status(400).json({ error: error.message });
     }
   }
 
   // Listar todos os usuários candidato
   async listarCandidatos(req: Request, res: Response) {
     try {
-      const candidatos = await adminService.listarTodosCandidatos();
-      return res.status(200).json({ success: true, data: candidatos });
+      const filtros = req.query;
+
+      const result = await adminService.listarTodosCandidatos(filtros);
+
+      return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(500).json({ success: false, error: error.message });
+      return res.status(500).json({ error: error.message });
     }
   }
 
   // Ver currículo completo do candidato
   async obterCurriculo(req: Request, res: Response) {
     try {
-      const { id_usuario } = req.params;
-      const curriculo = await adminService.obterCurriculoCompleto(
-        Number(id_usuario),
-      );
-      return res.status(200).json({ success: true, data: curriculo });
+      // Pegamos o id já validado e convertido pelo middleware
+      const { id } = req.params as any;
+
+      const curriculo = await adminService.obterCurriculoCompleto(id);
+
+      return res.status(200).json(curriculo);
     } catch (error: any) {
-      return res.status(404).json({ success: false, error: error.message });
+      return res.status(404).json({ error: error.message });
     }
   }
 
   // Atualizar currículo/perfil pelo ADM
   async atualizarPerfilCompleto(req: Request, res: Response) {
     try {
-      // 1. Pega o ID do candidato que será editado da URL (/candidatos/:id)
-      const id_usuario = parseInt(req.params.id as string);
-
-      // 2. Pega o ID de quem está editando (o ADM logado)
-      // Geralmente injetado por um middleware de autenticação
+      // O id já vem como number pelo middleware validate(IdParamSchema, 'params')
+      const { id } = req.params as any;
       const id_autor = req.user.id;
 
-      // 3. O corpo da requisição (JSON que criamos anteriormente)
-      const dados = req.body;
-
-      if (!id_usuario) {
-        return res
-          .status(400)
-          .json({ error: "ID do candidato é obrigatório." });
-      }
-
-      // 4. Chama o serviço (supondo que esteja instanciado como candidatoService)
+      // req.body já está validado e com as datas convertidas
       const resultado = await adminService.atualizarPerfilCompletoCandidato(
-        id_usuario,
-        dados,
+        id,
+        req.body,
         id_autor,
       );
 
-      // 5. Retorna o sucesso
       return res.status(200).json({
         message: "Perfil atualizado com sucesso!",
         data: resultado,
       });
     } catch (error: any) {
-      // Tratamento de erros (E-mail duplicado, erro de banco, etc)
-      return res.status(400).json({
-        error: error.message || "Erro ao atualizar perfil do candidato.",
-      });
+      return res.status(400).json({ error: error.message });
     }
   }
 
@@ -360,29 +342,43 @@ export class AdminController {
 
   async addExperiencia(req: Request, res: Response) {
     try {
-      const { id_usuario } = req.params;
+      const { id_usuario } = req.params as any; // Validado pelo IdParamSchema
       const exp = await adminService.adicionarExperienciaCandidato(
-        Number(id_usuario),
+        id_usuario,
         req.body,
         req.user.id,
       );
-      return res.status(201).json({ success: true, data: exp });
+      return res.status(201).json(exp);
     } catch (error: any) {
-      return res.status(400).json({ success: false, error: error.message });
+      return res.status(400).json({ error: error.message });
     }
   }
 
   async addFormacao(req: Request, res: Response) {
     try {
-      const { id_usuario } = req.params;
+      const { id_usuario } = req.params as any;
       const form = await adminService.adicionarFormacaoCandidato(
-        Number(id_usuario),
+        id_usuario,
         req.body,
         req.user.id,
       );
-      return res.status(201).json({ success: true, data: form });
+      return res.status(201).json(form);
     } catch (error: any) {
-      return res.status(400).json({ success: false, error: error.message });
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
+  async addCompetencia(req: Request, res: Response) {
+    try {
+      const { id_usuario } = req.params as any;
+      const result = await adminService.adicionarCompetenciaCandidato(
+        id_usuario,
+        req.body,
+        req.user.id,
+      );
+      return res.status(201).json(result);
+    } catch (error: any) {
+      return res.status(400).json({ error: error.message });
     }
   }
 

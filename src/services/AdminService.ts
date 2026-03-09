@@ -289,7 +289,6 @@ export class AdminService {
     const { page, limit, search, status } = filtros;
     const skip = (page - 1) * limit;
 
-    // Construímos o filtro dinamicamente
     const onde: any = {
       tipo_usuario: "EMPRESA",
       AND: [
@@ -336,34 +335,62 @@ export class AdminService {
     };
   }
 
-  // Obter detalhes de UM usuário específico com contexto total (empresa + logs)
-  async buscarUsuarioPorId(id_usuario: number) {
-    const usuario = await prisma.usuario.findUnique({
-      where: { id_usuario },
-      include: {
-        empresa: true,
-        logs_admin: {
-          take: 5,
-          orderBy: { criado_em: "desc" },
-        },
-      },
-    });
-
-    if (!usuario) throw new Error("Usuário não encontrado.");
-    return usuario;
-  }
-
   // Listar todos os candidatos com dados básicos
-  async listarTodosCandidatos() {
-    return await prisma.usuario.findMany({
-      where: { tipo_usuario: "CANDIDATO" },
-      include: {
-        candidato: {
-          select: { cpf: true, cidade: true, telefone: true },
+  async listarTodosCandidatos(filtros: any) {
+    const { page = 1, limit = 10, search, cidade, status } = filtros;
+    const skip = (page - 1) * limit;
+
+    const onde: any = {
+      tipo_usuario: "CANDIDATO",
+      AND: [
+        status ? { status } : {},
+        search
+          ? {
+              OR: [
+                { nome: { contains: search, mode: "insensitive" } },
+                { email: { contains: search, mode: "insensitive" } },
+                { candidato: { cpf: { contains: search } } },
+              ],
+            }
+          : {},
+        cidade
+          ? { candidato: { cidade: { contains: cidade, mode: "insensitive" } } }
+          : {},
+      ],
+    };
+
+    const [total, candidatos] = await Promise.all([
+      prisma.usuario.count({ where: onde }),
+      prisma.usuario.findMany({
+        where: onde,
+        skip,
+        take: limit,
+        select: {
+          id_usuario: true,
+          nome: true,
+          email: true,
+          status: true,
+          candidato: {
+            select: {
+              cpf: true,
+              cidade: true,
+              uf: true,
+              telefone: true,
+              competencias: {
+                include: { competencia: { select: { nome: true } } },
+                take: 3,
+              },
+            },
+          },
         },
-      },
-      orderBy: { criado_em: "desc" },
-    });
+        orderBy: { criado_em: "desc" },
+      }),
+    ]);
+
+    return {
+      meta: { total, page, limit, total_paginas: Math.ceil(total / limit) },
+      data: candidatos,
+    };
   }
 
   // Ver currículo completo (Perfil + Experiências + Formações)
@@ -373,16 +400,34 @@ export class AdminService {
       include: {
         candidato: {
           include: {
-            experiencias: true,
-            formacoes: true,
+            experiencias: {
+              orderBy: { data_inicio: "desc" }, // Mais recentes primeiro
+            },
+            formacoes: {
+              orderBy: { status: "asc" }, // Ou por data de conclusão
+            },
+            competencias: {
+              include: {
+                competencia: {
+                  select: { nome: true }, // Traz o nome da skill (Ex: Excel)
+                },
+              },
+            },
           },
         },
       },
     });
 
-    if (!perfil || perfil.tipo_usuario !== "CANDIDATO")
-      throw new Error("Candidato não encontrado.");
-    return perfil;
+    // Validação de segurança
+    if (!perfil || perfil.tipo_usuario !== "CANDIDATO") {
+      throw new Error(
+        "Candidato não encontrado ou usuário não é do tipo candidato.",
+      );
+    }
+
+    // Removemos a senha por segurança, mesmo sendo rota de Admin
+    const { senha_hash, ...dadosSeguros } = perfil;
+    return dadosSeguros;
   }
 
   // Atualizar o currículo (Parte do Candidato)
@@ -392,7 +437,6 @@ export class AdminService {
     id_autor: number,
   ) {
     return await prisma.$transaction(async (tx) => {
-      // 1. Atualiza Dados Básicos (Tabela Usuario)
       if (dados.nome || dados.email) {
         await tx.usuario.update({
           where: { id_usuario },
@@ -403,11 +447,9 @@ export class AdminService {
         });
       }
 
-      // 2. Atualiza Dados do Candidato (Endereço, Contato, etc)
       const candidato = await tx.candidato.update({
         where: { id_usuario },
         data: {
-          // Usamos 'null' em vez de 'undefined' para satisfazer o Prisma com strict types
           cpf: dados.cpf ? dados.cpf.replace(/\D/g, "") : null,
           cidade: dados.cidade || null,
           uf: dados.uf || null,
@@ -422,14 +464,12 @@ export class AdminService {
           genero: dados.genero || null,
           pcd: dados.pcd ?? false,
           tipo_pcd: dados.tipo_pcd || null,
-          // A correção principal para o erro de 'data_nascimento'
           data_nascimento: dados.data_nascimento
             ? new Date(dados.data_nascimento)
             : null,
         },
       });
 
-      // É a forma mais simples e segura para evitar conflitos de IDs antigos
       if (dados.experiencias && Array.isArray(dados.experiencias)) {
         await tx.experienciaProfissional.deleteMany({
           where: { id_candidato: id_usuario },
@@ -447,7 +487,6 @@ export class AdminService {
         });
       }
 
-      // 4. Atualiza Formações (Abordagem: Deletar e Reinserir)
       if (dados.formacoes && Array.isArray(dados.formacoes)) {
         await tx.formacaoAcademica.deleteMany({
           where: { id_candidato: id_usuario },
@@ -466,7 +505,22 @@ export class AdminService {
         });
       }
 
-      // 5. Log único de alteração total
+      if (dados.competencias && Array.isArray(dados.competencias)) {
+        // 1. Remove as associações antigas
+        await tx.candidatoCompetencia.deleteMany({
+          where: { id_candidato: id_usuario },
+        });
+
+        // 2. Cria as novas associações
+        await tx.candidatoCompetencia.createMany({
+          data: dados.competencias.map((comp: any) => ({
+            id_candidato: id_usuario,
+            id_competencia: comp.id_competencia,
+            nivel: comp.nivel,
+          })),
+        });
+      }
+
       await tx.logAuditoria.create({
         data: {
           id_usuario: id_autor,
@@ -483,20 +537,21 @@ export class AdminService {
 
   // Cadastrar Candidato Manualmente
   async cadastrarCandidatoManual(dados: any, id_autor: number) {
+    // 1. Verificações pré-transação (fail-fast)
     const emailExistente = await prisma.usuario.findUnique({
       where: { email: dados.email },
     });
     if (emailExistente) throw new Error("E-mail já cadastrado.");
 
-    const cpfLimpo = dados.cpf.replace(/\D/g, "");
     const cpfExistente = await prisma.candidato.findUnique({
-      where: { cpf: cpfLimpo },
+      where: { cpf: dados.cpf },
     });
     if (cpfExistente) throw new Error("CPF já cadastrado.");
 
     const senhaHash = await argon2.hash(dados.senha);
 
     return await prisma.$transaction(async (tx) => {
+      // 2. Cria o Usuário base
       const usuario = await tx.usuario.create({
         data: {
           nome: dados.nome,
@@ -508,10 +563,11 @@ export class AdminService {
         },
       });
 
+      // 3. Cria o Perfil do Candidato vinculado
       const candidato = await tx.candidato.create({
         data: {
           id_usuario: usuario.id_usuario,
-          cpf: cpfLimpo,
+          cpf: dados.cpf,
           telefone: dados.telefone,
           whatsapp: dados.whatsapp,
           cidade: dados.cidade,
@@ -519,25 +575,26 @@ export class AdminService {
           logradouro: dados.logradouro,
           numero: dados.numero,
           bairro: dados.bairro,
-          data_nascimento: dados.data_nascimento
-            ? new Date(dados.data_nascimento)
-            : null,
+          data_nascimento: dados.data_nascimento, // Já é um objeto Date graças ao Zod
           genero: dados.genero,
-          pcd: dados.pcd || false,
+          pcd: dados.pcd,
           tipo_pcd: dados.tipo_pcd,
           perfil_visivel_empresas: true,
         },
       });
 
-      await tx.logAuditoria.create({
-        data: {
-          id_usuario: id_autor,
-          acao: "CADASTRAR_CANDIDATO_MANUAL",
-          entidade: "Candidato",
-          id_entidade: usuario.id_usuario,
-          detalhes: { nome: usuario.nome, cpf: cpfLimpo },
+      // 4. Log padronizado
+      await baseUser.registrarLog(
+        tx,
+        id_autor,
+        "CADASTRAR_CANDIDATO_MANUAL",
+        "Candidato",
+        usuario.id_usuario,
+        {
+          nome: usuario.nome,
+          cpf: dados.cpf,
         },
-      });
+      );
 
       return { usuario, candidato };
     });
@@ -553,24 +610,21 @@ export class AdminService {
       const experiencia = await tx.experienciaProfissional.create({
         data: {
           id_candidato: id_usuario,
-          empresa: dados.empresa,
-          cargo: dados.cargo,
-          atividades: dados.atividades,
-          data_inicio: new Date(dados.data_inicio),
-          data_fim: dados.data_fim ? new Date(dados.data_fim) : null,
-          atual: dados.atual || false,
+          ...dados, // Zod já garantiu os campos e os tipos Date
         },
       });
 
-      await tx.logAuditoria.create({
-        data: {
-          id_usuario: id_autor,
-          acao: "ADM_ADD_EXPERIENCIA",
-          entidade: "Candidato",
-          id_entidade: id_usuario,
-          detalhes: { cargo: dados.cargo, empresa: dados.empresa },
+      await baseUser.registrarLog(
+        tx,
+        id_autor,
+        "ADM_ADD_EXPERIENCIA",
+        "Candidato",
+        id_usuario,
+        {
+          cargo: dados.cargo,
+          empresa: dados.empresa,
         },
-      });
+      );
 
       return experiencia;
     });
@@ -586,27 +640,62 @@ export class AdminService {
       const formacao = await tx.formacaoAcademica.create({
         data: {
           id_candidato: id_usuario,
-          instituicao: dados.instituicao,
-          nivel: dados.nivel,
-          curso: dados.curso,
-          status: dados.status,
-          data_conclusao: dados.data_conclusao
-            ? new Date(dados.data_conclusao)
-            : null,
+          ...dados, // Zod já cuidou de tudo
         },
       });
 
-      await tx.logAuditoria.create({
-        data: {
-          id_usuario: id_autor,
-          acao: "ADM_ADD_FORMACAO",
-          entidade: "Candidato",
-          id_entidade: id_usuario,
-          detalhes: { curso: dados.curso, instituicao: dados.instituicao },
+      await baseUser.registrarLog(
+        tx,
+        id_autor,
+        "ADM_ADD_FORMACAO",
+        "Candidato",
+        id_usuario,
+        {
+          curso: dados.curso,
+          instituicao: dados.instituicao,
         },
-      });
+      );
 
       return formacao;
+    });
+  }
+
+  async adicionarCompetenciaCandidato(
+    id_usuario: number,
+    dados: any,
+    id_autor: number,
+  ) {
+    return await prisma.$transaction(async (tx) => {
+      // Upsert: Se não existe, cria. Se existe, atualiza o nível.
+      const vinculo = await tx.candidatoCompetencia.upsert({
+        where: {
+          id_candidato_id_competencia: {
+            id_candidato: id_usuario,
+            id_competencia: dados.id_competencia,
+          },
+        },
+        update: { nivel: dados.nivel },
+        create: {
+          id_candidato: id_usuario,
+          id_competencia: dados.id_competencia,
+          nivel: dados.nivel,
+        },
+        include: { competencia: true }, // Para retornar o nome da skill no log
+      });
+
+      await baseUser.registrarLog(
+        tx,
+        id_autor,
+        "ADM_ADD_COMPETENCIA",
+        "Candidato",
+        id_usuario,
+        {
+          competencia: vinculo.competencia.nome,
+          nivel: dados.nivel,
+        },
+      );
+
+      return vinculo;
     });
   }
 

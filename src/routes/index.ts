@@ -5,13 +5,19 @@ import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { VagaController } from "../controllers/VagaController.js";
 import { AdminVagaController } from "../controllers/AdminVagaController.js";
 import {
+  AtualizarPerfilCompletoSchema,
   AtualizarUsuarioSchema,
+  cadastroCandidatoManualSchema,
   ColaboradorSchema,
   EmpresaSchema,
+  ExperienciaSchema,
+  FiltroUsuarioSchema,
+  FormacaoSchema,
   IdParamSchema,
   QueryListagemSchema,
   StatusEmpresaSchema,
   StatusUsuarioSchema,
+  VincularCompetenciaSchema,
 } from "../schemas/auth.schema.js";
 import { validate } from "../middlewares/validate.js";
 
@@ -44,7 +50,7 @@ routes.get(
 routes.get(
   "/admin/empresas/:id",
   authMiddleware(["ADM"]),
-  validate(IdParamSchema, "params"), // <--- Valida o :id da URL
+  validate(IdParamSchema, "params"),
   adminController.obterDetalhesEmpresa,
 );
 
@@ -79,8 +85,8 @@ routes.put(
 routes.patch(
   "/admin/usuarios/:id_usuario/status",
   authMiddleware(["ADM"]),
-  validate(IdParamSchema, "params"), // Valida o :id_usuario na URL
-  validate(StatusUsuarioSchema, "body"), // Valida o status no Body
+  validate(IdParamSchema, "params"),
+  validate(StatusUsuarioSchema, "body"),
   adminController.alternarStatusUsuario,
 );
 
@@ -88,13 +94,15 @@ routes.patch(
 routes.get(
   "/admin/usuarios-empresa",
   authMiddleware(["ADM"]),
+  validate(FiltroUsuarioSchema, "query"),
   adminController.listarUsuariosEmpresa,
 );
 
 // Detalhes de um usuário específico
 routes.get(
-  "/admin/usuarios-empresa/:id_usuario",
+  "/admin/usuarios/:id_usuario",
   authMiddleware(["ADM"]),
+  validate(IdParamSchema, "params"),
   adminController.obterDetalhesUsuario,
 );
 
@@ -104,6 +112,7 @@ routes.get(
 routes.get(
   "/admin/candidatos",
   authMiddleware(["ADM"]),
+  validate(FiltroUsuarioSchema, "query"),
   adminController.listarCandidatos,
 );
 
@@ -111,35 +120,51 @@ routes.get(
 routes.post(
   "/admin/candidatos/manual",
   authMiddleware(["ADM"]),
+  validate(cadastroCandidatoManualSchema, "body"),
   adminController.cadastrarCandidatoManual,
 );
 
 // Obter currículo completo de um candidato
 routes.get(
-  "/admin/candidatos/:id_usuario/curriculo",
+  "/admin/candidatos/:id/curriculo",
   authMiddleware(["ADM"]),
+  validate(IdParamSchema, "params"),
   adminController.obterCurriculo,
 );
-
 // Atualizar perfil completo do candidato (dados pessoais + perfil profissional)
 routes.put(
   "/admin/candidatos/:id/perfil-completo",
   authMiddleware(["ADM"]),
+  validate(IdParamSchema, "params"),
+  validate(AtualizarPerfilCompletoSchema, "body"),
   adminController.atualizarPerfilCompleto,
 );
 
 // Adicionar experiência profissional ao candidato
 routes.post(
-  "/admin/candidatos/:id_usuario/experiencia",
+  "/admin/candidatos/:id_usuario/formacao",
   authMiddleware(["ADM"]),
-  adminController.addExperiencia,
+  validate(IdParamSchema, "params"),
+  validate(FormacaoSchema, "body"), // <--- Valida a formação
+  adminController.addFormacao,
 );
 
 // Adicionar formação acadêmica ao candidato
 routes.post(
-  "/admin/candidatos/:id_usuario/formacao",
+  "/admin/candidatos/:id_usuario/experiencia",
   authMiddleware(["ADM"]),
-  adminController.addFormacao,
+  validate(IdParamSchema, "params"), // <--- Valida o ID
+  validate(ExperienciaSchema, "body"), // <--- Valida a experiência
+  adminController.addExperiencia,
+);
+
+// Adicionar competência ao candidato
+routes.post(
+  "/admin/candidatos/:id_usuario/competencia",
+  authMiddleware(["ADM"]),
+  validate(IdParamSchema, "params"),
+  validate(VincularCompetenciaSchema, "body"),
+  adminController.addCompetencia,
 );
 
 // --- UTILITÁRIOS ---
