@@ -3,7 +3,7 @@ declare namespace Express {
     user: {
       id: number;
       role: "CANDIDATO" | "EMPRESA" | "ADM";
-      master: boolean; 
+      is_master: boolean; 
     };
   }
 }

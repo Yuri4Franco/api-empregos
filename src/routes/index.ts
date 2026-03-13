@@ -5,8 +5,10 @@ import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { VagaController } from "../controllers/VagaController.js";
 import { AdminVagaController } from "../controllers/AdminVagaController.js";
 import {
+  AtualizarAdminSchema,
   AtualizarPerfilCompletoSchema,
   AtualizarUsuarioSchema,
+  CadastroAdminSchema,
   cadastroCandidatoManualSchema,
   ColaboradorSchema,
   EmpresaSchema,
@@ -106,6 +108,13 @@ routes.get(
   adminController.obterDetalhesUsuario,
 );
 
+routes.delete(
+  "/admin/equipe/:id",
+  authMiddleware(["ADM"]),
+  validate(IdParamSchema, "params"),
+  adminController.excluirAdmin,
+);
+
 // --- CANDIDATOS ---
 
 // Listar todos os candidatos
@@ -131,6 +140,7 @@ routes.get(
   validate(IdParamSchema, "params"),
   adminController.obterCurriculo,
 );
+
 // Atualizar perfil completo do candidato (dados pessoais + perfil profissional)
 routes.put(
   "/admin/candidatos/:id/perfil-completo",
@@ -185,6 +195,7 @@ routes.patch(
 routes.post(
   "/admin/equipe",
   authMiddleware(["ADM"]),
+  validate(CadastroAdminSchema, "body"), // <--- Blindagem com SenhaForte
   adminController.cadastrarNovoAdmin,
 );
 
@@ -198,7 +209,9 @@ routes.get(
 routes.put(
   "/admin/equipe/:id",
   authMiddleware(["ADM"]),
-  adminController.atualizarAdmin,
+  validate(IdParamSchema, "params"),      // Valida o :id na URL
+  validate(AtualizarAdminSchema, "body"), // Valida os campos de alteração
+  adminController.atualizarAdmin
 );
 
 routes.delete(

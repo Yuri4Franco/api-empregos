@@ -666,7 +666,6 @@ export class AdminService {
     id_autor: number,
   ) {
     return await prisma.$transaction(async (tx) => {
-      // Upsert: Se não existe, cria. Se existe, atualiza o nível.
       const vinculo = await tx.candidatoCompetencia.upsert({
         where: {
           id_candidato_id_competencia: {
@@ -680,7 +679,7 @@ export class AdminService {
           id_competencia: dados.id_competencia,
           nivel: dados.nivel,
         },
-        include: { competencia: true }, // Para retornar o nome da skill no log
+        include: { competencia: true },
       });
 
       await baseUser.registrarLog(
@@ -698,8 +697,6 @@ export class AdminService {
       return vinculo;
     });
   }
-
-  //conferir se precisamos criar uma função para cadastrar um usuario candidato completo e ver se precisamos fazer o crud para ele
 
   // #endregion FIM DAS FUNCIONALIDADES DE GESTÃO DE USUÁRIOS
 
@@ -767,21 +764,6 @@ export class AdminService {
     });
   }
 
-  // Deletar Administrador
-  async deletarAdmin(id_admin: number, id_autor: number) {
-    // Impedir que o Master delete a si mesmo por engano
-    if (id_admin === id_autor)
-      throw new Error("Você não pode deletar sua própria conta.");
-
-    return await prisma.usuario.update({
-      where: { id_usuario: id_admin },
-      data: {
-        status: "BLOQUEADO",
-        data_exclusao: new Date(),
-      },
-    });
-  }
-
   async atualizarDadosAdmin(id_admin: number, dados: any, id_autor: number) {
     const senha_hash = dados.senha ? await argon2.hash(dados.senha) : undefined;
 
@@ -793,19 +775,23 @@ export class AdminService {
           email: dados.email,
           status: dados.status,
           is_master: dados.is_master,
-          ...(senha_hash && { senha_hash, exigir_troca_senha: true }),
+          ...(senha_hash && {
+            senha_hash,
+            exigir_troca_senha: true,
+          }),
         },
       });
 
-      await tx.logAuditoria.create({
-        data: {
-          id_usuario: id_autor,
-          acao: "ATUALIZAR_ADMINISTRADOR",
-          entidade: "Usuario",
-          id_entidade: id_admin,
-          detalhes: { campos_alterados: Object.keys(dados) },
+      await baseUser.registrarLog(
+        tx,
+        id_autor,
+        "ATUALIZAR_ADMINISTRADOR",
+        "Usuario",
+        id_admin,
+        {
+          campos_alterados: Object.keys(dados).filter((k) => k !== "senha"),
         },
-      });
+      );
 
       return admin;
     });

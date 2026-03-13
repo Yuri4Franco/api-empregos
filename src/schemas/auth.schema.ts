@@ -6,6 +6,17 @@ const UsuarioBaseSchema = z.object({
   email: z.string().email("E-mail inválido"),
 });
 
+const SenhaForte = z
+  .string()
+  .min(8, "A senha deve ter no mínimo 8 caracteres")
+  .regex(/[A-Z]/, "Deve conter ao menos uma letra maiúscula")
+  .regex(/[0-9]/, "Deve conter ao menos um número")
+  .regex(/[^a-zA-Z0-9]/, "Deve conter ao menos um caractere especial");
+
+const SenhaPadrao = z
+  .string()
+  .min(6, "A senha deve ter no mínimo 6 caracteres");
+
 const EnderecoSchema = z.object({
   uf: z.string().length(2, "UF deve ter 2 caracteres").optional(),
   cidade: z.string().optional(),
@@ -52,11 +63,29 @@ export const VincularCompetenciaSchema = z.object({
   nivel: z.enum(["BASICO", "INTERMEDIARIO", "AVANCADO"]),
 });
 
+export const AtualizarAdminSchema = z
+  .object({
+    nome: z.string().min(3).optional(),
+    email: z.string().email().optional(),
+    is_master: z.boolean().optional(),
+    status: z.enum(["ATIVO", "BLOQUEADO", "INATIVO", "PENDENTE"]).optional(),
+    senha: SenhaForte.optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "Informe ao menos um campo para atualização.",
+  });
+
 // --- EXPORTS QUE VOCÊ JÁ USA ---
 
 // 1. Para Criar Colaborador (Admin da Empresa)
 export const ColaboradorSchema = UsuarioBaseSchema.extend({
   senha: z.string().min(6, "Mínimo 6 caracteres"),
+});
+
+export const CadastroAdminSchema = UsuarioBaseSchema.extend({
+  senha: SenhaForte, // Aquela com maiúsculas, números e caracteres especiais
+  is_master: z.boolean().default(false),
+  id_empresa: z.number().int().optional().nullable(),
 });
 
 // 2. Para Criar Empresa (Formulário completo)
@@ -130,4 +159,28 @@ export const StatusEmpresaSchema = z.object({
 
 export const StatusUsuarioSchema = z.object({
   status: z.enum(["ATIVO", "BLOQUEADO", "INATIVO", "PENDENTE"] as const),
+});
+
+export const vagaSchema = z.object({
+  titulo: z.string().min(3, "Título deve ter no mínimo 3 caracteres"),
+  descricao: z.string().min(10, "Descrição deve ter no mínimo 10 caracteres"),
+  requisitos: z.string().optional(),
+  beneficios: z.string().optional(),
+  salario: z.coerce
+    .number()
+    .positive("Salário deve ser um número positivo")
+    .optional(),
+  tipo_contrato: z.enum(["CLT", "PJ", "ESTAGIO", "TEMPORARIO"]).optional(),
+  local_trabalho: z.string().optional(),
+  remoto: z.boolean().default(false),
+  area_atuacao: z.string().optional(),
+  experiencia_minima: z.string().optional(),
+  nivel_hierarquico: z
+    .enum(["JUNIOR", "PLENO", "SENIOR", "ESTAGIARIO"])
+    .optional(),
+  jornada_trabalho: z.enum(["INTEGRAL", "PARCIAL", "HORISTA"]).optional(),
+  data_expiracao: z.coerce.date().optional(),
+  cidade: z.string().optional(),
+  uf: z.string().length(2, "UF deve ter 2 caracteres").optional(),
+  modelo: z.enum(["PUBLICA", "PRIVADA"]).default("PUBLICA"),
 });

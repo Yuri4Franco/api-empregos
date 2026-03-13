@@ -40,7 +40,7 @@ export function authMiddleware(roles?: string[]) {
       req.user = { 
         id: decoded.sub, 
         role: decoded.role,
-        master: decoded.master
+        is_master: decoded.master
       };
 
       return next();

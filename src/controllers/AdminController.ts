@@ -287,21 +287,25 @@ export class AdminController {
 
   async cadastrarNovoAdmin(req: Request, res: Response) {
     try {
-      if (!req.user.master)
-        return res.status(403).json({ message: "Acesso restrito ao Master." });
-      const admin = await adminService.cadastrarNovoAdmin(
-        req.body,
-        req.user.id,
-      );
-      return res.status(201).json({ success: true, data: admin });
+      // Verificação de segurança: Apenas Master cria equipe
+      if (!req.user.is_master) {
+        return res
+          .status(403)
+          .json({ error: "Acesso restrito a Administradores Master." });
+      }
+
+      const id_autor = req.user.id;
+      const admin = await adminService.cadastrarNovoAdmin(req.body, id_autor);
+
+      return res.status(201).json(admin);
     } catch (error: any) {
-      return res.status(400).json({ success: false, error: error.message });
+      return res.status(400).json({ error: error.message });
     }
   }
 
   async listarAdmins(req: Request, res: Response) {
     try {
-      if (!req.user.master)
+      if (!req.user.is_master)
         return res.status(403).json({ message: "Acesso restrito ao Master." });
       const admins = await adminService.listarAdministradores();
       return res.status(200).json({ success: true, data: admins });
@@ -312,31 +316,50 @@ export class AdminController {
 
   async atualizarAdmin(req: Request, res: Response) {
     try {
-      if (!req.user.master)
-        return res.status(403).json({ message: "Acesso restrito ao Master." });
-      const { id } = req.params;
+      if (!req.user.is_master) {
+        return res
+          .status(403)
+          .json({ error: "Acesso restrito ao Administrador Master." });
+      }
+
+      const { id } = req.params as any; // Pegamos o ID convertido pelo IdParamSchema
       const admin = await adminService.atualizarDadosAdmin(
-        Number(id),
+        id,
         req.body,
         req.user.id,
       );
-      return res.status(200).json({ success: true, data: admin });
+
+      return res.status(200).json(admin);
     } catch (error: any) {
-      return res.status(400).json({ success: false, error: error.message });
+      return res.status(400).json({ error: error.message });
     }
   }
 
   async excluirAdmin(req: Request, res: Response) {
     try {
-      if (!req.user.master)
-        return res.status(403).json({ message: "Acesso restrito ao Master." });
-      const { id } = req.params;
-      await adminService.deletarAdmin(Number(id), req.user.id);
-      return res
-        .status(200)
-        .json({ success: true, message: "Administrador removido/bloqueado." });
+      const { id } = req.params as any; // ID do Admin a ser removido
+      const idAutor = req.user.id; // ID do Master logado
+
+      // 1. TRAVA DE SEGURANÇA (Regra de Negócio)
+      if (!req.user.is_master) {
+        return res.status(403).json({ error: "Acesso restrito ao Master." });
+      }
+
+      if (id === idAutor) {
+        return res
+          .status(400)
+          .json({ error: "Você não pode remover a si mesmo." });
+      }
+
+      // 2. REUSO DO MOTOR (BaseUserService)
+      // Em vez de criar um código novo, usamos o que já está pronto
+      await baseUserService.alterarStatus(id, "BLOQUEADO", idAutor);
+
+      return res.status(200).json({
+        message: "Administrador removido da equipe com sucesso.",
+      });
     } catch (error: any) {
-      return res.status(400).json({ success: false, error: error.message });
+      return res.status(400).json({ error: error.message });
     }
   }
 
