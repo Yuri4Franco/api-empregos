@@ -4,6 +4,7 @@ import { BaseUserService } from "../services/BaseUserService.js";
 
 import { EmpresaSchema, QueryListagemSchema } from "../schemas/auth.schema.js";
 import { z } from "zod";
+import { prisma } from "../config/prisma.js";
 
 const adminService = new AdminService();
 const baseUserService = new BaseUserService();
@@ -256,24 +257,37 @@ export class AdminController {
   // Resetar senha de qualquer usuário (Forçar troca)
   async resetarSenhaUsuario(req: Request, res: Response) {
     try {
-      const { id_usuario } = req.params;
+      const { id } = req.params as any; // Validado pelo IdParamSchema
       const { novaSenha } = req.body;
       const idAutor = req.user.id;
 
-      if (!novaSenha) throw new Error("A nova senha deve ser fornecida.");
+      // 1. Buscar o tipo do usuário alvo antes de resetar
+      const usuarioAlvo = await prisma.usuario.findUnique({
+        where: { id_usuario: id },
+        select: { tipo_usuario: true, is_master: true },
+      });
 
-      await adminService.forcarTrocaSenha(
-        Number(id_usuario),
-        novaSenha,
-        idAutor,
-      );
+      if (!usuarioAlvo) throw new Error("Usuário não encontrado.");
+
+      // 2. Trava de segurança: Apenas Master reseta senha de outros Admins
+      if (usuarioAlvo.tipo_usuario === "ADM" && !req.user.is_master) {
+        return res
+          .status(403)
+          .json({
+            error:
+              "Apenas um Administrador Master pode resetar senhas da equipe.",
+          });
+      }
+
+      // 3. Executa o reset
+      await adminService.forcarTrocaSenha(id, novaSenha, idAutor);
 
       return res.status(200).json({
-        success: true,
-        message: "Senha alterada. O usuário deverá trocar no próximo login.",
+        message:
+          "Senha alterada com sucesso. O usuário será obrigado a trocá-la no próximo login.",
       });
     } catch (error: any) {
-      return res.status(400).json({ success: false, error: error.message });
+      return res.status(400).json({ error: error.message });
     }
   }
 
@@ -305,12 +319,19 @@ export class AdminController {
 
   async listarAdmins(req: Request, res: Response) {
     try {
-      if (!req.user.is_master)
-        return res.status(403).json({ message: "Acesso restrito ao Master." });
-      const admins = await adminService.listarAdministradores();
-      return res.status(200).json({ success: true, data: admins });
+      // 1. Segurança: Apenas Master gerencia a equipe
+      if (!req.user.is_master) {
+        return res
+          .status(403)
+          .json({ error: "Acesso restrito ao Administrador Master." });
+      }
+
+      // 2. Filtros validados pelo Zod (FiltroUsuarioSchema)
+      const result = await adminService.listarAdministradores(req.query);
+
+      return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(500).json({ success: false, error: error.message });
+      return res.status(500).json({ error: error.message });
     }
   }
 
@@ -410,22 +431,16 @@ export class AdminController {
   // Endpoint para o Admin adicionar créditos a uma empresa
   async atualizarCreditos(req: Request, res: Response) {
     try {
-      const { id_empresa } = req.params;
-      const { creditos_vagas, creditos_curriculos, modo } = req.body;
+      const { id_empresa } = req.params as any; // Validado pelo IdParamSchema
       const idAutor = req.user.id;
 
-      if (!modo || !["SOMAR", "DEFINIR"].includes(modo)) {
-        throw new Error("O modo deve ser 'SOMAR' ou 'DEFINIR'.");
-      }
-
       const empresa = await adminService.gerenciarCreditosEmpresa(
-        Number(id_empresa),
-        { creditos_vagas, creditos_curriculos, modo },
+        id_empresa,
+        req.body, // Já validado pelo CreditosSchema
         idAutor,
       );
 
       return res.status(200).json({
-        success: true,
         message: "Créditos atualizados com sucesso.",
         data: {
           id_empresa: empresa.id_empresa,
@@ -435,7 +450,7 @@ export class AdminController {
         },
       });
     } catch (error: any) {
-      return res.status(400).json({ success: false, error: error.message });
+      return res.status(400).json({ error: error.message });
     }
   }
 }

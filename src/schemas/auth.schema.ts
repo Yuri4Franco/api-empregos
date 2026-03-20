@@ -75,6 +75,10 @@ export const AtualizarAdminSchema = z
     message: "Informe ao menos um campo para atualização.",
   });
 
+export const ResetSenhaSchema = z.object({
+  novaSenha: SenhaForte, // Garante que a senha temporária também seja segura
+});
+
 // --- EXPORTS QUE VOCÊ JÁ USA ---
 
 // 1. Para Criar Colaborador (Admin da Empresa)
@@ -162,25 +166,52 @@ export const StatusUsuarioSchema = z.object({
 });
 
 export const vagaSchema = z.object({
-  titulo: z.string().min(3, "Título deve ter no mínimo 3 caracteres"),
-  descricao: z.string().min(10, "Descrição deve ter no mínimo 10 caracteres"),
+  titulo: z.string().min(3),
+  descricao: z.string().min(10),
   requisitos: z.string().optional(),
   beneficios: z.string().optional(),
-  salario: z.coerce
-    .number()
-    .positive("Salário deve ser um número positivo")
-    .optional(),
+  salario: z.coerce.number().optional(),
   tipo_contrato: z.enum(["CLT", "PJ", "ESTAGIO", "TEMPORARIO"]).optional(),
-  local_trabalho: z.string().optional(),
-  remoto: z.boolean().default(false),
   area_atuacao: z.string().optional(),
-  experiencia_minima: z.string().optional(),
   nivel_hierarquico: z
     .enum(["JUNIOR", "PLENO", "SENIOR", "ESTAGIARIO"])
     .optional(),
-  jornada_trabalho: z.enum(["INTEGRAL", "PARCIAL", "HORISTA"]).optional(),
-  data_expiracao: z.coerce.date().optional(),
+  remoto: z.boolean().default(false),
   cidade: z.string().optional(),
-  uf: z.string().length(2, "UF deve ter 2 caracteres").optional(),
-  modelo: z.enum(["PUBLICA", "PRIVADA"]).default("PUBLICA"),
+  uf: z.string().length(2).optional(),
+  enviar_para_aprovacao: z.boolean().default(false),
+
+  // Adicione estes para o Service não quebrar
+  etapas: z
+    .array(
+      z.object({
+        nome: z.string(),
+        ordem: z.number().int(),
+        tipo: z.enum(["INICIAL", "INTERMEDIARIA", "FINAL"]),
+      }),
+    )
+    .optional(),
+
+  // Para o Admin cadastrar para outros
+  id_empresa_alvo: z.number().int().optional(),
 });
+
+export const FiltroVagasEmpresaSchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(10),
+  search: z.string().optional(),
+  status: z.enum(["RASCUNHO", "EM_ANALISE", "ATIVA", "REPROVADA", "PAUSADA", "ENCERRADA"]).optional(),
+});
+
+export const CreditosSchema = z
+  .object({
+    creditos_vagas: z.number().int().min(0).optional(),
+    creditos_curriculos: z.number().int().min(0).optional(),
+    modo: z.enum(["SOMAR", "DEFINIR"]).default("DEFINIR"),
+  })
+  .refine(
+    (data) =>
+      data.creditos_vagas !== undefined ||
+      data.creditos_curriculos !== undefined,
+    {},
+  );

@@ -12,19 +12,29 @@ export class VagaController {
    */
   async cadastrar(req: Request, res: Response) {
     try {
+      // 1. Usamos os dados que o Zod já validou e transformou
       const dadosValidados = vagaSchema.parse(req.body);
-      const user = req.user as any;
-      const idEmpresa = user.id_empresa;
+
+      // 2. Pegamos o id_empresa do usuário logado (token)
+      const idEmpresa = (req.user as any).id_empresa;
 
       if (!idEmpresa) {
-        throw new Error("Usuário não está vinculado a uma conta de empresa.");
+        return res.status(403).json({
+          success: false,
+          error: "Usuário não está vinculado a uma conta de empresa.",
+        });
       }
 
-      const vaga = await vagaService.criarVaga(req.body, idEmpresa, false);
+      // 3. Passamos 'dadosValidados' para o Service
+      const vaga = await vagaService.criarVaga(
+        dadosValidados,
+        idEmpresa,
+        false,
+      );
 
       const mensagem =
         vaga.status === "EM_ANALISE"
-          ? "Vaga enviada para aprovação da ACI com sucesso!"
+          ? "Vaga enviada para aprovação da ACI com sucesso! "
           : "Rascunho da vaga salvo com sucesso.";
 
       return res.status(201).json({
@@ -37,72 +47,30 @@ export class VagaController {
     }
   }
 
-  /**
-   * POST /admin/vagas
-   * Cadastro Assistido (Balcão) - [cite: 14]
-   * Admin cadastra para uma empresa e a vaga já nasce ATIVA.
-   */
-  async adminCadastrarVaga(req: Request, res: Response) {
+  async atualizar(req: Request, res: Response) {
     try {
+      const { id } = req.params as any;
       const dadosValidados = vagaSchema.parse(req.body);
-      const { id_empresa_alvo } = req.body;
+      const idEmpresa = (req.user as any).id_empresa;
 
-      if (!id_empresa_alvo) {
-        throw new Error(
-          "O ID da empresa alvo é obrigatório para o cadastro assistido.",
-        );
-      }
-
-      const vaga = await vagaService.criarVaga(
-        req.body,
-        Number(id_empresa_alvo),
-        true,
+      const vaga = await vagaService.atualizarVaga(
+        Number(id),
+        idEmpresa,
+        dadosValidados,
+        false, // is_admin = false
+        req.user.id,
       );
 
-      return res.status(201).json({
+      return res.status(200).json({
         success: true,
-        message: "Vaga cadastrada e publicada via balcão com sucesso.",
+        message:
+          vaga.status === "EM_ANALISE"
+            ? "Vaga enviada para análise!"
+            : "Vaga atualizada.",
         data: vaga,
       });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
-    }
-  }
-
-  async atualizar(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const idVaga = Number(id);
-      const dadosValidados = vagaSchema.parse(req.body);
-      const user = req.user as any;
-      const idEmpresa = user.id_empresa;
-      const isAdmin = user.tipo_usuario === "ADM";
-      if (!idEmpresa && !isAdmin) {
-        throw new Error("Usuário não autorizado.");
-      }
-
-      const vaga = await vagaService.atualizarVaga(
-        idVaga,
-        idEmpresa,
-        dadosValidados,
-        isAdmin,
-      );
-
-      const mensagem =
-        vaga.status === "EM_ANALISE"
-          ? "Vaga enviada para análise com sucesso!"
-          : "Vaga atualizada com sucesso.";
-
-      return res.status(200).json({
-        success: true,
-        message: mensagem,
-        data: vaga,
-      });
-    } catch (error: any) {
-      return res.status(400).json({
-        success: false,
-        error: error.message,
-      });
     }
   }
 

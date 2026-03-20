@@ -11,14 +11,18 @@ import {
   CadastroAdminSchema,
   cadastroCandidatoManualSchema,
   ColaboradorSchema,
+  CreditosSchema,
   EmpresaSchema,
   ExperienciaSchema,
   FiltroUsuarioSchema,
+  FiltroVagasEmpresaSchema,
   FormacaoSchema,
   IdParamSchema,
   QueryListagemSchema,
+  ResetSenhaSchema,
   StatusEmpresaSchema,
   StatusUsuarioSchema,
+  vagaSchema,
   VincularCompetenciaSchema,
 } from "../schemas/auth.schema.js";
 import { validate } from "../middlewares/validate.js";
@@ -108,6 +112,7 @@ routes.get(
   adminController.obterDetalhesUsuario,
 );
 
+// Deletar um admin
 routes.delete(
   "/admin/equipe/:id",
   authMiddleware(["ADM"]),
@@ -203,22 +208,92 @@ routes.post(
 routes.get(
   "/admin/equipe",
   authMiddleware(["ADM"]),
+  validate(FiltroUsuarioSchema, "query"),
   adminController.listarAdmins,
 );
 
+// Atualizar dados de um admin (incluindo status e senha)
 routes.put(
   "/admin/equipe/:id",
   authMiddleware(["ADM"]),
-  validate(IdParamSchema, "params"),      // Valida o :id na URL
-  validate(AtualizarAdminSchema, "body"), // Valida os campos de alteração
-  adminController.atualizarAdmin
+  validate(IdParamSchema, "params"),
+  validate(AtualizarAdminSchema, "body"),
+  adminController.atualizarAdmin,
 );
 
+// Excluir um admin (Soft Delete, na verdade só desativa)
 routes.delete(
   "/admin/equipe/:id",
   authMiddleware(["ADM"]),
+  validate(IdParamSchema, "params"),
   adminController.excluirAdmin,
 );
+
+// Resetar senha de um usuário
+routes.patch(
+  "/admin/usuarios/:id/reset-senha",
+  authMiddleware(["ADM"]),
+  validate(IdParamSchema, "params"),
+  validate(ResetSenhaSchema, "body"),
+  adminController.resetarSenhaUsuario,
+);
+
+// Gerenciar créditos da empresa
+routes.patch(
+  "/admin/empresas/:id_empresa/creditos",
+  authMiddleware(["ADM"]),
+  validate(IdParamSchema, "params"),
+  validate(CreditosSchema, "body"),
+  adminController.atualizarCreditos,
+);
+
+// VAGAS
+
+// Rota da Empresa (Cria como Rascunho ou Analise)
+routes.post(
+  "/vagas",
+  authMiddleware(["EMPRESA"]),
+  validate(vagaSchema),
+  vagaController.cadastrar,
+);
+
+// Rota do Admin (Cadastro Assistido/Balcão - Direto como ATIVA)
+routes.post(
+  "/admin/vagas/balcao",
+  authMiddleware(["ADM"]),
+  validate(vagaSchema),
+  adminVagaController.adminCadastrarVaga,
+);
+
+// A empresa só consegue atualizar se a vaga NÃO estiver "ATIVA" [Regra de Negócio]
+routes.put(
+  "/vagas/:id",
+  authMiddleware(["EMPRESA"]),
+  validate(IdParamSchema, "params"),
+  validate(vagaSchema, "body"),
+  vagaController.atualizar,
+);
+
+// O Admin tem poder de superusuário para editar qualquer vaga
+routes.put(
+  "/admin/vagas/:id",
+  authMiddleware(["ADM"]),
+  validate(IdParamSchema, "params"),
+  validate(vagaSchema, "body"),
+  adminVagaController.adminAtualizarVaga,
+);
+
+routes.get(
+  "/vagas/minhas-vagas",
+  authMiddleware(["EMPRESA"]),
+  validate(FiltroVagasEmpresaSchema, "query"),
+  vagaController.listarMinhasVagas,
+);
+
+
+
+
+
 
 routes.get(
   "/admin/vagas/pendentes",

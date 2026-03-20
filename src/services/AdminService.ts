@@ -749,19 +749,53 @@ export class AdminService {
   }
 
   // Listar apenas os administradores
-  async listarAdministradores() {
-    return await prisma.usuario.findMany({
-      where: { tipo_usuario: "ADM" },
-      select: {
-        id_usuario: true,
-        nome: true,
-        email: true,
-        status: true,
-        is_master: true,
-        ultimo_login: true,
+  async listarAdministradores(filtros: any) {
+    const { page = 1, limit = 10, search, status } = filtros;
+    const skip = (page - 1) * limit;
+
+    const onde: any = {
+      tipo_usuario: "ADM",
+      AND: [
+        status ? { status } : {},
+        search
+          ? {
+              OR: [
+                { nome: { contains: search, mode: "insensitive" } },
+                { email: { contains: search, mode: "insensitive" } },
+              ],
+            }
+          : {},
+      ],
+    };
+
+    const [total, admins] = await Promise.all([
+      prisma.usuario.count({ where: onde }),
+      prisma.usuario.findMany({
+        where: onde,
+        skip,
+        take: limit,
+        select: {
+          id_usuario: true,
+          nome: true,
+          email: true,
+          status: true,
+          is_master: true,
+          ultimo_login: true,
+          criado_em: true,
+        },
+        orderBy: { nome: "asc" },
+      }),
+    ]);
+
+    return {
+      meta: {
+        total,
+        page,
+        limit,
+        total_paginas: Math.ceil(total / limit),
       },
-      orderBy: { nome: "asc" },
-    });
+      data: admins,
+    };
   }
 
   async atualizarDadosAdmin(id_admin: number, dados: any, id_autor: number) {
@@ -809,20 +843,19 @@ export class AdminService {
         where: { id_usuario },
         data: {
           senha_hash,
-          exigir_troca_senha: true, // Força a troca no próximo login
+          exigir_troca_senha: true,
         },
       });
 
-      await tx.logAuditoria.create({
-        data: {
-          id_usuario: id_autor,
-          acao: "FORCAR_TROCA_SENHA",
-          entidade: "Usuario",
-          id_entidade: id_usuario,
-        },
-      });
+      await baseUser.registrarLog(
+        tx,
+        id_autor,
+        "FORCAR_TROCA_SENHA",
+        "Usuario",
+        id_usuario,
+      );
 
-      // TODO: EmailService.enviarSenhaTemporaria(usuario.email, novaSenhaPura);
+      // Opcional: Aqui dispararia o EmailService no futuro
       return usuario;
     });
   }
@@ -832,19 +865,17 @@ export class AdminService {
 
   async gerenciarCreditosEmpresa(
     id_empresa: number,
-    dados: {
-      creditos_vagas?: number;
-      creditos_curriculos?: number;
-      modo: "SOMAR" | "DEFINIR";
-    },
+    dados: any,
     id_autor: number,
   ) {
+    // 1. Busca inicial fora da transação para validar existência
     const empresa = await prisma.empresa.findUnique({ where: { id_empresa } });
     if (!empresa) throw new Error("Empresa não encontrada.");
 
     return await prisma.$transaction(async (tx) => {
       const novaData: any = {};
 
+      // Lógica de cálculo (Vagas)
       if (dados.creditos_vagas !== undefined) {
         novaData.creditos_vagas =
           dados.modo === "SOMAR"
@@ -852,6 +883,7 @@ export class AdminService {
             : dados.creditos_vagas;
       }
 
+      // Lógica de cálculo (Currículos)
       if (dados.creditos_curriculos !== undefined) {
         novaData.creditos_curriculos =
           dados.modo === "SOMAR"
@@ -864,25 +896,22 @@ export class AdminService {
         data: novaData,
       });
 
-      await tx.logAuditoria.create({
-        data: {
-          id_usuario: id_autor,
-          acao: "ATUALIZAR_CREDITOS_EMPRESA",
-          entidade: "Empresa",
-          id_entidade: id_empresa,
-          detalhes: {
-            antes: {
-              v: empresa.creditos_vagas,
-              c: empresa.creditos_curriculos,
-            },
-            depois: {
-              v: empresaAtualizada.creditos_vagas,
-              c: empresaAtualizada.creditos_curriculos,
-            },
-            modo: dados.modo,
+      // Auditoria rica em detalhes
+      await baseUser.registrarLog(
+        tx,
+        id_autor,
+        "ATUALIZAR_CREDITOS_EMPRESA",
+        "Empresa",
+        id_empresa,
+        {
+          antes: { v: empresa.creditos_vagas, c: empresa.creditos_curriculos },
+          depois: {
+            v: empresaAtualizada.creditos_vagas,
+            c: empresaAtualizada.creditos_curriculos,
           },
+          modo: dados.modo,
         },
-      });
+      );
 
       return empresaAtualizada;
     });

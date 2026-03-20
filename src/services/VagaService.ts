@@ -10,21 +10,20 @@ export class VagaService {
 
     if (!empresa) throw new Error("Empresa não encontrada.");
 
-    let statusFinal: StatusVaga = StatusVaga.RASCUNHO;
-    if (is_admin) statusFinal = StatusVaga.ATIVA;
-    else if (dados.enviar_para_aprovacao) statusFinal = StatusVaga.EM_ANALISE;
+    // Definição de Status conforme Escopo [cite: 19, 20]
+    let statusFinal: StatusVaga = "RASCUNHO";
+    if (is_admin)
+      statusFinal = "ATIVA"; // Cadastro via Balcão vai direto
+    else if (dados.enviar_para_aprovacao) statusFinal = "EM_ANALISE";
 
+    // Lógica de Créditos para Não-Associados [cite: 33, 35]
     const consomeCredito =
-      statusFinal === StatusVaga.EM_ANALISE ||
-      (is_admin && empresa.tipo_vinculo_aci === "NAO_ASSOCIADA");
-
-    if (
       !is_admin &&
       empresa.tipo_vinculo_aci === "NAO_ASSOCIADA" &&
-      consomeCredito
-    ) {
-      if (empresa.creditos_vagas <= 0)
-        throw new Error("Saldo de vagas insuficiente.");
+      statusFinal === "EM_ANALISE";
+
+    if (consomeCredito && empresa.creditos_vagas <= 0) {
+      throw new Error("Saldo de vagas insuficiente para publicação.");
     }
 
     return await prisma.$transaction(async (tx) => {
@@ -32,60 +31,35 @@ export class VagaService {
         data: {
           id_empresa,
           titulo: dados.titulo,
-          area_profissional: dados.area_professional,
+          descricao: dados.descricao,
+          requisitos_obrigatorios: dados.requisitos, // Alinhado ao schema
+          beneficios: dados.beneficios,
+          faixa_salarial_ate: dados.salario,
+          tipo_contrato: dados.tipo_contrato,
+          modelo_trabalho: dados.remoto ? "REMOTO" : "PRESENCIAL",
+          area_profissional: dados.area_atuacao,
           nivel_hierarquico: dados.nivel_hierarquico,
           cidade: dados.cidade,
           uf: dados.uf,
-          logradouro: dados.logradouro,
-          numero: dados.numero,
-          bairro: dados.bairro,
-          modelo_trabalho: dados.modelo_trabalho,
-          tipo_contrato: dados.tipo_contrato,
-          faixa_salarial_de: dados.salario_a_combinar
-            ? null
-            : dados.faixa_salarial_de,
-          faixa_salarial_ate: dados.salario_a_combinar
-            ? null
-            : dados.faixa_salarial_ate,
-          salario_a_combinar: dados.salario_a_combinar || false,
-          ocultar_salario: dados.ocultar_salario || false,
-          descricao: dados.descricao,
-          responsabilidades: dados.responsabilidades,
-          requisitos_obrigatorios: dados.requisitos_obrigatorios,
-          diferenciais: dados.diferenciais,
-          empresa_confidencial: dados.empresa_confidencial || false,
           status: statusFinal,
-          data_publicacao: statusFinal === StatusVaga.ATIVA ? new Date() : null,
+          data_publicacao: statusFinal === "ATIVA" ? new Date() : null,
         },
       });
 
-      if (dados.etapas && dados.etapas.length > 0) {
+      // Cadastro de Etapas do Kanban [cite: 21]
+      if (dados.etapas?.length > 0) {
         await tx.etapaProcesso.createMany({
-          data: dados.etapas.map((e: any) => ({
+          data: dados.etapas.map((e: any, index: number) => ({
             id_vaga: vaga.id_vaga,
             nome: e.nome,
-            ordem: e.ordem,
-            tipo: e.tipo,
-            requer_agendamento: e.requer_agendamento || false,
+            ordem: e.ordem || index,
+            tipo: e.tipo || "INTERMEDIARIA",
           })),
         });
       }
 
-      if (dados.perguntas && dados.perguntas.length > 0) {
-        await tx.vagaPerguntaEliminatoria.createMany({
-          data: dados.perguntas.map((p: any) => ({
-            id_vaga: vaga.id_vaga,
-            id_pergunta: p.id_pergunta,
-            resposta_esperada: p.resposta_esperada,
-          })),
-        });
-      }
-
-      if (
-        !is_admin &&
-        empresa.tipo_vinculo_aci === "NAO_ASSOCIADA" &&
-        statusFinal === StatusVaga.EM_ANALISE
-      ) {
+      // Débito de crédito após sucesso na criação [cite: 38]
+      if (consomeCredito) {
         await tx.empresa.update({
           where: { id_empresa },
           data: { creditos_vagas: { decrement: 1 } },
@@ -98,125 +72,128 @@ export class VagaService {
 
   async atualizarVaga(
     id_vaga: number,
-    id_empresa: number,
+    id_empresa_solicitante: number | null,
     dados: any,
-    is_admin: boolean = false,
+    is_admin: boolean,
+    id_autor: number,
   ) {
-    // 1. Verificar se a vaga existe e pertence à empresa
-    const vagaExistente = await prisma.vaga.findFirst({
-      where: { id_vaga, id_empresa },
-      include: { etapas: true, perguntas_eliminatorias: true },
+    // 1. Busca a vaga atual para verificar permissões
+    const vagaAtual = await prisma.vaga.findUnique({
+      where: { id_vaga },
+      include: { empresa: { select: { tipo_vinculo_aci: true } } },
     });
 
-    if (!vagaExistente) {
-      throw new Error(
-        "Vaga não encontrada ou você não tem permissão para editá-la.",
-      );
-    }
+    if (!vagaAtual) throw new Error("Vaga não encontrada.");
 
-    // 2. Trava de segurança: Se a vaga já estiver ATIVA, evitar mudar dados críticos
-    // ou decidir se ela deve voltar para análise após edição.
-    const enviandoParaAnalise =
-      !is_admin &&
-      dados.enviar_para_aprovacao &&
-      vagaExistente.status === "RASCUNHO";
+    // 2. Trava de Segurança: Empresa não pode editar vaga de outra ou vaga já ATIVA
+    if (!is_admin) {
+      if (vagaAtual.id_empresa !== id_empresa_solicitante) {
+        throw new Error("Você não tem permissão para editar esta vaga.");
+      }
 
-    // 3. Lógica de Crédito na Edição
-    if (enviandoParaAnalise) {
-      const empresa = await prisma.empresa.findUnique({
-        where: { id_empresa },
-        select: { tipo_vinculo_aci: true, creditos_vagas: true },
-      });
-
-      if (
-        empresa?.tipo_vinculo_aci === "NAO_ASSOCIADA" &&
-        empresa.creditos_vagas <= 0
-      ) {
+      // Conforme sua proposta: Se já estiver publicada/aceita, empresa não mexe
+      if (vagaAtual.status === "ATIVA") {
         throw new Error(
-          "Saldo de vagas insuficiente para publicar este rascunho.",
+          "Vagas já publicadas não podem ser editadas pela empresa. Contate o suporte da ACI.",
         );
       }
     }
 
+    // 3. Definição do novo status
+    let novoStatus = vagaAtual.status;
+    if (!is_admin && dados.enviar_para_aprovacao) {
+      novoStatus = "EM_ANALISE";
+    }
+
     return await prisma.$transaction(async (tx) => {
-      // 4. Atualizar dados básicos da Vaga
-      const vagaAtualizada = await tx.vaga.update({
+      const vaga = await tx.vaga.update({
         where: { id_vaga },
         data: {
           titulo: dados.titulo,
-          area_profissional: dados.area_professional,
+          descricao: dados.descricao,
+          requisitos_obrigatorios: dados.requisitos,
+          beneficios: dados.beneficios,
+          faixa_salarial_ate: dados.salario,
+          tipo_contrato: dados.tipo_contrato,
+          area_profissional: dados.area_atuacao,
           nivel_hierarquico: dados.nivel_hierarquico,
           cidade: dados.cidade,
           uf: dados.uf,
-          logradouro: dados.logradouro,
-          numero: dados.numero,
-          bairro: dados.bairro,
-          modelo_trabalho: dados.modelo_trabalho,
-          tipo_contrato: dados.tipo_contrato,
-          descricao: dados.descricao,
-          responsabilidades: dados.responsabilidades,
-          requisitos_obrigatorios: dados.requisitos_obrigatorios,
-          diferenciais: dados.diferenciais,
-          salario_a_combinar: dados.salario_a_combinar,
-          faixa_salarial_de: dados.salario_a_combinar
-            ? null
-            : dados.faixa_salarial_de,
-          faixa_salarial_ate: dados.salario_a_combinar
-            ? null
-            : dados.faixa_salarial_ate,
-          ocultar_salario: dados.ocultar_salario,
-          empresa_confidencial: dados.empresa_confidencial,
-          // Se enviou para aprovação agora, muda o status
-          status: enviandoParaAnalise ? "EM_ANALISE" : vagaExistente.status,
+          status: novoStatus,
         },
       });
 
-      // 5. Atualizar Etapas (Lógica simples: deleta as antigas e cria as novas)
+      // Se houver novas etapas, limpamos e recriamos (Sync)
       if (dados.etapas) {
         await tx.etapaProcesso.deleteMany({ where: { id_vaga } });
         await tx.etapaProcesso.createMany({
-          data: dados.etapas.map((e: any) => ({
+          data: dados.etapas.map((e: any, index: number) => ({
             id_vaga,
             nome: e.nome,
-            ordem: e.ordem,
+            ordem: e.ordem ?? index,
             tipo: e.tipo,
-            requer_agendamento: e.requer_agendamento || false,
           })),
         });
       }
 
-      // 6. Atualizar Perguntas Eliminatórias
-      if (dados.perguntas) {
-        await tx.vagaPerguntaEliminatoria.deleteMany({ where: { id_vaga } });
-        await tx.vagaPerguntaEliminatoria.createMany({
-          data: dados.perguntas.map((p: any) => ({
-            id_vaga,
-            id_pergunta: p.id_pergunta,
-            resposta_esperada: p.resposta_esperada,
-          })),
-        });
-      }
+      // Log de Auditoria (Escopo: Histórico de ações críticas [cite: 58])
+      await tx.logAuditoria.create({
+        data: {
+          id_usuario: id_autor,
+          acao: is_admin ? "ADM_EDITAR_VAGA" : "EMPRESA_EDITAR_VAGA",
+          entidade: "Vaga",
+          id_entidade: id_vaga,
+          detalhes: { campos: Object.keys(dados) },
+        },
+      });
 
-      // 7. Consumir crédito se estiver saindo de Rascunho para Análise agora
-      if (enviandoParaAnalise) {
-        await tx.empresa.update({
-          where: { id_empresa },
-          data: { creditos_vagas: { decrement: 1 } },
-        });
-      }
-
-      return vagaAtualizada;
+      return vaga;
     });
   }
 
-  async listarVagasPorEmpresa(id_empresa: number) {
-    return await prisma.vaga.findMany({
-      where: { id_empresa },
-      include: {
-        _count: { select: { candidaturas: true } },
+  async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
+    const { page, limit, search, status } = filtros;
+    const skip = (page - 1) * limit;
+
+    const onde: any = {
+      id_empresa, // Trava de segurança obrigatória
+      AND: [
+        status ? { status } : {},
+        search
+          ? {
+              OR: [
+                { titulo: { contains: search, mode: "insensitive" } },
+                {
+                  area_profissional: { contains: search, mode: "insensitive" },
+                },
+              ],
+            }
+          : {},
+      ],
+    };
+
+    const [total, vagas] = await Promise.all([
+      prisma.vaga.count({ where: onde }),
+      prisma.vaga.findMany({
+        where: onde,
+        skip,
+        take: limit,
+        include: {
+          _count: { select: { candidaturas: true } },
+        },
+        orderBy: { data_publicacao : "desc" },
+      }),
+    ]);
+
+    return {
+      meta: {
+        total,
+        page,
+        limit,
+        total_paginas: Math.ceil(total / limit),
       },
-      orderBy: { id_vaga: "desc" },
-    });
+      data: vagas,
+    };
   }
 
   async listarVagasPendentes() {

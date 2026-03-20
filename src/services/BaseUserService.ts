@@ -2,7 +2,7 @@ import { prisma } from "../config/prisma.js";
 import argon2 from "argon2";
 
 export class BaseUserService {
-  // Método privado para padronizar logs de auditoria em todo o sistema
+  // Centralizamos o log para reuso em todos os services
   async registrarLog(
     tx: any,
     id_autor: number,
@@ -22,28 +22,26 @@ export class BaseUserService {
     });
   }
 
-  // Atualização genérica de qualquer tipo de usuário
-  async atualizarDadosBasicos(
-    id_usuario: number,
-    dados: any,
-    id_autor: number,
-  ) {
-    return await prisma.$transaction(async (tx) => {
-      const dataUpdate: any = {
-        nome: dados.nome,
-        email: dados.email,
-        status: dados.status,
-      };
+  // Função única de atualização para a tabela 'Usuario'
+  async atualizarUsuario(id_usuario: number, dados: any, id_autor: number) {
+    const usuarioExistente = await prisma.usuario.findUnique({
+      where: { id_usuario },
+    });
 
+    if (!usuarioExistente) throw new Error("Usuário não encontrado.");
+
+    return await prisma.$transaction(async (tx) => {
+      const dataUpdate: any = {};
+
+      if (dados.nome) dataUpdate.nome = dados.nome;
+      if (dados.email) dataUpdate.email = dados.email;
+      if (dados.status) dataUpdate.status = dados.status;
+
+      // Se houver senha, faz o hash e exige troca
       if (dados.senha) {
         dataUpdate.senha_hash = await argon2.hash(dados.senha);
         dataUpdate.exigir_troca_senha = true;
       }
-
-      // Limpa campos undefined para o Prisma
-      Object.keys(dataUpdate).forEach(
-        (key) => dataUpdate[key] === undefined && delete dataUpdate[key],
-      );
 
       const usuario = await tx.usuario.update({
         where: { id_usuario },
@@ -56,24 +54,27 @@ export class BaseUserService {
         "ATUALIZAR_USUARIO_BASE",
         "Usuario",
         id_usuario,
-        {
-          campos: Object.keys(dataUpdate),
-        },
+        { campos_alterados: Object.keys(dataUpdate) },
       );
 
       return usuario;
     });
   }
 
+  // Função genérica de status que atende Candidatos, Empresas e Admins
   async alterarStatus(
     id_usuario: number,
-    novoStatus: "ATIVO" | "BLOQUEADO" | "INATIVO",
+    novoStatus: "ATIVO" | "BLOQUEADO" | "INATIVO" | "PENDENTE",
     id_autor: number,
   ) {
     return await prisma.$transaction(async (tx) => {
       const usuario = await tx.usuario.update({
         where: { id_usuario },
-        data: { status: novoStatus },
+        data: {
+          status: novoStatus,
+          // Se for bloqueado, podemos marcar a data de exclusão lógica
+          ...(novoStatus === "BLOQUEADO" && { data_exclusao: new Date() }),
+        },
       });
 
       await this.registrarLog(
@@ -88,42 +89,7 @@ export class BaseUserService {
     });
   }
 
-  async atualizarUsuario(id_usuario: number, dados: any, id_autor: number) {
-    const usuarioExistente = await prisma.usuario.findUnique({
-      where: { id_usuario },
-    });
-    if (!usuarioExistente) throw new Error("Usuário não encontrado.");
-
-    return await prisma.$transaction(async (tx) => {
-      const dataUpdate: any = {};
-
-      if (dados.nome) dataUpdate.nome = dados.nome;
-      if (dados.email) dataUpdate.email = dados.email;
-      if (dados.senha) {
-        dataUpdate.senha_hash = await argon2.hash(dados.senha);
-        dataUpdate.exigir_troca_senha = true;
-      }
-
-      const usuario = await tx.usuario.update({
-        where: { id_usuario },
-        data: dataUpdate,
-      });
-
-      await this.registrarLog(
-        tx,
-        id_autor,
-        "ATUALIZAR_USUARIO",
-        "Usuario",
-        id_usuario,
-        {
-          campos_alterados: Object.keys(dataUpdate),
-        },
-      );
-
-      return usuario;
-    });
-  }
-
+  // Busca completa com relacionamentos (Candidato/Empresa)
   async buscarPorId(id_usuario: number) {
     const usuario = await prisma.usuario.findUnique({
       where: { id_usuario },
@@ -131,12 +97,13 @@ export class BaseUserService {
         empresa: {
           select: { id_empresa: true, nome_fantasia: true, cnpj: true },
         },
-        // Aqui entra a mágica: Traz o perfil do candidato se existir
         candidato: {
           include: {
-            experiencias: true, // Já traz o currículo junto
+            experiencias: { orderBy: { data_inicio: "desc" } },
             formacoes: true,
-            competencias: true,
+            competencias: {
+              include: { competencia: { select: { nome: true } } },
+            },
           },
         },
         logs_admin: {
@@ -148,6 +115,7 @@ export class BaseUserService {
 
     if (!usuario) throw new Error("Usuário não encontrado.");
 
+    // Higienização de dados sensíveis
     const { senha_hash, ...dadosSeguros } = usuario;
     return dadosSeguros;
   }
