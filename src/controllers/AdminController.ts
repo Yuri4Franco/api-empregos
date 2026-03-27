@@ -271,12 +271,10 @@ export class AdminController {
 
       // 2. Trava de segurança: Apenas Master reseta senha de outros Admins
       if (usuarioAlvo.tipo_usuario === "ADM" && !req.user.is_master) {
-        return res
-          .status(403)
-          .json({
-            error:
-              "Apenas um Administrador Master pode resetar senhas da equipe.",
-          });
+        return res.status(403).json({
+          error:
+            "Apenas um Administrador Master pode resetar senhas da equipe.",
+        });
       }
 
       // 3. Executa o reset
@@ -431,17 +429,18 @@ export class AdminController {
   // Endpoint para o Admin adicionar créditos a uma empresa
   async atualizarCreditos(req: Request, res: Response) {
     try {
-      const { id_empresa } = req.params as any; // Validado pelo IdParamSchema
-      const idAutor = req.user.id;
+      const { id_empresa } = req.params; // ID da empresa vindo da URL
+      const idAutor = (req.user as any).id;
 
       const empresa = await adminService.gerenciarCreditosEmpresa(
-        id_empresa,
-        req.body, // Já validado pelo CreditosSchema
+        Number(id_empresa),
+        req.body, // Validado pelo CreditosSchema no router
         idAutor,
       );
 
       return res.status(200).json({
-        message: "Créditos atualizados com sucesso.",
+        success: true,
+        message: "Créditos/Recursos atualizados com sucesso.",
         data: {
           id_empresa: empresa.id_empresa,
           nome_fantasia: empresa.nome_fantasia,
@@ -450,7 +449,93 @@ export class AdminController {
         },
       });
     } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  // Ouvidoria
+  async listarOuvidoria(req: Request, res: Response) {
+    try {
+      const resultado = await adminService.listarRelatosOuvidoria(req.query);
+      return res.status(200).json(resultado);
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  // Suporte
+  async listarTickets(req: Request, res: Response) {
+    try {
+      const resultado = await adminService.listarTicketsSuporte(req.query);
+      return res.status(200).json(resultado);
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  async responderTicket(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { status } = req.body; // Aberto, Em Andamento, Resolvido
+
+      const ticket = await adminService.atualizarStatusTicket(
+        Number(id),
+        status,
+        req.user.id,
+      );
+      return res
+        .status(200)
+        .json({ message: "Status do ticket atualizado.", data: ticket });
+    } catch (error: any) {
       return res.status(400).json({ error: error.message });
     }
   }
+
+  async liberarRecursos(req: Request, res: Response) {
+    try {
+      const { id } = req.params; // ID da Empresa vindo da URL
+      const { tipo, quantidade } = req.body; // 'VAGA' ou 'CURRICULO' e a quantia
+      const id_autor = (req.user as any).id; // ID do Admin logado para o Log de Auditoria
+
+      // Chamada para o Service que criamos anteriormente
+      const resultado = await adminService.liberarRecursosPagos(
+        Number(id),
+        { tipo, quantidade: Number(quantidade) },
+        id_autor,
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: `Recursos liberados com sucesso para a empresa.`,
+        data: resultado,
+      });
+    } catch (error: any) {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async listarParaAdmin(req: Request, res: Response) {
+    try {
+      const { status } = req.query;
+      const resultado = await adminService.listarPedidosAdmin(status);
+      return res.status(200).json({ success: true, data: resultado });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  async gerenciarPedido(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const id_autor = (req.user as any).id;
+      const resultado = await adminService.atualizarStatusPedido(Number(id), req.body, id_autor);
+      return res.status(200).json({ success: true, data: resultado });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
 }

@@ -31,4 +31,14 @@ export class EmpresaController {
       });
     }
   }
+
+  async criarSolicitacao(req: Request, res: Response) {
+    try {
+      const id_empresa = (req.user as any).id_empresa;
+      const resultado = await empresaService.solicitarDivulgacao(id_empresa, req.body);
+      return res.status(201).json({ success: true, data: resultado });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
 }

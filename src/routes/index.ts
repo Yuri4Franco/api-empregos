@@ -1,9 +1,11 @@
+import { env } from "prisma/config";
 import { Router } from "express";
 import { AdminController } from "../controllers/AdminController.js";
 import { AuthController } from "../controllers/AuthController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { VagaController } from "../controllers/VagaController.js";
 import { AdminVagaController } from "../controllers/AdminVagaController.js";
+import { EmpresaController } from "../controllers/EmpresaController.js";
 import {
   AtualizarAdminSchema,
   AtualizarPerfilCompletoSchema,
@@ -17,21 +19,28 @@ import {
   FiltroUsuarioSchema,
   FiltroVagasEmpresaSchema,
   FormacaoSchema,
+  GerenciarMidiaSchema,
   IdParamSchema,
+  ModeracaoVagaSchema,
   QueryListagemSchema,
   ResetSenhaSchema,
+  SolicitacaoMidiaSchema,
   StatusEmpresaSchema,
   StatusUsuarioSchema,
+  TaxonomiaSchema,
   vagaSchema,
   VincularCompetenciaSchema,
 } from "../schemas/auth.schema.js";
 import { validate } from "../middlewares/validate.js";
+import { TaxonomiaController } from "../controllers/TaxonomiaController.js";
 
 const routes = Router();
 const vagaController = new VagaController();
 const adminController = new AdminController();
 const authController = new AuthController();
 const adminVagaController = new AdminVagaController();
+const empresaController = new EmpresaController();
+const taxonomiaController = new TaxonomiaController();
 
 routes.post("/auth/login", authController.login);
 
@@ -283,6 +292,7 @@ routes.put(
   adminVagaController.adminAtualizarVaga,
 );
 
+// Listar vagas da empresa logada com filtros
 routes.get(
   "/vagas/minhas-vagas",
   authMiddleware(["EMPRESA"]),
@@ -290,21 +300,112 @@ routes.get(
   vagaController.listarMinhasVagas,
 );
 
-
-
-
-
-
+// Listar vagas pendentes para moderação (Apenas ADM)
 routes.get(
   "/admin/vagas/pendentes",
   authMiddleware(["ADM"]),
+  validate(QueryListagemSchema, "query"),
   adminVagaController.listarPendentes,
 );
 
 routes.patch(
   "/admin/vagas/:id/moderacao",
   authMiddleware(["ADM"]),
+  validate(IdParamSchema, "params"),
+  validate(ModeracaoVagaSchema, "body"),
   adminVagaController.moderar,
+);
+
+// --- OUVIDORIA (Relatos de Candidatos) ---
+routes.get(
+  "/admin/ouvidoria",
+  authMiddleware(["ADM"]),
+  adminController.listarOuvidoria,
+);
+
+// --- SUPORTE (Tickets Fale Conosco) ---
+routes.get(
+  "/admin/tickets",
+  authMiddleware(["ADM"]),
+  validate(QueryListagemSchema, "query"),
+  adminController.listarTickets,
+);
+
+// Ticket response
+routes.patch(
+  "/admin/tickets/:id",
+  authMiddleware(["ADM"]),
+  validate(IdParamSchema, "params"),
+  adminController.responderTicket,
+);
+
+// Rotas de Empresa
+routes.post(
+  "/vagas/solicitar-midia",
+  authMiddleware(["EMPRESA"]),
+  validate(SolicitacaoMidiaSchema),
+  empresaController.criarSolicitacao,
+);
+
+// Rotas de Admin [cite: 41, 44]
+routes.get(
+  "/admin/midia/pedidos",
+  authMiddleware(["ADM"]),
+  adminController.listarParaAdmin,
+);
+
+//
+routes.patch(
+  "/admin/midia/pedidos/:id",
+  authMiddleware(["ADM"]),
+  validate(IdParamSchema, "params"),
+  validate(GerenciarMidiaSchema),
+  adminController.gerenciarPedido,
+);
+
+// Bairros
+routes.get("/taxonomia/bairros", taxonomiaController.listarBairros);
+routes.post(
+  "/admin/taxonomia/bairros",
+  authMiddleware(["ADM"]),
+  validate(TaxonomiaSchema),
+  taxonomiaController.criarBairro,
+);
+routes.delete(
+  "/admin/taxonomia/bairros/:id",
+  authMiddleware(["ADM"]),
+  validate(IdParamSchema, "params"),
+  taxonomiaController.excluirBairro,
+);
+
+// Áreas
+routes.get("/taxonomia/areas", taxonomiaController.listarAreas);
+routes.post(
+  "/admin/taxonomia/areas",
+  authMiddleware(["ADM"]),
+  validate(TaxonomiaSchema),
+  taxonomiaController.criarArea,
+);
+routes.delete(
+  "/admin/taxonomia/areas/:id",
+  authMiddleware(["ADM"]),
+  validate(IdParamSchema, "params"),
+  taxonomiaController.excluirArea,
+);
+
+// Benefícios
+routes.get("/taxonomia/beneficios", taxonomiaController.listarBeneficios);
+routes.post(
+  "/admin/taxonomia/beneficios",
+  authMiddleware(["ADM"]),
+  validate(TaxonomiaSchema),
+  taxonomiaController.criarBeneficio,
+);
+routes.delete(
+  "/admin/taxonomia/beneficios/:id",
+  authMiddleware(["ADM"]),
+  validate(IdParamSchema, "params"),
+  taxonomiaController.excluirBeneficio,
 );
 
 routes.get("/vagas/:id", vagaController.buscarDetalhes);

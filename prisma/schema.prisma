@@ -94,6 +94,42 @@ model Usuario {
   @@map("usuarios")
 }
 
+model Endereco {
+  id_endereco   Int      @id @default(autoincrement())
+  logradouro    String?
+  numero        String?
+  complemento   String?
+  cep           String?
+  cidade        String   @default("Panambi")
+  uf            String   @default("RS")
+  
+  id_bairro     Int?
+  bairro        Bairro?  @relation(fields: [id_bairro], references: [id_bairro])
+
+  candidato     Candidato?
+  empresa       Empresa?
+  vaga          Vaga?
+
+  @@map("enderecos")
+}
+
+model Bairro {
+  id_bairro Int         @id @default(autoincrement())
+  nome      String      @unique
+  enderecos Endereco[]
+
+  @@map("taxonomia_bairros")
+}
+
+model AreaAtuacao {
+  id_area   Int      @id @default(autoincrement())
+  nome      String   @unique
+  candidatos  Candidato[]
+  vagas     Vaga[]
+
+  @@map("taxonomia_areas")
+}
+
 model Candidato {
   id_usuario              Int       @id
   usuario                 Usuario   @relation(fields: [id_usuario], references: [id_usuario])
@@ -101,11 +137,8 @@ model Candidato {
   cpf                     String    @unique
   telefone                String?
   whatsapp                String?
-  cidade                  String?
-  uf                      String?
-  logradouro              String?
-  numero                  String?
-  bairro                  String?
+  id_endereco             Int?      @unique // Note o @unique para 1-para-1
+  endereco                Endereco? @relation(fields: [id_endereco], references: [id_endereco])
   data_nascimento         DateTime?
   genero                  String?
   link_linkedin           String?
@@ -119,6 +152,8 @@ model Candidato {
   disponibilidade_viagem  Boolean   @default(false)
   disponibilidade_mudanca Boolean   @default(false)
   turno_preferido         String?
+  id_area_atuacao         Int?
+  area_atuacao            AreaAtuacao? @relation(fields: [id_area_atuacao], references: [id_area])
 
   experiencias            ExperienciaProfissional[]
   formacoes               FormacaoAcademica[]
@@ -144,11 +179,8 @@ model Empresa {
   instagram           String?
   linkedin            String?
   facebook            String?
-  cidade              String?
-  uf                  String?
-  logradouro          String?
-  numero              String?
-  bairro              String?
+  id_endereco         Int?      @unique
+  endereco            Endereco? @relation(fields: [id_endereco], references: [id_endereco])
   creditos_vagas      Int            @default(0)
   creditos_curriculos Int            @default(0)
 
@@ -156,23 +188,21 @@ model Empresa {
   vagas                Vaga[]
   beneficios_padrao    EmpresaBeneficioPadrao[]
   avaliacoes_recebidas AvaliacaoEmpresa[]
+  solicitacoes_midia SolicitacaoMidia[]
+  
 
   @@map("empresas")
 }
 
 model Vaga {
- id_vaga           Int             @id @default(autoincrement())
+  id_vaga           Int             @id @default(autoincrement())
   id_empresa        Int
   empresa           Empresa         @relation(fields: [id_empresa], references: [id_empresa])
   
   titulo                  String
-  area_profissional       String
   nivel_hierarquico       String
-  cidade                  String
-  uf                      String
-  logradouro              String?
-  numero                  String?
-  bairro                  String?
+  id_endereco             Int?      @unique
+  endereco                Endereco? @relation(fields: [id_endereco], references: [id_endereco])
   modelo_trabalho         ModeloTrabalho
   tipo_contrato           TipoContrato
   faixa_salarial_de       Decimal?        @db.Decimal(10, 2)
@@ -187,12 +217,17 @@ model Vaga {
   status                  StatusVaga      @default(RASCUNHO)
   data_publicacao         DateTime?
   data_encerramento       DateTime?
+  observacoes_admin       String?          @db.Text
+
+  id_area_atuacao         Int
+  area_atuacao            AreaAtuacao     @relation(fields: [id_area_atuacao], references: [id_area])
   
   beneficios              VagaBeneficio[]
   etapas                  EtapaProcesso[]
   candidaturas            Candidatura[]
   perguntas_eliminatorias VagaPerguntaEliminatoria[]
   competencias VagaCompetencia[]
+  solicitacoes_midia SolicitacaoMidia[]
 
   @@map("vagas")
 }
@@ -419,4 +454,30 @@ model OuvidoriaRelato {
   texto        String    @db.Text
   criado_em    DateTime  @default(now())
   @@map("ouvidoria_relatos")
+}
+
+
+enum StatusMidia {
+  PENDENTE
+  AGENDADO
+  POSTADO
+  RECUSADO
+}
+
+model SolicitacaoMidia {
+  id_solicitacao Int          @id @default(autoincrement())
+  id_vaga        Int
+  vaga           Vaga         @relation(fields: [id_vaga], references: [id_vaga])
+  id_empresa     Int
+  empresa        Empresa      @relation(fields: [id_empresa], references: [id_empresa])
+  
+  plataforma     String  
+  descricao      String?      @db.Text
+  status         StatusMidia  @default(PENDENTE)
+  justificativa  String?      @db.Text
+  
+  criado_em      DateTime     @default(now())
+  atualizado_em  DateTime     @updatedAt
+
+  @@map("solicitacoes_midia")
 }

@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { VagaService } from "../services/VagaService.js";
 import { vagaSchema } from "../schemas/auth.schema.js"; // Importando o Zod que corrigimos
+import type { ModeloTrabalho } from "@prisma/client";
 
 const vagaService = new VagaService();
 
@@ -80,31 +81,42 @@ export class VagaController {
    */
   async listarMinhasVagas(req: Request, res: Response) {
     try {
-      const user = req.user as any;
-      const idEmpresa = user.id_empresa;
+      const idEmpresa = (req.user as any).id_empresa;
 
-      const vagas = await vagaService.listarVagasPorEmpresa(idEmpresa);
+      if (!idEmpresa) {
+        return res
+          .status(403)
+          .json({ error: "Usuário não vinculado a uma empresa." });
+      }
 
-      return res.status(200).json({
-        success: true,
-        data: vagas,
-      });
+      // req.query já validado pelo FiltroVagasEmpresaSchema
+      const resultado = await vagaService.listarVagasPorEmpresa(
+        idEmpresa,
+        req.query,
+      );
+
+      return res.status(200).json(resultado);
     } catch (error: any) {
-      return res.status(500).json({ success: false, error: error.message });
+      return res.status(500).json({ error: error.message });
     }
   }
 
   async listarPublicas(req: Request, res: Response) {
     try {
-      const { cidade, uf, area, modelo, pagina } = req.query;
+      const { cidade, uf, area, modelo, pagina, bairro } = req.query;
 
-      const resultado = await vagaService.listarVagasPublicas({
-        cidade: cidade as string,
-        uf: uf as string,
-        area: area as string,
-        modelo: modelo as string,
-        pagina: pagina ? Number(pagina) : 1,
-      });
+      // 2. Construção dinâmica do objeto para evitar 'undefined' e erros de tipagem
+      const filtros: any = {};
+
+      if (cidade) filtros.cidade = cidade as string;
+      if (uf) filtros.uf = uf as string;
+      if (area) filtros.id_area_atuacao = Number(area);
+      if (bairro) filtros.id_bairro = Number(bairro);
+      if (modelo) filtros.modelo = modelo as ModeloTrabalho;
+
+      filtros.pagina = pagina ? Number(pagina) : 1;
+
+      const resultado = await vagaService.listarVagasPublicas(filtros);
 
       return res.status(200).json({
         success: true,

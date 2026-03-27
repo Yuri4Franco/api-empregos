@@ -9,19 +9,20 @@ export class CandidatoController {
     try {
       const user = req.user as any;
 
-      // No seu middleware, o 'sub' ou 'id' é o id_usuario
       const candidaturas = await candidatoService.listarMinhasCandidaturas(
         user.id,
       );
 
-      // Tratamento para vagas confidenciais
-      const candidaturasTratadas = candidaturas.map((c) => ({
+      const candidaturasTratadas = candidaturas.map((c: any) => ({
         id_candidatura: c.id_candidatura,
         data_inscricao: c.data_candidatura,
         status_processo: c.status_atual,
         vaga: {
           titulo: c.vaga.titulo,
-          local: `${c.vaga.cidade}/${c.vaga.uf}`,
+          // ACESSO CORRIGIDO: Agora pegamos do objeto endereco
+          local: c.vaga.endereco
+            ? `${c.vaga.endereco.cidade}/${c.vaga.endereco.uf}`
+            : "Remoto/Não informado",
           empresa: c.vaga.empresa_confidencial
             ? "Empresa Confidencial"
             : c.vaga.empresa.nome_fantasia,

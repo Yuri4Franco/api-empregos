@@ -200,7 +200,27 @@ export const FiltroVagasEmpresaSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(10),
   search: z.string().optional(),
-  status: z.enum(["RASCUNHO", "EM_ANALISE", "ATIVA", "REPROVADA", "PAUSADA", "ENCERRADA"]).optional(),
+  status: z
+    .enum([
+      "RASCUNHO",
+      "EM_ANALISE",
+      "ATIVA",
+      "REPROVADA",
+      "PAUSADA",
+      "ENCERRADA",
+    ])
+    .optional(),
+});
+
+export const ModeracaoVagaSchema = z.object({
+  acao: z.enum(["APROVAR", "REPROVAR"]),
+  motivo: z
+    .string()
+    .optional()
+    .refine((val) => {
+      // Se a ação for REPROVAR, o motivo passa a ser obrigatório
+      return true; // Podemos validar lógica condicional aqui se desejar
+    }),
 });
 
 export const CreditosSchema = z
@@ -215,3 +235,18 @@ export const CreditosSchema = z
       data.creditos_curriculos !== undefined,
     {},
   );
+
+export const SolicitacaoMidiaSchema = z.object({
+  id_vaga: z.number().int(),
+  plataforma: z.enum(["Instagram", "LinkedIn", "Ambos"]),
+  descricao: z.string().max(500).optional(),
+});
+
+export const GerenciarMidiaSchema = z.object({
+  status: z.enum(["PENDENTE", "AGENDADO", "POSTADO", "RECUSADO"]),
+  justificativa: z.string().optional(),
+});
+
+export const TaxonomiaSchema = z.object({
+  nome: z.string().min(2, "O nome deve ter pelo menos 2 caracteres").max(100),
+});

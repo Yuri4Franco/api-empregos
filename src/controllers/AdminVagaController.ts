@@ -43,10 +43,35 @@ export class AdminVagaController {
     }
   }
 
+  async adminAtualizarVaga(req: Request, res: Response) {
+    try {
+      const { id } = req.params as any;
+      const dadosValidados = vagaSchema.parse(req.body);
+
+      const vaga = await vagaService.atualizarVaga(
+        Number(id),
+        null, // Admin ignora trava de dono da empresa
+        dadosValidados,
+        true, // is_admin = true
+        req.user.id,
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Vaga editada pelo administrador com sucesso.",
+        data: vaga,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
   async listarPendentes(req: Request, res: Response) {
     try {
-      const vagas = await vagaService.listarVagasPendentes();
-      return res.status(200).json({ success: true, data: vagas });
+      // Apenas ADM acessa a fila de moderação
+      const resultado = await vagaService.listarVagasPendentes(req.query);
+
+      return res.status(200).json(resultado);
     } catch (error: any) {
       return res.status(500).json({ success: false, error: error.message });
     }

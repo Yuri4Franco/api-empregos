@@ -62,4 +62,24 @@ export class EmpresaService {
       },
     });
   }
+
+  async solicitarDivulgacao(id_empresa: number, dados: any) {
+    // Verifica se a vaga pertence à empresa
+    const vaga = await prisma.vaga.findFirst({
+      where: { id_vaga: dados.id_vaga, id_empresa },
+    });
+
+    if (!vaga)
+      throw new Error("Vaga não encontrada ou não pertence a esta empresa.");
+
+    return await prisma.solicitacaoMidia.create({
+      data: {
+        id_vaga: dados.id_vaga,
+        id_empresa: id_empresa,
+        plataforma: dados.plataforma,
+        descricao: dados.descricao,
+        status: "PENDENTE",
+      },
+    });
+  }
 }
