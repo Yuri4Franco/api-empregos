@@ -80,23 +80,31 @@ export class AdminVagaController {
   // PATCH /admin/vagas/:id/moderacao
   async moderar(req: Request, res: Response) {
     try {
-      const { id } = req.params;
-      const { acao } = req.body; // "APROVAR" ou "REPROVAR"
+      const { id } = req.params as any; // Validado pelo IdParamSchema
+      const { acao, motivo } = req.body; // Validado pelo ModeracaoVagaSchema
+      const idAutor = req.user.id;
 
-      if (!["APROVAR", "REPROVAR"].includes(acao)) {
-        throw new Error("Ação inválida. Use APROVAR ou REPROVAR.");
+      if (acao === "REPROVAR" && !motivo) {
+        throw new Error(
+          "Ao reprovar uma vaga, você deve informar o motivo para a empresa. ",
+        );
       }
 
       const novoStatus = acao === "APROVAR" ? "ATIVA" : "REPROVADA";
-      const vaga = await vagaService.moderarVaga(Number(id), novoStatus);
+
+      const vaga = await vagaService.moderarVaga(
+        id,
+        novoStatus,
+        motivo || null,
+        idAutor,
+      );
 
       return res.status(200).json({
-        success: true,
         message: `Vaga ${acao === "APROVAR" ? "aprovada e publicada" : "reprovada"} com sucesso.`,
         data: vaga,
       });
     } catch (error: any) {
-      return res.status(400).json({ success: false, error: error.message });
+      return res.status(400).json({ error: error.message });
     }
   }
 }

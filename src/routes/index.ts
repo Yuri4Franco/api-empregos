@@ -9,6 +9,7 @@ import { EmpresaController } from "../controllers/EmpresaController.js";
 import {
   AtualizarAdminSchema,
   AtualizarPerfilCompletoSchema,
+  AtualizarPerfilEmpresaSchema,
   AtualizarUsuarioSchema,
   CadastroAdminSchema,
   cadastroCandidatoManualSchema,
@@ -406,6 +407,13 @@ routes.delete(
   authMiddleware(["ADM"]),
   validate(IdParamSchema, "params"),
   taxonomiaController.excluirBeneficio,
+);
+
+routes.put(
+  "/empresa/perfil",
+  authMiddleware(["EMPRESA"]),
+  validate(AtualizarPerfilEmpresaSchema, "body"),
+  empresaController.atualizarPerfil,
 );
 
 routes.get("/vagas/:id", vagaController.buscarDetalhes);

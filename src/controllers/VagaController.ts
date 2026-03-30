@@ -50,31 +50,33 @@ export class VagaController {
 
   async atualizar(req: Request, res: Response) {
     try {
-      const { id } = req.params as any;
-      const dadosValidados = vagaSchema.parse(req.body);
+      const { id } = req.params;
       const idEmpresa = (req.user as any).id_empresa;
 
+      // O Zod valida o corpo da requisição conforme o schema do Wizard
+      const dadosValidados = vagaSchema.parse(req.body);
+
+      // CORREÇÃO: Passar argumentos na ordem correta
       const vaga = await vagaService.atualizarVaga(
-        Number(id),
-        idEmpresa,
-        dadosValidados,
-        false, // is_admin = false
-        req.user.id,
+        Number(id), // 1. id_vaga
+        idEmpresa, // 2. id_empresa (Trava de dono)
+        dadosValidados, // 3. dados (O objeto com os campos da vaga)
+        false, // 4. is_admin (Empresa enviando = false)
       );
+
+      const mensagem = dadosValidados.enviar_para_aprovacao
+        ? "Vaga enviada para aprovação da ACI!"
+        : "Progresso da vaga salvo como rascunho.";
 
       return res.status(200).json({
         success: true,
-        message:
-          vaga.status === "EM_ANALISE"
-            ? "Vaga enviada para análise!"
-            : "Vaga atualizada.",
+        message: mensagem,
         data: vaga,
       });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
-
   /**
    * GET /vagas/minhas
    * Painel da Empresa: Lista apenas as vagas dela - [cite: 96, 207]
@@ -105,7 +107,6 @@ export class VagaController {
     try {
       const { cidade, uf, area, modelo, pagina, bairro } = req.query;
 
-      // 2. Construção dinâmica do objeto para evitar 'undefined' e erros de tipagem
       const filtros: any = {};
 
       if (cidade) filtros.cidade = cidade as string;

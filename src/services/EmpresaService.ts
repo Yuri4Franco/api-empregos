@@ -82,4 +82,43 @@ export class EmpresaService {
       },
     });
   }
+
+  async atualizarPerfilInstitucional(id_empresa: number, dados: any) {
+    return await prisma.$transaction(async (tx) => {
+      // 1. Atualizar dados básicos e links
+      const empresa = await tx.empresa.update({
+        where: { id_empresa },
+        data: {
+          nome_fantasia: dados.nome_fantasia,
+          quem_somos: dados.quem_somos,
+          logotipo_url: dados.logotipo_url,
+          banner_url: dados.banner_url,
+          site: dados.site,
+          instagram: dados.instagram,
+          linkedin: dados.linkedin,
+          facebook: dados.facebook,
+        },
+      });
+
+      // 2. Sincronizar Benefícios (se enviados)
+      if (dados.beneficios_ids) {
+        // Remove os antigos para evitar duplicidade
+        await tx.empresaBeneficioPadrao.deleteMany({
+          where: { id_empresa },
+        });
+
+        // Adiciona os novos selecionados
+        if (dados.beneficios_ids.length > 0) {
+          await tx.empresaBeneficioPadrao.createMany({
+            data: dados.beneficios_ids.map((id_ben: number) => ({
+              id_empresa,
+              id_beneficio: id_ben,
+            })),
+          });
+        }
+      }
+
+      return empresa;
+    });
+  }
 }

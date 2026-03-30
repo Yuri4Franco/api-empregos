@@ -491,6 +491,7 @@ export class AdminController {
     }
   }
 
+  // Balcão de vagas: Admin cadastra e publica uma vaga diretamente para uma empresa
   async liberarRecursos(req: Request, res: Response) {
     try {
       const { id } = req.params; // ID da Empresa vindo da URL
@@ -517,6 +518,7 @@ export class AdminController {
     }
   }
 
+  // Listar pedidos de marketing para o Admin (com filtro opcional por status)
   async listarParaAdmin(req: Request, res: Response) {
     try {
       const { status } = req.query;
@@ -527,15 +529,45 @@ export class AdminController {
     }
   }
 
+  // Endpoint para o Admin aprovar ou rejeitar um pedido de marketing
   async gerenciarPedido(req: Request, res: Response) {
     try {
       const { id } = req.params;
       const id_autor = (req.user as any).id;
-      const resultado = await adminService.atualizarStatusPedido(Number(id), req.body, id_autor);
+      const resultado = await adminService.atualizarStatusPedido(
+        Number(id),
+        req.body,
+        id_autor,
+      );
       return res.status(200).json({ success: true, data: resultado });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
 
+  async atualizarPerfil(req: Request, res: Response) {
+    try {
+      // O ID vem do token (empresa logada) para segurança
+      const id_empresa = (req.user as any).id_empresa;
+
+      if (!id_empresa) {
+        return res
+          .status(403)
+          .json({ error: "Usuário não vinculado a uma empresa." });
+      }
+
+      const empresa = await empresaService.atualizarPerfilInstitucional(
+        id_empresa,
+        req.body,
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Perfil atualizado com sucesso!",
+        data: empresa,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
 }

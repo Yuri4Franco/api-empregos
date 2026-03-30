@@ -10,63 +10,109 @@ export class VagaService {
 
     if (!empresa) throw new Error("Empresa não encontrada.");
 
-    // Definição de Status conforme Escopo [cite: 19, 20]
+    // 1. Definição de Status conforme Escopo [cite: 151, 205]
     let statusFinal: StatusVaga = "RASCUNHO";
-    if (is_admin)
+    if (is_admin) {
       statusFinal = "ATIVA"; // Cadastro via Balcão [cite: 14]
-    else if (dados.enviar_para_aprovacao) statusFinal = "EM_ANALISE";
-
-    // Lógica de Créditos para Não-Associados [cite: 33, 35, 38]
-    const consomeCredito =
-      !is_admin &&
-      empresa.tipo_vinculo_aci === "NAO_ASSOCIADA" &&
-      statusFinal === "EM_ANALISE";
-
-    if (consomeCredito && empresa.creditos_vagas <= 0) {
-      throw new Error("Saldo de vagas insuficiente para publicação.");
+    } else if (dados.enviar_para_aprovacao) {
+      // Se for Não-Associada e não tiver pago, cai em aguardando pagamento [cite: 322, 328]
+      statusFinal =
+        empresa.tipo_vinculo_aci === "NAO_ASSOCIADA" &&
+        empresa.creditos_vagas <= 0
+          ? "AGUARDANDO_PAGAMENTO"
+          : "EM_ANALISE";
     }
 
     return await prisma.$transaction(async (tx) => {
-      // 1. Criar o Endereço primeiro (Nova Regra de Negócio)
+      // 2. Criar o Endereço (Vaga pode ter endereço próprio ou da empresa) [cite: 171]
       const endereco = await tx.endereco.create({
         data: {
           logradouro: dados.logradouro,
           numero: dados.numero,
           cidade: dados.cidade || "Panambi",
           uf: dados.uf || "RS",
-          id_bairro: dados.id_bairro, // Agora usa o ID da Taxonomia
+          id_bairro: dados.id_bairro,
         },
       });
 
+      // 3. Criar a Vaga Base (Etapa 1 e 2 do Wizard) [cite: 165, 177]
       const vaga = await tx.vaga.create({
         data: {
           id_empresa,
           id_endereco: endereco.id_endereco,
           id_area_atuacao: dados.id_area_atuacao,
           titulo: dados.titulo,
-          descricao: dados.descricao,
-          requisitos_obrigatorios: dados.requisitos,
-          beneficios: dados.beneficios,
-          faixa_salarial_ate: dados.salario,
-          tipo_contrato: dados.tipo_contrato,
-          modelo_trabalho: dados.remoto ? "REMOTO" : "PRESENCIAL",
           nivel_hierarquico: dados.nivel_hierarquico,
+          modelo_trabalho: dados.modelo_trabalho, // PRESENCIAL, HIBRIDO, REMOTO [cite: 172]
+          tipo_contrato: dados.tipo_contrato, // CLT, PJ, etc [cite: 172]
+          faixa_salarial_de: dados.salario_de,
+          faixa_salarial_ate: dados.salario_ate,
+          salario_a_combinar: dados.salario_a_combinar || false,
+          ocultar_salario: dados.ocultar_salario || false,
+          descricao: dados.descricao,
+          responsabilidades: dados.responsabilidades,
+          requisitos_obrigatorios: dados.requisitos_obrigatorios,
+          diferenciais: dados.diferenciais,
+          empresa_confidencial: dados.empresa_confidencial || false,
           status: statusFinal,
           data_publicacao: statusFinal === "ATIVA" ? new Date() : null,
         },
       });
-      if (dados.etapas?.length > 0) {
-        await tx.etapaProcesso.createMany({
-          data: dados.etapas.map((e: any, index: number) => ({
+
+      // 4. Vincular Benefícios (Etapa 2 - Biblioteca + Extras) [cite: 182, 183]
+      if (dados.beneficios_ids?.length > 0) {
+        await tx.vagaBeneficio.createMany({
+          data: dados.beneficios_ids.map((id_ben: number) => ({
             id_vaga: vaga.id_vaga,
-            nome_etapa: e.nome,
-            ordem: e.ordem || index,
-            tipo: e.tipo || "INTERMEDIARIA",
+            id_beneficio: id_ben,
           })),
         });
       }
 
-      if (consomeCredito) {
+      // 5. Configurar Triagem: Perguntas Eliminatórias (Etapa 3) [cite: 185, 186]
+      if (dados.perguntas_eliminatorias?.length > 0) {
+        await tx.vagaPerguntaEliminatoria.createMany({
+          data: dados.perguntas_eliminatorias.map((p: any) => ({
+            id_vaga: vaga.id_vaga,
+            id_pergunta: p.id_pergunta,
+            resposta_esperada: p.resposta_esperada,
+          })),
+        });
+      }
+
+      // 6. Configurar Etapas do Kanban (Etapa 3) [cite: 191, 194]
+      // Se não enviar nada, cria o padrão: Triagem > Entrevista > Oferta [cite: 193]
+      const etapasPadrao = [
+        { nome_etapa: "Inscritos", ordem: 0, tipo: "INICIAL" },
+        { nome_etapa: "Triagem", ordem: 1, tipo: "INTERMEDIARIA" },
+        {
+          nome_etapa: "Entrevista",
+          ordem: 2,
+          tipo: "INTERMEDIARIA",
+          requer_agendamento: true,
+        },
+        { nome_etapa: "Finalistas", ordem: 3, tipo: "FINAL" },
+      ];
+
+      const etapasParaCriar =
+        dados.etapas?.length > 0 ? dados.etapas : etapasPadrao;
+
+      await tx.etapaProcesso.createMany({
+        data: etapasParaCriar.map((e: any, idx: number) => ({
+          id_vaga: vaga.id_vaga,
+          nome_etapa: e.nome_etapa || e.nome,
+          ordem: e.ordem !== undefined ? e.ordem : idx,
+          tipo: e.tipo || "INTERMEDIARIA",
+          requer_agendamento: e.requer_agendamento || false,
+        })),
+      });
+
+      // 7. Consumo de Créditos (Apenas se for publicada/enviada para análise) [cite: 322, 329]
+      if (
+        statusFinal === "EM_ANALISE" &&
+        empresa.tipo_vinculo_aci === "NAO_ASSOCIADA" &&
+        !is_admin
+      ) {
         await tx.empresa.update({
           where: { id_empresa },
           data: { creditos_vagas: { decrement: 1 } },
@@ -79,104 +125,113 @@ export class VagaService {
 
   async atualizarVaga(
     id_vaga: number,
-    id_empresa_solicitante: number | null,
+    id_empresa: number | null, // Admin passa null para ignorar trava de dono
     dados: any,
-    is_admin: boolean,
-    id_autor: number,
+    is_admin: boolean = false, // Flag para pular validações de rascunho
+    id_autor?: number, // Para o log de auditoria do Admin
   ) {
-    // 1. Busca a vaga atual com as relações necessárias para conferência
-    const vagaAtual = await prisma.vaga.findUnique({
+    // 1. Buscar a vaga e o endereço atual
+    const vagaExistente = await prisma.vaga.findUnique({
       where: { id_vaga },
-      include: {
-        empresa: { select: { tipo_vinculo_aci: true } },
-        endereco: true, // Precisamos do ID do endereço para atualizar
-      },
+      include: { endereco: true },
     });
 
-    if (!vagaAtual) throw new Error("Vaga não encontrada.");
+    if (!vagaExistente) throw new Error("Vaga não encontrada.");
 
-    // 2. Trava de Segurança [cite: 12]
-    if (!is_admin) {
-      if (vagaAtual.id_empresa !== id_empresa_solicitante) {
-        throw new Error("Você não tem permissão para editar esta vaga.");
-      }
-
-      if (vagaAtual.status === "ATIVA") {
-        throw new Error(
-          "Vagas já publicadas não podem ser editadas pela empresa. Contate o suporte da ACI.",
-        );
-      }
-    }
-
-    // 3. Definição do novo status
-    let novoStatus = vagaAtual.status;
-    if (!is_admin && dados.enviar_para_aprovacao) {
-      novoStatus = "EM_ANALISE";
+    // 2. Trava de Segurança: Se NÃO for admin, obriga ser o dono da empresa
+    if (!is_admin && vagaExistente.id_empresa !== id_empresa) {
+      throw new Error(
+        "Acesso negado: Você não tem permissão para editar esta vaga.",
+      );
     }
 
     return await prisma.$transaction(async (tx) => {
-      // 4. Atualizar o Endereço vinculado (Se os dados forem enviados)
-      if (vagaAtual.id_endereco) {
+      // 3. Atualizar Endereço (Normalizado)
+      // 3. Atualizar Endereço (Normalizado)
+      if (vagaExistente.id_endereco) {
+        // Criamos um objeto apenas com o que realmente veio para evitar o erro de 'undefined'
+        const dadosEndereco: any = {};
+
+        if (dados.logradouro !== undefined)
+          dadosEndereco.logradouro = dados.logradouro;
+        if (dados.numero !== undefined) dadosEndereco.numero = dados.numero;
+        if (dados.cidade !== undefined) dadosEndereco.cidade = dados.cidade;
+
+        // Para chaves estrangeiras no Prisma Update, usamos o valor direto
+        if (dados.id_bairro !== undefined) {
+          dadosEndereco.id_bairro = dados.id_bairro
+            ? Number(dados.id_bairro)
+            : null;
+        }
+
         await tx.endereco.update({
-          where: { id_endereco: vagaAtual.id_endereco },
-          data: {
-            logradouro: dados.logradouro,
-            numero: dados.numero,
-            cidade: dados.cidade,
-            uf: dados.uf,
-            id_bairro: dados.id_bairro, // Taxonomia de Bairros
-          },
+          where: { id_endereco: vagaExistente.id_endereco },
+          data: dadosEndereco,
         });
       }
+      // 4. Determinar novo Status
+      // Admin pode forçar status "ATIVA" direto ou manter o que foi enviado
+      let novoStatus = vagaExistente.status;
+      if (is_admin && dados.status) {
+        novoStatus = dados.status;
+      } else if (dados.enviar_para_aprovacao) {
+        novoStatus = "EM_ANALISE";
+      }
 
-      // 5. Atualizar a Vaga (Corrigindo os nomes dos campos conforme o Schema)
+      // 5. Atualizar a Vaga
       const vaga = await tx.vaga.update({
         where: { id_vaga },
         data: {
           titulo: dados.titulo,
-          descricao: dados.descricao,
-          requisitos_obrigatorios: dados.requisitos,
-          faixa_salarial_ate: dados.salario,
-          tipo_contrato: dados.tipo_contrato,
-          id_area_atuacao: dados.id_area_atuacao,
           nivel_hierarquico: dados.nivel_hierarquico,
+          id_area_atuacao: dados.id_area_atuacao
+            ? Number(dados.id_area_atuacao)
+            : undefined,
+          modelo_trabalho: dados.modelo_trabalho,
+          tipo_contrato: dados.tipo_contrato,
+          faixa_salarial_de: dados.faixa_salarial_de,
+          faixa_salarial_ate: dados.faixa_salarial_ate,
+          salario_a_combinar: dados.salario_a_combinar,
+          ocultar_salario: dados.ocultar_salario,
+          descricao: dados.descricao,
+          responsabilidades: dados.responsabilidades,
+          requisitos_obrigatorios: dados.requisitos_obrigatorios,
+          diferenciais: dados.diferenciais,
+          empresa_confidencial: dados.empresa_confidencial,
           status: novoStatus,
+          data_publicacao:
+            novoStatus === "ATIVA" && !vagaExistente.data_publicacao
+              ? new Date()
+              : undefined,
         },
       });
 
-      if (dados.id_beneficios) {
-        await tx.vagaBeneficio.deleteMany({ where: { id_vaga } });
-        await tx.vagaBeneficio.createMany({
-          data: dados.id_beneficios.map((id_ben: number) => ({
-            id_vaga,
-            id_beneficio: id_ben,
-          })),
-        });
-      }
-
-      // 7. Sincronizar Etapas
-      if (dados.etapas) {
+      // 6. Sincronizar Etapas (CRUD completo das colunas do Kanban)
+      if (dados.etapas && Array.isArray(dados.etapas)) {
         await tx.etapaProcesso.deleteMany({ where: { id_vaga } });
         await tx.etapaProcesso.createMany({
-          data: dados.etapas.map((e: any, index: number) => ({
+          data: dados.etapas.map((e: any, idx: number) => ({
             id_vaga,
-            nome_etapa: e.nome, // Nome correto do campo no seu Schema
-            ordem: e.ordem ?? index,
-            tipo: e.tipo,
+            nome_etapa: e.nome_etapa || e.nome,
+            ordem: e.ordem ?? idx,
+            tipo: e.tipo || "INTERMEDIARIA",
+            requer_agendamento: e.requer_agendamento || false,
           })),
         });
       }
 
-      // 8. Log de Auditoria Crítica [cite: 56, 58]
-      await tx.logAuditoria.create({
-        data: {
-          id_usuario: id_autor,
-          acao: is_admin ? "ADM_EDITAR_VAGA" : "EMPRESA_EDITAR_VAGA",
-          entidade: "Vaga",
-          id_entidade: id_vaga,
-          detalhes: { campos_alterados: Object.keys(dados) },
-        },
-      });
+      // 7. Auditoria Crítica (Exigência do Escopo Admin [cite: 56, 58])
+      if (is_admin && id_autor) {
+        await tx.logAuditoria.create({
+          data: {
+            id_usuario: id_autor,
+            acao: "ADM_EDITAR_VAGA",
+            entidade: "Vaga",
+            id_entidade: id_vaga,
+            detalhes: { alterado_por: id_autor, data: new Date() },
+          },
+        });
+      }
 
       return vaga;
     });
