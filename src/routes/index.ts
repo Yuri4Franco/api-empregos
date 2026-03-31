@@ -6,7 +6,9 @@ import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { VagaController } from "../controllers/VagaController.js";
 import { AdminVagaController } from "../controllers/AdminVagaController.js";
 import { EmpresaController } from "../controllers/EmpresaController.js";
+import { CandidatoController } from "../controllers/CandidatoController.js";
 import {
+  AgendarEntrevistaSchema,
   AtualizarAdminSchema,
   AtualizarPerfilCompletoSchema,
   AtualizarPerfilEmpresaSchema,
@@ -42,6 +44,7 @@ const authController = new AuthController();
 const adminVagaController = new AdminVagaController();
 const empresaController = new EmpresaController();
 const taxonomiaController = new TaxonomiaController();
+const candidatoController = new CandidatoController();
 
 routes.post("/auth/login", authController.login);
 
@@ -260,11 +263,21 @@ routes.patch(
 // VAGAS
 
 // Rota da Empresa (Cria como Rascunho ou Analise)
+// Criar Rascunho (Etapa 1) [cite: 161, 163, 165]
 routes.post(
   "/vagas",
   authMiddleware(["EMPRESA"]),
   validate(vagaSchema),
   vagaController.cadastrar,
+);
+
+// Atualizar Etapas do Wizard (Etapa 2, 3 e 4) [cite: 177, 185, 201, 219]
+routes.put(
+  "/vagas/:id",
+  authMiddleware(["EMPRESA"]),
+  validate(IdParamSchema, "params"),
+  validate(vagaSchema, "body"), // O mesmo schema pode ser usado ou um parcial
+  vagaController.atualizar,
 );
 
 // Rota do Admin (Cadastro Assistido/Balcão - Direto como ATIVA)
@@ -364,7 +377,7 @@ routes.patch(
   adminController.gerenciarPedido,
 );
 
-// Bairros
+//  CRUD - Bairros
 routes.get("/taxonomia/bairros", taxonomiaController.listarBairros);
 routes.post(
   "/admin/taxonomia/bairros",
@@ -379,7 +392,7 @@ routes.delete(
   taxonomiaController.excluirBairro,
 );
 
-// Áreas
+//  CRUD - Áreas
 routes.get("/taxonomia/areas", taxonomiaController.listarAreas);
 routes.post(
   "/admin/taxonomia/areas",
@@ -394,7 +407,7 @@ routes.delete(
   taxonomiaController.excluirArea,
 );
 
-// Benefícios
+// CRUD - Benefícios
 routes.get("/taxonomia/beneficios", taxonomiaController.listarBeneficios);
 routes.post(
   "/admin/taxonomia/beneficios",
@@ -409,11 +422,66 @@ routes.delete(
   taxonomiaController.excluirBeneficio,
 );
 
+// Empresa  - Gestão de Perfil Institucional (Logo, Banner, Quem Somos, Links)
 routes.put(
   "/empresa/perfil",
   authMiddleware(["EMPRESA"]),
   validate(AtualizarPerfilEmpresaSchema, "body"),
   empresaController.atualizarPerfil,
+);
+
+// Visualizar Kanban da Vaga
+routes.get(
+  "/empresa/vagas/:id_vaga/kanban",
+  authMiddleware(["EMPRESA"]),
+  validate(IdParamSchema, "params"),
+  candidatoController.index,
+);
+
+// Mover Card individual
+routes.patch(
+  "/empresa/candidaturas/:id_candidatura/mover",
+  authMiddleware(["EMPRESA"]),
+  validate(IdParamSchema, "params"),
+  candidatoController.mover,
+);
+
+// Ações em Massa (Reprovar)
+routes.post(
+  "/empresa/candidaturas/reprovar-lote",
+  authMiddleware(["EMPRESA"]),
+  candidatoController.reprovarEmLote,
+);
+
+// Safe Send (Botão Publicar)
+routes.post(
+  "/empresa/vagas/:id_vaga/notificar-candidatos",
+  authMiddleware(["EMPRESA"]),
+  validate(IdParamSchema, "params"),
+  candidatoController.publicarNotificacoes,
+);
+
+// Perfil completo do candidato (Dados + Currículo + Agendamento + Avaliação)
+routes.get(
+  "/empresa/candidaturas/:id_candidatura/perfil",
+  authMiddleware(["EMPRESA"]),
+  candidatoController.verPerfil,
+);
+
+// Salvar avaliação interna
+routes.post(
+  "/empresa/candidaturas/:id_candidatura/avaliar",
+  authMiddleware(["EMPRESA"]),
+  candidatoController.avaliar,
+);
+
+// Agendar Entrevista
+routes.post(
+  "/empresa/candidaturas/:id_candidatura/agendar",
+  authMiddleware(["EMPRESA"]),
+  validate(IdParamSchema, "params"),
+  validate(AgendarEntrevistaSchema, "body"),
+  candidatoController.agendar,
 );
 
 routes.get("/vagas/:id", vagaController.buscarDetalhes);

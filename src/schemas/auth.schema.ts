@@ -274,3 +274,11 @@ export const AtualizarPerfilEmpresaSchema = z.object({
   // IDs dos benefícios que a empresa oferece (da tabela Beneficio)
   beneficios_ids: z.array(z.number()).optional(),
 });
+
+export const AgendarEntrevistaSchema = z.object({
+  data_hora: z.string().datetime({ message: "Data e hora inválidas" }),
+  local_link: z
+    .string()
+    .min(5, "O local ou link deve ter pelo menos 5 caracteres"),
+  observacoes: z.string().optional(),
+});

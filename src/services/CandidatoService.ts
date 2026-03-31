@@ -1,30 +1,272 @@
-// CandidatoService.ts
 import { prisma } from "../config/prisma.js";
+import { StatusCandidatura } from "@prisma/client";
 
 export class CandidatoService {
-  async listarMinhasCandidaturas(id_candidato: number) {
-    return await prisma.candidatura.findMany({
-      where: { id_candidato },
+  // --- KANBAN E LISTAGEM ---
+  async kanban(id_vaga: number, id_empresa: number) {
+    const vaga = await prisma.vaga.findFirst({
+      where: { id_vaga, id_empresa },
       include: {
-        vaga: {
-          select: {
-            id_vaga: true,
-            titulo: true,
-            cidade: true,
-            uf: true,
-            status: true,
-            empresa_confidencial: true, // CORRETO: O campo pertence à Vaga
-            empresa: {
-              select: {
-                nome_fantasia: true,
-                logotipo_url: true,
-                // Removido o campo daqui
-              },
-            },
+        etapas: { orderBy: { ordem: "asc" } },
+      },
+    });
+
+    if (!vaga) throw new Error("Vaga não encontrada.");
+
+    const candidaturas = await prisma.candidatura.findMany({
+      where: { id_vaga },
+      include: {
+        candidato: {
+          include: {
+            usuario: { select: { nome: true, email: true } },
+            area_atuacao: true,
           },
         },
+        respostas: true,
+        agendamento: true, // Incluímos o agendamento para visualização no card
       },
-      orderBy: { data_candidatura: "desc" },
+    });
+
+    return {
+      vaga: { titulo: vaga.titulo, status: vaga.status },
+      colunas: vaga.etapas.map((etapa) => ({
+        ...etapa,
+        candidatos: candidaturas
+          .filter((c) => c.id_etapa_atual === etapa.id_etapa)
+          .map((c) => ({
+            id_candidatura: c.id_candidatura,
+            nome: c.candidato.usuario.nome,
+            id_usuario: c.id_candidato,
+            fora_do_perfil: c.respostas.some((r) => r.fora_do_perfil),
+            data_inscricao: c.data_candidatura,
+            possui_agendamento: !!c.agendamento,
+            data_entrevista: c.agendamento?.data_hora || null,
+          })),
+      })),
+    };
+  }
+
+  // --- MOVIMENTAÇÃO ---
+  async moverCandidato(
+    id_candidatura: number,
+    id_etapa_destino: number,
+    id_empresa: number,
+  ) {
+    return await prisma.$transaction(async (tx) => {
+      const candidatura = await tx.candidatura.findUnique({
+        where: { id_candidatura },
+        include: { vaga: { select: { id_empresa: true } } },
+      });
+
+      if (!candidatura || candidatura.vaga.id_empresa !== id_empresa) {
+        throw new Error("Candidatura não encontrada ou acesso negado.");
+      }
+
+      const etapaDestino = await tx.etapaProcesso.findUnique({
+        where: { id_etapa: id_etapa_destino },
+      });
+
+      if (!etapaDestino || etapaDestino.id_vaga !== candidatura.id_vaga) {
+        throw new Error("Etapa de destino inválida para esta vaga.");
+      }
+
+      let novoStatus: StatusCandidatura = "TRIAGEM";
+      if (etapaDestino.tipo === "FINAL") novoStatus = "APROVADO";
+      if (etapaDestino.nome_etapa.toLowerCase().includes("entrevista")) {
+        novoStatus = "ENTREVISTA";
+      }
+
+      // Regra: Se a etapa requer agendamento, a notificação fica travada (false)
+      const podeNotificarStatus = !etapaDestino.requer_agendamento;
+
+      await tx.movimentoCandidatura.create({
+        data: {
+          id_candidatura,
+          etapa_origem: candidatura.id_etapa_atual,
+          etapa_destino: id_etapa_destino,
+          status_destino: novoStatus,
+          motivo: `Movido para etapa: ${etapaDestino.nome_etapa}`,
+        },
+      });
+
+      return await tx.candidatura.update({
+        where: { id_candidatura },
+        data: {
+          id_etapa_atual: id_etapa_destino,
+          status_atual: novoStatus,
+          // Se requer agendamento, resetamos a flag até que o agendamento ocorra
+          notificacao_pendente: podeNotificarStatus,
+        },
+      });
+    });
+  }
+
+  // --- AGENDAMENTO (NOVO) ---
+  async agendarEntrevista(
+    id_candidatura: number,
+    id_empresa: number,
+    dados: { data_hora: Date; local_link: string; observacoes?: string },
+  ) {
+    return await prisma.$transaction(async (tx) => {
+      // 1. Validar se a empresa é dona da vaga do candidato
+      const candidatura = await tx.candidatura.findUnique({
+        where: { id_candidatura },
+        include: { vaga: { select: { id_empresa: true } } },
+      });
+
+      if (!candidatura || candidatura.vaga.id_empresa !== id_empresa) {
+        throw new Error("Candidatura não encontrada ou acesso negado.");
+      }
+
+      // 2. Criar ou atualizar o agendamento (Resolvendo erro de undefined/null)
+      const agendamento = await tx.agendamentoEntrevista.upsert({
+        where: { id_candidatura },
+        create: {
+          id_candidatura,
+          data_hora: dados.data_hora,
+          local_link: dados.local_link,
+          // CORREÇÃO: Forçamos null se for undefined para agradar o Prisma
+          observacoes: dados.observacoes ?? null,
+        },
+        update: {
+          data_hora: dados.data_hora,
+          local_link: dados.local_link,
+          // CORREÇÃO: Forçamos null se for undefined
+          observacoes: dados.observacoes ?? null,
+        },
+      });
+
+      // 3. Após agendar, liberamos a notificação para o Safe Send [cite: 262, 265]
+      await tx.candidatura.update({
+        where: { id_candidatura },
+        data: { notificacao_pendente: true },
+      });
+
+      return agendamento;
+    });
+  }
+  // --- SAFE SEND E REPROVAÇÃO ---
+  async processarNotificacoesPendentes(id_vaga: number, id_empresa: number) {
+    const pendentes = await prisma.candidatura.findMany({
+      where: {
+        id_vaga,
+        notificacao_pendente: true,
+        vaga: { id_empresa },
+      },
+    });
+
+    // Simulação de disparo de e-mails/notificações [cite: 260]
+    return await prisma.candidatura.updateMany({
+      where: { id_candidatura: { in: pendentes.map((p) => p.id_candidatura) } },
+      data: { notificacao_pendente: false },
+    });
+  }
+
+  async reprovarEmMassa(
+    id_candidaturas: number[],
+    motivo: string,
+    id_empresa: number,
+  ) {
+    return await prisma.$transaction(async (tx) => {
+      const candidaturas = await tx.candidatura.findMany({
+        where: {
+          id_candidatura: { in: id_candidaturas },
+          vaga: { id_empresa },
+        },
+        select: { id_candidatura: true, id_etapa_atual: true },
+      });
+
+      if (candidaturas.length !== id_candidaturas.length) {
+        throw new Error("Candidaturas inválidas.");
+      }
+
+      await tx.movimentoCandidatura.createMany({
+        data: candidaturas.map((c) => ({
+          id_candidatura: c.id_candidatura,
+          etapa_origem: c.id_etapa_atual ?? null,
+          etapa_destino: 0,
+          status_destino: StatusCandidatura.REPROVADO,
+          motivo: motivo || "Reprovação em lote",
+        })),
+      });
+
+      return await tx.candidatura.updateMany({
+        where: { id_candidatura: { in: id_candidaturas } },
+        data: {
+          status_atual: StatusCandidatura.REPROVADO,
+          notificacao_pendente: true,
+        },
+      });
+    });
+  }
+
+  async obterPerfilCompleto(id_candidatura: number, id_empresa: number) {
+    const candidatura = await prisma.candidatura.findUnique({
+      where: { id_candidatura },
+      include: {
+        vaga: { select: { id_empresa: true, titulo: true } },
+        candidato: {
+          include: {
+            usuario: { select: { nome: true, email: true } },
+            endereco: { include: { bairro: true } },
+            area_atuacao: true,
+            experiencias: { orderBy: { data_inicio: "desc" } },
+            formacoes: { orderBy: { data_conclusao: "desc" } },
+            competencias: { include: { competencia: true } },
+          },
+        },
+        respostas: {
+          include: {
+            // Opcional: incluir a pergunta para mostrar o texto da pergunta eliminatória
+          },
+        },
+        agendamento: true,
+        avaliacao: true, // Nova tabela de suporte à decisão
+      },
+    });
+
+    if (!candidatura || candidatura.vaga.id_empresa !== id_empresa) {
+      throw new Error("Candidatura não encontrada ou acesso negado.");
+    }
+
+    return candidatura;
+  }
+
+  /**
+   * Salva ou atualiza a avaliação interna da empresa sobre o candidato
+   */
+
+  async avaliarCandidatura(
+    id_candidatura: number,
+    id_empresa: number,
+    dados: {
+      pontuacao?: number;
+      observacoes_internas?: string;
+      tags_avaliacao?: any;
+    },
+  ) {
+    // Validação de segurança: a candidatura deve pertencer a uma vaga da empresa
+    const candidatura = await prisma.candidatura.findFirst({
+      where: { id_candidatura, vaga: { id_empresa } },
+    });
+
+    if (!candidatura)
+      throw new Error("Ação não permitida ou candidatura não encontrada.");
+
+    return await prisma.avaliacaoCandidatura.upsert({
+      where: { id_candidatura },
+      update: {
+        // CORREÇÃO: Forçamos null se for undefined para cumprir o 'exactOptionalPropertyTypes'
+        pontuacao: dados.pontuacao ?? null,
+        observacoes_internas: dados.observacoes_internas ?? null,
+        tags_avaliacao: dados.tags_avaliacao ?? null,
+      },
+      create: {
+        id_candidatura,
+        pontuacao: dados.pontuacao ?? null,
+        observacoes_internas: dados.observacoes_internas ?? null,
+        tags_avaliacao: dados.tags_avaliacao ?? null,
+      },
     });
   }
 }

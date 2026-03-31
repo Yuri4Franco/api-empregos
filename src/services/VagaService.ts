@@ -178,32 +178,43 @@ export class VagaService {
         novoStatus = "EM_ANALISE";
       }
 
-      // 5. Atualizar a Vaga
+      // 5. Atualizar a Vaga (Limpando Undefineds)
+      const dadosVaga: any = {};
+
+      // Mapeamento de campos simples
+      const campos = [
+        "titulo",
+        "nivel_hierarquico",
+        "modelo_trabalho",
+        "tipo_contrato",
+        "faixa_salarial_de",
+        "faixa_salarial_ate",
+        "salario_a_combinar",
+        "ocultar_salario",
+        "descricao",
+        "responsabilidades",
+        "requisitos_obrigatorios",
+        "diferenciais",
+        "empresa_confidencial",
+      ];
+
+      campos.forEach((campo) => {
+        if (dados[campo] !== undefined) dadosVaga[campo] = dados[campo];
+      });
+
+      // Tratamento especial para IDs e Status
+      if (dados.id_area_atuacao !== undefined)
+        dadosVaga.id_area_atuacao = Number(dados.id_area_atuacao);
+      if (novoStatus !== undefined) dadosVaga.status = novoStatus;
+
+      // Tratamento para data_publicacao
+      if (novoStatus === "ATIVA" && !vagaExistente.data_publicacao) {
+        dadosVaga.data_publicacao = new Date();
+      }
+
       const vaga = await tx.vaga.update({
         where: { id_vaga },
-        data: {
-          titulo: dados.titulo,
-          nivel_hierarquico: dados.nivel_hierarquico,
-          id_area_atuacao: dados.id_area_atuacao
-            ? Number(dados.id_area_atuacao)
-            : undefined,
-          modelo_trabalho: dados.modelo_trabalho,
-          tipo_contrato: dados.tipo_contrato,
-          faixa_salarial_de: dados.faixa_salarial_de,
-          faixa_salarial_ate: dados.faixa_salarial_ate,
-          salario_a_combinar: dados.salario_a_combinar,
-          ocultar_salario: dados.ocultar_salario,
-          descricao: dados.descricao,
-          responsabilidades: dados.responsabilidades,
-          requisitos_obrigatorios: dados.requisitos_obrigatorios,
-          diferenciais: dados.diferenciais,
-          empresa_confidencial: dados.empresa_confidencial,
-          status: novoStatus,
-          data_publicacao:
-            novoStatus === "ATIVA" && !vagaExistente.data_publicacao
-              ? new Date()
-              : undefined,
-        },
+        data: dadosVaga,
       });
 
       // 6. Sincronizar Etapas (CRUD completo das colunas do Kanban)
@@ -216,6 +227,38 @@ export class VagaService {
             ordem: e.ordem ?? idx,
             tipo: e.tipo || "INTERMEDIARIA",
             requer_agendamento: e.requer_agendamento || false,
+          })),
+        });
+      }
+
+      // 5.1. Sincronizar Benefícios (Etapa 2 - Biblioteca [cite: 182, 183])
+      if (dados.beneficios_ids && Array.isArray(dados.beneficios_ids)) {
+        // Limpa os vínculos antigos daquela vaga
+        await tx.vagaBeneficio.deleteMany({ where: { id_vaga } });
+
+        // Cria os novos vínculos com a tabela de Taxonomia de Benefícios
+        await tx.vagaBeneficio.createMany({
+          data: dados.beneficios_ids.map((id_ben: number) => ({
+            id_vaga,
+            id_beneficio: id_ben,
+          })),
+        });
+      }
+
+      // 5.2. Sincronizar Perguntas Eliminatórias (Etapa 3 [cite: 185, 186])
+      if (
+        dados.perguntas_eliminatorias &&
+        Array.isArray(dados.perguntas_eliminatorias)
+      ) {
+        // Remove as configurações de triagem anteriores
+        await tx.vagaPerguntaEliminatoria.deleteMany({ where: { id_vaga } });
+
+        // Insere as novas perguntas e as respostas esperadas
+        await tx.vagaPerguntaEliminatoria.createMany({
+          data: dados.perguntas_eliminatorias.map((p: any) => ({
+            id_vaga,
+            id_pergunta: p.id_pergunta,
+            resposta_esperada: p.resposta_esperada,
           })),
         });
       }

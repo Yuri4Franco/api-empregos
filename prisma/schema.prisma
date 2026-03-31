@@ -244,6 +244,21 @@ model EtapaProcesso {
   @@map("etapas_processo")
 }
 
+model AgendamentoEntrevista {
+  id_agendamento Int         @id @default(autoincrement())
+  id_candidatura Int         @unique // Uma entrevista ativa por vez por candidatura
+  candidatura    Candidatura @relation(fields: [id_candidatura], references: [id_candidatura])
+  
+  data_hora      DateTime    // Data e horário da entrevista [cite: 265]
+  local_link     String      // Endereço físico ou link do Google Meet/Zoom 
+  observacoes    String?     @db.Text
+  
+  criado_em      DateTime    @default(now())
+  atualizado_em  DateTime    @updatedAt
+
+  @@map("agendamentos_entrevista")
+}
+
 model Candidatura {
   id_candidatura   Int               @id @default(autoincrement())
   id_vaga          Int
@@ -257,8 +272,27 @@ model Candidatura {
   candidato        Candidato         @relation(fields: [id_candidato], references: [id_usuario])
   movimentacoes    MovimentoCandidatura[]
   respostas        RespostaPergunta[]
+  agendamento AgendamentoEntrevista?
+  avaliacao AvaliacaoCandidatura?
 
   @@map("candidaturas")
+}
+
+model AvaliacaoCandidatura {
+  id_avaliacao   Int         @id @default(autoincrement())
+  id_candidatura Int         @unique
+  candidatura    Candidatura @relation(fields: [id_candidatura], references: [id_candidatura])
+  
+  pontuacao      Int?        
+  
+  observacoes_internas String? @db.Text
+  
+  tags_avaliacao Json?       
+
+  criado_em      DateTime    @default(now())
+  atualizado_em  DateTime    @updatedAt
+
+  @@map("avaliacoes_candidatura")
 }
 
 model MovimentoCandidatura {
