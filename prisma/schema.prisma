@@ -221,6 +221,8 @@ model Vaga {
 
   id_area_atuacao         Int
   area_atuacao            AreaAtuacao     @relation(fields: [id_area_atuacao], references: [id_area])
+
+  configuracao            ConfiguracaoVaga?
   
   beneficios              VagaBeneficio[]
   etapas                  EtapaProcesso[]
@@ -230,6 +232,17 @@ model Vaga {
   solicitacoes_midia SolicitacaoMidia[]
 
   @@map("vagas")
+}
+
+model ConfiguracaoVaga {
+  id_configuracao Int  @id @default(autoincrement())
+  id_vaga         Int  @unique
+  vaga            Vaga @relation(fields: [id_vaga], references: [id_vaga])
+
+  campos_destaque Json?
+
+
+  @@map("vagas_configuracoes")
 }
 
 model EtapaProcesso {
