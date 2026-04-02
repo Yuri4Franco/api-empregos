@@ -204,7 +204,7 @@ export class CandidatoService {
     const candidatura = await prisma.candidatura.findUnique({
       where: { id_candidatura },
       include: {
-        vaga: { select: { id_empresa: true, titulo: true } },
+        vaga: { include: { configuracao: true } },
         candidato: {
           include: {
             usuario: { select: { nome: true, email: true } },
@@ -215,21 +215,72 @@ export class CandidatoService {
             competencias: { include: { competencia: true } },
           },
         },
-        respostas: {
-          include: {
-            // Opcional: incluir a pergunta para mostrar o texto da pergunta eliminatória
-          },
-        },
+        respostas: true,
         agendamento: true,
-        avaliacao: true, // Nova tabela de suporte à decisão
+        avaliacao: true,
       },
     });
 
     if (!candidatura || candidatura.vaga.id_empresa !== id_empresa) {
-      throw new Error("Candidatura não encontrada ou acesso negado.");
+      throw new Error("Acesso negado.");
     }
 
-    return candidatura;
+    // --- LÓGICA DO RESUMO ESTRATÉGICO ---
+    const camposEscolhidos = (candidatura.vaga.configuracao
+      ?.campos_destaque as string[]) || [
+      "nome",
+      "experiencia_recente",
+      "cidade",
+    ];
+
+    const resumo: any = {};
+
+    // Mapeamos os dados estratégicos conforme a escolha do recrutador
+    if (camposEscolhidos.includes("experiencia_recente")) {
+      resumo.experiencia_recente =
+        candidatura.candidato.experiencias[0] || "Sem experiência registrada";
+    }
+
+    if (
+      camposEscolhidos.includes("idade") &&
+      candidatura.candidato.data_nascimento
+    ) {
+      const hoje = new Date();
+      const nasc = new Date(candidatura.candidato.data_nascimento);
+      let idade = hoje.getFullYear() - nasc.getFullYear();
+      resumo.idade = idade;
+    }
+
+    if (camposEscolhidos.includes("localizacao")) {
+      resumo.cidade_bairro = `${candidatura.candidato.endereco?.cidade} - ${candidatura.candidato.endereco?.bairro?.nome}`;
+    }
+
+    return {
+      ...candidatura,
+      resumo_estrategico: resumo, // O Front-end usa isso para o topo do modal
+    };
+  }
+
+  async atualizarPreferenciaDestaque(
+    id_vaga: number,
+    id_empresa: number,
+    campos: string[],
+  ) {
+    // Validação: A vaga pertence a esta empresa?
+    const vaga = await prisma.vaga.findFirst({
+      where: { id_vaga, id_empresa },
+    });
+
+    if (!vaga) throw new Error("Vaga não encontrada ou acesso negado.");
+
+    return await prisma.configuracaoVaga.upsert({
+      where: { id_vaga },
+      update: { campos_destaque: campos },
+      create: {
+        id_vaga,
+        campos_destaque: campos,
+      },
+    });
   }
 
   /**

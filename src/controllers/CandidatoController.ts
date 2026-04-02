@@ -143,6 +143,28 @@ export class CandidatoController {
     }
   }
 
+  async salvarConfiguracaoDestaques(req: Request, res: Response) {
+    try {
+      const { id_vaga } = req.params;
+      const { campos } = req.body;
+      const id_empresa = (req.user as any).id_empresa;
+
+      const config = await candidatoService.atualizarPreferenciaDestaque(
+        Number(id_vaga),
+        id_empresa,
+        campos,
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Preferências de visualização atualizadas!",
+        data: config,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
   async avaliar(req: Request, res: Response) {
     try {
       const { id_candidatura } = req.params;

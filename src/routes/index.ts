@@ -16,6 +16,7 @@ import {
   CadastroAdminSchema,
   cadastroCandidatoManualSchema,
   ColaboradorSchema,
+  ConfigurarDestaquesSchema,
   CreditosSchema,
   EmpresaSchema,
   ExperienciaSchema,
@@ -482,6 +483,24 @@ routes.post(
   validate(IdParamSchema, "params"),
   validate(AgendarEntrevistaSchema, "body"),
   candidatoController.agendar,
+);
+
+
+// Configurar quais campos aparecem no resumo estratégico do candidato
+routes.patch(
+  "/empresa/vagas/:id_vaga/configurar-destaques",
+  authMiddleware(["EMPRESA"]),
+  validate(IdParamSchema, "params"),
+  validate(ConfigurarDestaquesSchema, "body"),
+  candidatoController.salvarConfiguracaoDestaques,
+);
+
+// Encerrar vaga
+routes.post(
+  "/empresa/vagas/:id_vaga/encerrar",
+  authMiddleware(["EMPRESA"]),
+  validate(IdParamSchema, "params"),
+  vagaController.encerrar,
 );
 
 routes.get("/vagas/:id", vagaController.buscarDetalhes);

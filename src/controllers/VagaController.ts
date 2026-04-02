@@ -48,35 +48,49 @@ export class VagaController {
     }
   }
 
+  async duplicar(req: Request, res: Response) {
+    try {
+      const { id_vaga } = req.params;
+      const id_empresa = (req.user as any).id_empresa;
+
+      const novaVaga = await vagaService.duplicarVaga(Number(id_vaga), id_empresa);
+
+      return res.status(201).json({
+        success: true,
+        message: "Vaga duplicada com sucesso! Verifique o rascunho para publicar.",
+        data: novaVaga
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
   async atualizar(req: Request, res: Response) {
     try {
-      const { id } = req.params;
-      const idEmpresa = (req.user as any).id_empresa;
+      const { id_vaga } = req.params;
+      const id_empresa = (req.user as any).id_empresa;
+      const id_usuario = (req.user as any).id_usuario;
+      const is_admin = (req.user as any).tipo_usuario === "ADM";
 
-      // O Zod valida o corpo da requisição conforme o schema do Wizard
-      const dadosValidados = vagaSchema.parse(req.body);
-
-      // CORREÇÃO: Passar argumentos na ordem correta
+      // Passamos id_empresa para a trava de dono, ou null se for Admin
       const vaga = await vagaService.atualizarVaga(
-        Number(id), // 1. id_vaga
-        idEmpresa, // 2. id_empresa (Trava de dono)
-        dadosValidados, // 3. dados (O objeto com os campos da vaga)
-        false, // 4. is_admin (Empresa enviando = false)
+        Number(id_vaga),
+        is_admin ? null : id_empresa,
+        req.body,
+        is_admin,
+        id_usuario,
       );
-
-      const mensagem = dadosValidados.enviar_para_aprovacao
-        ? "Vaga enviada para aprovação da ACI!"
-        : "Progresso da vaga salvo como rascunho.";
 
       return res.status(200).json({
         success: true,
-        message: mensagem,
+        message: "Vaga atualizada com sucesso!",
         data: vaga,
       });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
+
   /**
    * GET /vagas/minhas
    * Painel da Empresa: Lista apenas as vagas dela - [cite: 96, 207]
@@ -174,6 +188,24 @@ export class VagaController {
       });
     } catch (error: any) {
       return res.status(403).json({ success: false, error: error.message });
+    }
+  }
+
+  async encerrar(req: Request, res: Response) {
+    try {
+      const { id_vaga } = req.params;
+      const { motivo } = req.body;
+      const id_empresa = (req.user as any).id_empresa;
+
+      await vagaService.encerrarVaga(Number(id_vaga), id_empresa, motivo);
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Vaga encerrada com sucesso. Candidatos pendentes foram movidos para reprovação e aguardam publicação de feedback.",
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
     }
   }
 }

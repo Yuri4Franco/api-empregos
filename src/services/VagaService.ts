@@ -107,6 +107,20 @@ export class VagaService {
         })),
       });
 
+      await tx.configuracaoVaga.create({
+        data: {
+          id_vaga: vaga.id_vaga,
+          // Sugestão de campos padrão para o "Resumo Estratégico"
+          campos_destaque: [
+            "foto",
+            "nome",
+            "idade",
+            "experiencia_recente",
+            "cidade_bairro",
+          ],
+        },
+      });
+
       // 7. Consumo de Créditos (Apenas se for publicada/enviada para análise) [cite: 322, 329]
       if (
         statusFinal === "EM_ANALISE" &&
@@ -120,6 +134,112 @@ export class VagaService {
       }
 
       return vaga;
+    });
+  }
+
+  async duplicarVaga(id_vaga: number, id_empresa: number) {
+    return await prisma.$transaction(async (tx) => {
+      // 1. Busca a vaga original com todas as relações que precisam ser copiadas
+      const original = await tx.vaga.findFirst({
+        where: { id_vaga, id_empresa },
+        include: {
+          endereco: true,
+          beneficios: true,
+          etapas: { orderBy: { ordem: "asc" } },
+          perguntas_eliminatorias: true,
+          competencias: true,
+          configuracao: true,
+        },
+      });
+
+      if (!original)
+        throw new Error("Vaga original não encontrada ou acesso negado.");
+
+      // 2. Criar um NOVO registro de Endereço (Deep Copy)
+      // Se a original não tiver endereço, o novoEndereco será null
+      const novoEndereco = original.endereco
+        ? await tx.endereco.create({
+            data: {
+              logradouro: original.endereco.logradouro,
+              numero: original.endereco.numero,
+              complemento: original.endereco.complemento,
+              cep: original.endereco.cep,
+              cidade: original.endereco.cidade,
+              uf: original.endereco.uf,
+              id_bairro: original.endereco.id_bairro,
+            },
+          })
+        : null;
+
+      // 3. Criar a Nova Vaga (Resolvendo erro 2375 com ?? null)
+      const novaVaga = await tx.vaga.create({
+        data: {
+          id_empresa: original.id_empresa,
+          titulo: `${original.titulo} (Cópia)`,
+          nivel_hierarquico: original.nivel_hierarquico,
+          id_endereco: novoEndereco?.id_endereco ?? null, // Garante null se não houver endereço
+          modelo_trabalho: original.modelo_trabalho,
+          tipo_contrato: original.tipo_contrato,
+          faixa_salarial_de: original.faixa_salarial_de,
+          faixa_salarial_ate: original.faixa_salarial_ate,
+          salario_a_combinar: original.salario_a_combinar,
+          ocultar_salario: original.ocultar_salario,
+          descricao: original.descricao,
+          responsabilidades: original.responsabilidades,
+          requisitos_obrigatorios: original.requisitos_obrigatorios,
+          diferenciais: original.diferenciais,
+          empresa_confidencial: original.empresa_confidencial,
+          id_area_atuacao: original.id_area_atuacao,
+          status: "RASCUNHO", // Sempre rascunho para segurança
+        },
+      });
+
+      // 4. Replicar Benefícios
+      if (original.beneficios.length > 0) {
+        await tx.vagaBeneficio.createMany({
+          data: original.beneficios.map((b) => ({
+            id_vaga: novaVaga.id_vaga,
+            id_beneficio: b.id_beneficio,
+          })),
+        });
+      }
+
+      // 5. Replicar Perguntas Eliminatórias
+      if (original.perguntas_eliminatorias.length > 0) {
+        await tx.vagaPerguntaEliminatoria.createMany({
+          data: original.perguntas_eliminatorias.map((p) => ({
+            id_vaga: novaVaga.id_vaga,
+            id_pergunta: p.id_pergunta,
+            resposta_esperada: p.resposta_esperada,
+          })),
+        });
+      }
+
+      // 6. Replicar Etapas do Kanban
+      if (original.etapas.length > 0) {
+        await tx.etapaProcesso.createMany({
+          data: original.etapas.map((e) => ({
+            id_vaga: novaVaga.id_vaga,
+            nome_etapa: e.nome_etapa,
+            ordem: e.ordem,
+            tipo: e.tipo,
+            requer_agendamento: e.requer_agendamento,
+          })),
+        });
+      }
+
+      // 7. Replicar Configurações Estratégicas (Resolvendo erro 2322 de JSON)
+      if (original.configuracao) {
+        await tx.configuracaoVaga.create({
+          data: {
+            id_vaga: novaVaga.id_vaga,
+            // Cast ou fallback para evitar o erro de JsonValue incompatível
+            campos_destaque: original.configuracao.campos_destaque ?? [],
+          },
+        });
+      }
+
+      return novaVaga;
     });
   }
 
@@ -181,6 +301,38 @@ export class VagaService {
       // 5. Atualizar a Vaga (Limpando Undefineds)
       const dadosVaga: any = {};
 
+      // 5.1. Sincronizar Benefícios (Etapa 2 - Biblioteca [cite: 182, 183])
+      if (dados.beneficios_ids && Array.isArray(dados.beneficios_ids)) {
+        // Limpa os vínculos antigos daquela vaga
+        await tx.vagaBeneficio.deleteMany({ where: { id_vaga } });
+
+        // Cria os novos vínculos com a tabela de Taxonomia de Benefícios
+        await tx.vagaBeneficio.createMany({
+          data: dados.beneficios_ids.map((id_ben: number) => ({
+            id_vaga,
+            id_beneficio: id_ben,
+          })),
+        });
+      }
+
+      // 5.2. Sincronizar Perguntas Eliminatórias (Etapa 3 [cite: 185, 186])
+      if (
+        dados.perguntas_eliminatorias &&
+        Array.isArray(dados.perguntas_eliminatorias)
+      ) {
+        // Remove as configurações de triagem anteriores
+        await tx.vagaPerguntaEliminatoria.deleteMany({ where: { id_vaga } });
+
+        // Insere as novas perguntas e as respostas esperadas
+        await tx.vagaPerguntaEliminatoria.createMany({
+          data: dados.perguntas_eliminatorias.map((p: any) => ({
+            id_vaga,
+            id_pergunta: p.id_pergunta,
+            resposta_esperada: p.resposta_esperada,
+          })),
+        });
+      }
+
       // Mapeamento de campos simples
       const campos = [
         "titulo",
@@ -218,49 +370,60 @@ export class VagaService {
       });
 
       // 6. Sincronizar Etapas (CRUD completo das colunas do Kanban)
+      // 6. Sincronizar Etapas (Com Trava de Segurança para Processo em Andamento)
       if (dados.etapas && Array.isArray(dados.etapas)) {
-        await tx.etapaProcesso.deleteMany({ where: { id_vaga } });
-        await tx.etapaProcesso.createMany({
-          data: dados.etapas.map((e: any, idx: number) => ({
-            id_vaga,
-            nome_etapa: e.nome_etapa || e.nome,
-            ordem: e.ordem ?? idx,
-            tipo: e.tipo || "INTERMEDIARIA",
-            requer_agendamento: e.requer_agendamento || false,
-          })),
+        const etapasAtuais = await tx.etapaProcesso.findMany({
+          where: { id_vaga },
         });
-      }
+        const idsNovasEtapas = dados.etapas
+          .map((e: any) => e.id_etapa)
+          .filter(Boolean);
 
-      // 5.1. Sincronizar Benefícios (Etapa 2 - Biblioteca [cite: 182, 183])
-      if (dados.beneficios_ids && Array.isArray(dados.beneficios_ids)) {
-        // Limpa os vínculos antigos daquela vaga
-        await tx.vagaBeneficio.deleteMany({ where: { id_vaga } });
+        // Identifica quais etapas seriam removidas
+        const etapasParaRemover = etapasAtuais.filter(
+          (ea) => !idsNovasEtapas.includes(ea.id_etapa),
+        );
 
-        // Cria os novos vínculos com a tabela de Taxonomia de Benefícios
-        await tx.vagaBeneficio.createMany({
-          data: dados.beneficios_ids.map((id_ben: number) => ({
-            id_vaga,
-            id_beneficio: id_ben,
-          })),
-        });
-      }
+        if (etapasParaRemover.length > 0) {
+          // Verifica se alguma dessas etapas possui candidatos vinculados
+          const temCandidatos = await tx.candidatura.findFirst({
+            where: {
+              id_etapa_atual: { in: etapasParaRemover.map((e) => e.id_etapa) },
+            },
+          });
 
-      // 5.2. Sincronizar Perguntas Eliminatórias (Etapa 3 [cite: 185, 186])
-      if (
-        dados.perguntas_eliminatorias &&
-        Array.isArray(dados.perguntas_eliminatorias)
-      ) {
-        // Remove as configurações de triagem anteriores
-        await tx.vagaPerguntaEliminatoria.deleteMany({ where: { id_vaga } });
+          if (temCandidatos) {
+            throw new Error(
+              "Não é possível remover etapas que possuem candidatos vinculados. Mova os candidatos primeiro.",
+            );
+          }
 
-        // Insere as novas perguntas e as respostas esperadas
-        await tx.vagaPerguntaEliminatoria.createMany({
-          data: dados.perguntas_eliminatorias.map((p: any) => ({
-            id_vaga,
-            id_pergunta: p.id_pergunta,
-            resposta_esperada: p.resposta_esperada,
-          })),
-        });
+          await tx.etapaProcesso.deleteMany({
+            where: {
+              id_etapa: { in: etapasParaRemover.map((e) => e.id_etapa) },
+            },
+          });
+        }
+
+        // Atualiza as existentes ou cria novas
+        for (const [idx, e] of dados.etapas.entries()) {
+          await tx.etapaProcesso.upsert({
+            where: { id_etapa: e.id_etapa || 0 },
+            update: {
+              nome_etapa: e.nome_etapa,
+              ordem: e.ordem ?? idx,
+              tipo: e.tipo,
+              requer_agendamento: e.requer_agendamento,
+            },
+            create: {
+              id_vaga,
+              nome_etapa: e.nome_etapa,
+              ordem: e.ordem ?? idx,
+              tipo: e.tipo,
+              requer_agendamento: e.requer_agendamento,
+            },
+          });
+        }
       }
 
       // 7. Auditoria Crítica (Exigência do Escopo Admin [cite: 56, 58])
@@ -594,5 +757,65 @@ export class VagaService {
         data_inscricao: c.data_candidatura,
       })),
     };
+  }
+
+  async encerrarVaga(
+    id_vaga: number,
+    id_empresa: number,
+    motivo: string = "Vaga encerrada pela empresa",
+  ) {
+    return await prisma.$transaction(async (tx) => {
+      // 1. Validar se a vaga pertence à empresa e se está ativa
+      const vaga = await tx.vaga.findFirst({
+        where: { id_vaga, id_empresa },
+      });
+
+      if (!vaga) throw new Error("Vaga não encontrada ou acesso negado.");
+
+      // 2. Buscar todos os candidatos que NÃO estão em status final (APROVADO, REPROVADO, DESISTENCIA)
+      const candidatosPendentes = await tx.candidatura.findMany({
+        where: {
+          id_vaga,
+          status_atual: {
+            notIn: ["APROVADO", "REPROVADO", "DESISTENCIA"],
+          },
+        },
+        select: { id_candidatura: true, id_etapa_atual: true },
+      });
+
+      // 3. Mover esses candidatos para REPROVADO e marcar notificação pendente
+      if (candidatosPendentes.length > 0) {
+        const ids = candidatosPendentes.map((c) => c.id_candidatura);
+
+        // Criar registros de movimentação para o histórico
+        await tx.movimentoCandidatura.createMany({
+          data: candidatosPendentes.map((c) => ({
+            id_candidatura: c.id_candidatura,
+            etapa_origem: c.id_etapa_atual,
+            etapa_destino: 0, // 0 ou ID da etapa de descarte
+            status_destino: "REPROVADO",
+            motivo: motivo,
+          })),
+        });
+
+        // Atualizar as candidaturas
+        await tx.candidatura.updateMany({
+          where: { id_candidatura: { in: ids } },
+          data: {
+            status_atual: "REPROVADO",
+            notificacao_pendente: true,
+          },
+        });
+      }
+
+      // 4. Atualizar o status da Vaga
+      return await tx.vaga.update({
+        where: { id_vaga },
+        data: {
+          status: "ENCERRADA",
+          data_encerramento: new Date(),
+        },
+      });
+    });
   }
 }

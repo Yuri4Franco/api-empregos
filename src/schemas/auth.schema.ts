@@ -282,3 +282,9 @@ export const AgendarEntrevistaSchema = z.object({
     .min(5, "O local ou link deve ter pelo menos 5 caracteres"),
   observacoes: z.string().optional(),
 });
+
+export const ConfigurarDestaquesSchema = z.object({
+  campos: z
+    .array(z.string())
+    .min(1, "Selecione pelo menos um campo para destaque"),
+});
