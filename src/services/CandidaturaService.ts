@@ -5,8 +5,17 @@ export class CandidaturaService {
   async candidatar(
     id_vaga: number,
     id_candidato: number,
-    respostas: { id_pergunta: number; resposta: boolean }[],
+    respostas: { id_pergunta: number; resposta: any }[],
   ) {
+    // 1. Trava de Segurança: Verificar se já existe candidatura ativa para este usuário nesta vaga
+    const candidaturaExistente = await prisma.candidatura.findFirst({
+      where: { id_vaga, id_candidato },
+    });
+
+    if (candidaturaExistente) {
+      throw new Error("Você já está inscrito nesta vaga.");
+    }
+
     const vaga = await prisma.vaga.findUnique({
       where: { id_vaga },
       include: {
@@ -19,15 +28,18 @@ export class CandidaturaService {
       throw new Error("Esta vaga não está aberta para candidaturas.");
     }
 
+    // 2. Processamento da Triagem Inteligente
     let reprovadoNaTriagem = false;
+
     const respostasFormatadas = vaga.perguntas_eliminatorias.map(
       (perguntaVaga) => {
         const respCandidato = respostas.find(
           (r) => r.id_pergunta === perguntaVaga.id_pergunta,
         );
-        const valorRespostaStr = String(respCandidato?.resposta || "false");
 
-        // Verifica se a resposta do candidato é diferente da esperada pela vaga
+        // Se a pergunta era obrigatória e não veio resposta, tratamos como fora do perfil
+        const valorRespostaStr = String(respCandidato?.resposta ?? "");
+
         const isForaDoPerfil =
           valorRespostaStr !== perguntaVaga.resposta_esperada;
 
@@ -41,18 +53,18 @@ export class CandidaturaService {
       },
     );
 
+    // 3. Definição da Etapa Inicial
     const primeiraEtapa = vaga.etapas[0]?.id_etapa;
-
     if (!primeiraEtapa) {
-      throw new Error(
-        "Esta vaga não possui etapas de seleção configuradas. Contate o administrador.",
-      );
+      throw new Error("Erro na configuração da vaga: sem etapas definidas.");
     }
 
+    // 4. Persistência Atômica
     return await prisma.candidatura.create({
       data: {
         id_vaga,
         id_candidato,
+        // Se reprovado, podemos marcar uma etapa 0 ou manter a primeira para histórico
         id_etapa_atual: primeiraEtapa,
         status_atual: reprovadoNaTriagem
           ? StatusCandidatura.REPROVADO
@@ -61,6 +73,9 @@ export class CandidaturaService {
         respostas: {
           create: respostasFormatadas,
         },
+      },
+      include: {
+        vaga: { select: { titulo: true } }, // Para facilitar o retorno ao usuário
       },
     });
   }
@@ -117,6 +132,21 @@ export class CandidaturaService {
       });
 
       return candidaturaAtualizada;
+    });
+  }
+
+  async desistirCandidatura(id_candidatura: number, id_candidato: number) {
+    // 1. Validar se a candidatura pertence ao usuário logado
+    const candidatura = await prisma.candidatura.findFirst({
+      where: { id_candidatura, id_candidato },
+    });
+
+    if (!candidatura) throw new Error("Candidatura não encontrada.");
+
+    // 2. Atualizar para o status de DESISTENCIA
+    return await prisma.candidatura.update({
+      where: { id_candidatura },
+      data: { status_atual: "DESISTENCIA" },
     });
   }
 }

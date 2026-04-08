@@ -186,4 +186,23 @@ export class CandidatoController {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
+
+  async verHistorico(req: Request, res: Response) {
+    try {
+      const { id_candidatura } = req.params;
+      const id_empresa = (req.user as any).id_empresa;
+
+      const historico = await candidatoService.obterHistoricoCandidatura(
+        Number(id_candidatura),
+        id_empresa,
+      );
+
+      return res.json({
+        success: true,
+        data: historico,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
 }

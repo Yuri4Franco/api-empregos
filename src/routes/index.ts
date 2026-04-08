@@ -7,6 +7,7 @@ import { VagaController } from "../controllers/VagaController.js";
 import { AdminVagaController } from "../controllers/AdminVagaController.js";
 import { EmpresaController } from "../controllers/EmpresaController.js";
 import { CandidatoController } from "../controllers/CandidatoController.js";
+import { CandidaturaController } from "../controllers/CandidaturaController.js";
 import {
   AgendarEntrevistaSchema,
   AtualizarAdminSchema,
@@ -15,9 +16,11 @@ import {
   AtualizarUsuarioSchema,
   CadastroAdminSchema,
   cadastroCandidatoManualSchema,
+  CandidaturaSchema,
   ColaboradorSchema,
   ConfigurarDestaquesSchema,
   CreditosSchema,
+  DashboardFiltroSchema,
   EmpresaSchema,
   ExperienciaSchema,
   FiltroUsuarioSchema,
@@ -46,6 +49,7 @@ const adminVagaController = new AdminVagaController();
 const empresaController = new EmpresaController();
 const taxonomiaController = new TaxonomiaController();
 const candidatoController = new CandidatoController();
+const candidaturaController = new CandidaturaController();
 
 routes.post("/auth/login", authController.login);
 
@@ -272,12 +276,12 @@ routes.post(
   vagaController.cadastrar,
 );
 
-// Atualizar Etapas do Wizard (Etapa 2, 3 e 4) [cite: 177, 185, 201, 219]
+// Atualizar Etapas do Wizard
 routes.put(
   "/vagas/:id",
   authMiddleware(["EMPRESA"]),
   validate(IdParamSchema, "params"),
-  validate(vagaSchema, "body"), // O mesmo schema pode ser usado ou um parcial
+  validate(vagaSchema, "body"),
   vagaController.atualizar,
 );
 
@@ -386,6 +390,7 @@ routes.post(
   validate(TaxonomiaSchema),
   taxonomiaController.criarBairro,
 );
+
 routes.delete(
   "/admin/taxonomia/bairros/:id",
   authMiddleware(["ADM"]),
@@ -485,7 +490,6 @@ routes.post(
   candidatoController.agendar,
 );
 
-
 // Configurar quais campos aparecem no resumo estratégico do candidato
 routes.patch(
   "/empresa/vagas/:id_vaga/configurar-destaques",
@@ -501,6 +505,46 @@ routes.post(
   authMiddleware(["EMPRESA"]),
   validate(IdParamSchema, "params"),
   vagaController.encerrar,
+);
+
+// Duplicar vaga
+routes.post(
+  "/empresa/vagas/:id_vaga/duplicar",
+  authMiddleware(["EMPRESA"]),
+  validate(IdParamSchema, "params"),
+  vagaController.duplicar,
+);
+
+// Histórico de movimentações (Timeline) do candidato
+routes.get(
+  "/empresa/candidaturas/:id_candidatura/historico",
+  authMiddleware(["EMPRESA"]),
+  validate(IdParamSchema, "params"),
+  candidatoController.verHistorico,
+);
+
+// Resumo operacional para a tela inicial da empresa
+routes.get(
+  "/empresa/dashboard",
+  authMiddleware(["EMPRESA"]),
+  validate(DashboardFiltroSchema, "query"),
+  empresaController.dashboard,
+);
+
+// Rota para o candidato se inscrever em uma vaga
+routes.post(
+  "/candidatos/inscrever",
+  authMiddleware(["CANDIDATO"]),
+  validate(CandidaturaSchema, "body"),
+  candidaturaController.aplicar,
+);
+
+// Candidato desiste de uma vaga específica
+routes.patch(
+  "/candidatos/candidaturas/:id_candidatura/desistir",
+  authMiddleware(["CANDIDATO"]),
+  validate(IdParamSchema, "params"),
+  candidaturaController.desistir,
 );
 
 routes.get("/vagas/:id", vagaController.buscarDetalhes);

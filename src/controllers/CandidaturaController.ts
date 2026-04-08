@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { CandidaturaService } from "../services/CandidaturaService.js";
 import { StatusCandidatura } from "@prisma/client";
+import { prisma } from "../config/prisma.js";
 
 const candidaturaService = new CandidaturaService();
 
@@ -16,7 +17,6 @@ export class CandidaturaController {
         respostas,
       );
 
-      // Comparação exata com o Enum do seu Prisma
       const mensagem =
         candidatura.status_atual === StatusCandidatura.REPROVADO
           ? "Candidatura registrada. Infelizmente você não atende aos requisitos críticos desta vaga no momento."
@@ -91,6 +91,25 @@ export class CandidaturaController {
       return res
         .status(200)
         .json({ success: true, message: "Notificação lida." });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  async desistir(req: Request, res: Response) {
+    try {
+      const id_candidato = (req.user as any).id;
+      const { id_candidatura } = req.params;
+
+      await candidaturaService.desistirCandidatura(
+        Number(id_candidatura),
+        id_candidato,
+      );
+
+      return res.json({
+        success: true,
+        message: "Você desistiu deste processo seletivo com sucesso.",
+      });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
     }

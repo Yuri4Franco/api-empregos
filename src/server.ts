@@ -1,6 +1,6 @@
 import express from "express";
 import "dotenv/config";
-import { prisma } from "./config/prisma"; // Importando nossa instância configurada
+import { prisma } from "./config/prisma";
 import routes from "./routes/index.js";
 import cors from "cors";
 
@@ -8,7 +8,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: "*" , // URL do seu frontend (ex: Vite)
+    origin: "*" ,
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
@@ -18,11 +18,10 @@ app.use(express.json());
 
 app.use(routes);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 
 app.get("/health", async (req, res) => {
   try {
-    // Testamos se o Prisma consegue falar com o banco
     await prisma.$queryRaw`SELECT 1`;
     res.json({ status: "ok", database: "connected" });
   } catch (error) {
@@ -31,5 +30,5 @@ app.get("/health", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
+  console.log(`Servidor rodando em http://localhost:${PORT}`);
 });

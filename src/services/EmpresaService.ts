@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { startOfDay, endOfDay, subDays } from "date-fns";
 
 export class EmpresaService {
   async visualizarPerfilCandidato(id_empresa: number, id_candidato: number) {
@@ -120,5 +121,116 @@ export class EmpresaService {
 
       return empresa;
     });
+  }
+
+  async obterResumoDashboard(id_empresa: number, periodo_dias: number = 30) {
+    const hoje = new Date();
+    const dataLimite = subDays(hoje, periodo_dias);
+    const inicioHoje = startOfDay(hoje);
+    const fimHoje = endOfDay(hoje);
+
+    // Executamos múltiplas queries em paralelo para máxima performance
+    const [
+      vagasStatus,
+      totalCandidatos,
+      inscritosUltimas24h,
+      funilCandidaturas,
+      proximasEntrevistas,
+      notificacoesPendentes,
+      foraDoPerfil,
+    ] = await Promise.all([
+      // 1. Vagas por Status (para ver quantas estão Ativas, em Análise, etc)
+      prisma.vaga.groupBy({
+        by: ["status"],
+        where: { id_empresa },
+        _count: true,
+      }),
+
+      // 2. Total Geral de Inscritos
+      prisma.candidatura.count({
+        where: { vaga: { id_empresa } },
+      }),
+
+      // 3. Inscritos nas últimas 24h (O "calor" do dia)
+      prisma.candidatura.count({
+        where: {
+          vaga: { id_empresa },
+          data_candidatura: { gte: subDays(hoje, 1) },
+        },
+      }),
+
+      // 4. Funil de Candidaturas (Distribuição por Etapa/Status)
+      prisma.candidatura.groupBy({
+        by: ["status_atual"],
+        where: { vaga: { id_empresa } },
+        _count: true,
+      }),
+
+      // 5. Lista das 5 próximas entrevistas agendadas
+      prisma.agendamentoEntrevista.findMany({
+        where: {
+          candidatura: { vaga: { id_empresa } },
+          data_hora: { gte: hoje },
+        },
+        include: {
+          candidatura: {
+            select: {
+              candidato: {
+                select: { usuario: { select: { nome: true } } },
+              },
+              vaga: { select: { titulo: true } },
+            },
+          },
+        },
+        orderBy: { data_hora: "asc" },
+        take: 5,
+      }),
+
+      // 6. Contador do Safe Send (Feedback pendente)
+      prisma.candidatura.count({
+        where: {
+          vaga: { id_empresa },
+          notificacao_pendente: true,
+        },
+      }),
+
+      prisma.candidatura.count({
+        where: {
+          vaga: { id_empresa },
+          data_candidatura: { gte: dataLimite }, // Agora filtra pelo período do dashboard
+        },
+      }),
+
+      // 7. Inteligência de Triagem (Quantos estão "Fora do Perfil")
+      prisma.respostaPergunta.count({
+        where: {
+          fora_do_perfil: true,
+          candidatura: { vaga: { id_empresa } },
+        },
+      }),
+    ]);
+
+    // Formatamos os dados para facilitar o consumo no Front-end
+    return {
+      kpis: {
+        vagas_ativas:
+          vagasStatus.find((v) => v.status === "ATIVA")?._count || 0,
+        total_inscritos: totalCandidatos,
+        novos_hoje: inscritosUltimas24h,
+        alertas_safe_send: notificacoesPendentes,
+        candidatos_fora_perfil: foraDoPerfil,
+      },
+      funil: funilCandidaturas.map((f) => ({
+        status: f.status_atual,
+        quantidade: f._count,
+      })),
+      agenda: proximasEntrevistas.map((ent) => ({
+        id: ent.id_agendamento,
+        candidato: ent.candidatura.candidato.usuario.nome,
+        vaga: ent.candidatura.vaga.titulo,
+        data_hora: ent.data_hora,
+        link: ent.local_link,
+      })),
+    };
   }
 }

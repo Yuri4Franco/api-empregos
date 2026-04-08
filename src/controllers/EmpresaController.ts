@@ -73,4 +73,14 @@ export class EmpresaController {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
+
+  async dashboard(req: Request, res: Response) {
+    try {
+      const id_empresa = (req.user as any).id_empresa;
+      const dados = await empresaService.obterResumoDashboard(id_empresa);
+      return res.json({ success: true, data: dados });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
 }

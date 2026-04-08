@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// --- ÁTOMOS (Base para evitar repetição) ---
+// --- ÁTOMOS  ---
 const UsuarioBaseSchema = z.object({
   nome: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
   email: z.string().email("E-mail inválido"),
@@ -288,3 +288,46 @@ export const ConfigurarDestaquesSchema = z.object({
     .array(z.string())
     .min(1, "Selecione pelo menos um campo para destaque"),
 });
+
+export const DashboardFiltroSchema = z.object({
+  periodo_dias: z
+    .string()
+    .optional()
+    .transform((val) => (val ? Number(val) : 30)),
+});
+
+export const CandidaturaSchema = z.object({
+  id_vaga: z.number(),
+
+  respostas: z
+    .array(
+      z.object({
+        id_pergunta: z.number(),
+        resposta: z.any(),
+      }),
+    )
+    .min(
+      1,
+      "Você precisa responder às perguntas eliminatórias para se candidatar.",
+    ),
+});
+
+export const RegisterCandidatoSchema = z
+  .object({
+    nome: z.string().min(3, "Nome muito curto"),
+    email: z.string().email("E-mail inválido"),
+    senha: z
+      .string()
+      .min(8, "A senha deve ter no mínimo 8 caracteres")
+      .regex(/[a-zA-Z]/, "A senha deve conter letras")
+      .regex(/[0-9]/, "A senha deve conter números")
+      .regex(/[@#$!%*?&]/, "A senha deve conter um caractere especial"),
+    confirmar_senha: z.string(),
+    aceite_termos: z.boolean().refine((val) => val === true, {
+      message: "Você deve aceitar os Termos de Uso e Política de Privacidade",
+    }),
+  })
+  .refine((data) => data.senha === data.confirmar_senha, {
+    message: "As senhas não coincidem",
+    path: ["confirmar_senha"],
+  });

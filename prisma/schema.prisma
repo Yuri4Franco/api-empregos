@@ -75,6 +75,10 @@ model Usuario {
   senha_hash      String
   tipo_usuario    TipoUsuario
   status          StatusGeral   @default(PENDENTE)
+
+  token_ativacao  String?       @unique // 
+  token_recuperar String?       @unique // 
+  expira_token    DateTime?
   
   is_master       Boolean       @default(false)
   id_empresa      Int?          
@@ -134,7 +138,7 @@ model Candidato {
   id_usuario              Int       @id
   usuario                 Usuario   @relation(fields: [id_usuario], references: [id_usuario])
   
-  cpf                     String    @unique
+  cpf                     String?    @unique
   telefone                String?
   whatsapp                String?
   id_endereco             Int?      @unique // Note o @unique para 1-para-1

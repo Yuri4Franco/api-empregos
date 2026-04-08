@@ -320,4 +320,96 @@ export class CandidatoService {
       },
     });
   }
+
+  async obterHistoricoCandidatura(id_candidatura: number, id_empresa: number) {
+    const candidatura = await prisma.candidatura.findFirst({
+      where: {
+        id_candidatura,
+        vaga: { id_empresa },
+      },
+    });
+
+    if (!candidatura)
+      throw new Error("Candidatura não encontrada ou acesso negado.");
+
+    return await prisma.movimentoCandidatura.findMany({
+      where: { id_candidatura },
+      orderBy: { criado_em: "desc" },
+    });
+  }
+
+  async inscrever(
+    id_usuario: number,
+    id_vaga: number,
+    respostas: { id_pergunta: number; resposta: string }[],
+  ) {
+    return await prisma.$transaction(async (tx) => {
+      // 1. Validar se a vaga existe e está ativa
+      const vaga = await tx.vaga.findUnique({
+        where: { id_vaga },
+        include: {
+          perguntas_eliminatorias: true,
+          etapas: { where: { tipo: "INICIAL" } },
+        },
+      });
+
+      if (!vaga || vaga.status !== "ATIVA") {
+        throw new Error(
+          "Esta vaga não está recebendo candidaturas no momento.",
+        );
+      }
+
+      // 2. Verificar se o candidato já se inscreveu
+      const jaInscrito = await tx.candidatura.findFirst({
+        where: { id_vaga, id_candidato: id_usuario },
+      });
+
+      if (jaInscrito) throw new Error("Você já se candidatou a esta vaga.");
+
+      // 3. Identificar a Etapa Inicial do Kanban
+      const etapaInicial = vaga.etapas[0];
+      if (!etapaInicial)
+        throw new Error(
+          "A vaga ainda não foi configurada corretamente pela empresa.",
+        );
+
+      // 4. Criar a Candidatura
+      const candidatura = await tx.candidatura.create({
+        data: {
+          id_vaga,
+          id_candidato: id_usuario,
+          id_etapa_atual: etapaInicial.id_etapa,
+          status_atual: "INSCRITO",
+        },
+      });
+
+      // 5. Processar e Salvar Respostas com Triagem Automática
+      if (respostas.length > 0) {
+        const dadosRespostas = respostas.map((resp) => {
+          const configVaga = vaga.perguntas_eliminatorias.find(
+            (p) => p.id_pergunta === resp.id_pergunta,
+          );
+
+          // Regra de Triagem: Se a resposta for diferente da esperada, marca como fora do perfil
+          const isForaDoPerfil = configVaga
+            ? resp.resposta.toLowerCase() !==
+              configVaga.resposta_esperada.toLowerCase()
+            : false;
+
+          return {
+            id_candidatura: candidatura.id_candidatura,
+            id_pergunta: resp.id_pergunta,
+            resposta: resp.resposta,
+            fora_do_perfil: isForaDoPerfil,
+          };
+        });
+
+        await tx.respostaPergunta.createMany({
+          data: dadosRespostas,
+        });
+      }
+
+      return candidatura;
+    });
+  }
 }
