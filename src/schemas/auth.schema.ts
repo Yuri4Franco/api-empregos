@@ -102,7 +102,7 @@ export const EmpresaSchema = UsuarioBaseSchema.extend({
     .transform((v) => v.replace(/\D/g, ""))
     .refine((v) => v.length === 14, "CNPJ inválido"),
   tipo_vinculo_aci: z
-    .enum(["ASSOCIADA", "NAO_ASSOCIADA", "PARCEIRA"])
+    .enum(["ASSOCIADA", "NAO_ASSOCIADA"])
     .default("NAO_ASSOCIADA"),
 }).merge(EnderecoSchema);
 

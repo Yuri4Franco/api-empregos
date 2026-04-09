@@ -104,25 +104,15 @@ model Endereco {
   numero        String?
   complemento   String?
   cep           String?
-  cidade        String   @default("Panambi")
-  uf            String   @default("RS")
-  
-  id_bairro     Int?
-  bairro        Bairro?  @relation(fields: [id_bairro], references: [id_bairro])
+  cidade        String?  @default("Panambi")
+  uf            String?   @default("RS")
+  bairro        String?
 
   candidato     Candidato?
   empresa       Empresa?
   vaga          Vaga?
 
   @@map("enderecos")
-}
-
-model Bairro {
-  id_bairro Int         @id @default(autoincrement())
-  nome      String      @unique
-  enderecos Endereco[]
-
-  @@map("taxonomia_bairros")
 }
 
 model AreaAtuacao {
@@ -141,7 +131,7 @@ model Candidato {
   cpf                     String?    @unique
   telefone                String?
   whatsapp                String?
-  id_endereco             Int?      @unique // Note o @unique para 1-para-1
+  id_endereco             Int?      @unique
   endereco                Endereco? @relation(fields: [id_endereco], references: [id_endereco])
   data_nascimento         DateTime?
   genero                  String?

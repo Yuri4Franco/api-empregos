@@ -34,16 +34,16 @@ export class AdminService {
     const senha_hash = await argon2.hash(dados.senha);
 
     return await prisma.$transaction(async (tx) => {
-
+      // 2. Criar o Endereço primeiro (Nova Regra de Negócio)
       const endereco = await tx.endereco.create({
         data: {
           logradouro: dados.logradouro,
           numero: dados.numero,
-          complemento: dados.complemento,
+          complemento: dados.complemento || null,
           cep: dados.cep,
           cidade: dados.cidade || "Panambi",
           uf: dados.uf || "RS",
-          id_bairro: dados.id_bairro,
+          bairro: dados.bairro,
         },
       });
 
@@ -55,7 +55,7 @@ export class AdminService {
           nome_fantasia: dados.nome_fantasia,
           email: dados.email_institucional || null,
           tipo_vinculo_aci: dados.tipo_vinculo_aci || "NAO_ASSOCIADA",
-          id_endereco: endereco.id_endereco, // FK para a tabela Endereco
+          id_endereco: endereco.id_endereco,
         },
       });
 
@@ -66,10 +66,9 @@ export class AdminService {
           email: dados.email,
           senha_hash,
           tipo_usuario: "EMPRESA",
-          status: "ATIVO",
+          status: "PENDENTE", // Aguardando Validação Manual do Admin
           id_empresa: empresa.id_empresa,
           exigir_troca_senha: true,
-          is_master: true,
         },
       });
 
@@ -98,7 +97,6 @@ export class AdminService {
   ) {
     const skip = (pagina - 1) * limite;
 
-    // Filtro de busca atualizado
     const onde: any = busca
       ? {
           OR: [
@@ -109,47 +107,52 @@ export class AdminService {
         }
       : {};
 
-    const [total, empresas] = await Promise.all([
-      prisma.empresa.count({ where: onde }),
-      prisma.empresa.findMany({
-        where: onde,
-        skip,
-        take: limite,
-        select: {
-          id_empresa: true,
-          nome_fantasia: true,
-          cnpj: true,
-          tipo_vinculo_aci: true,
-          // ACESSO AO ENDEREÇO: Substitui o campo "cidade" direto
-          endereco: {
-            select: {
-              cidade: true,
-              uf: true,
-              bairro: { select: { nome: true } }, // Taxonomia para o BI
+    const [total, totalAssociadas, totalNaoAssociadas, empresas] =
+      await Promise.all([
+        prisma.empresa.count({ where: onde }),
+        prisma.empresa.count({
+          where: { ...onde, tipo_vinculo_aci: "ASSOCIADA" },
+        }),
+        prisma.empresa.count({
+          where: { ...onde, tipo_vinculo_aci: "NAO_ASSOCIADA" },
+        }),
+        prisma.empresa.findMany({
+          where: onde,
+          skip,
+          take: limite,
+          select: {
+            id_empresa: true,
+            nome_fantasia: true,
+            cnpj: true,
+            tipo_vinculo_aci: true,
+            endereco: {
+              select: {
+                cidade: true,
+                uf: true,
+                bairro: true, // Agora como string (true), não objeto select
+              },
+            },
+            _count: { select: { vagas: true } },
+            usuarios: {
+              take: 1,
+              select: {
+                nome: true,
+                email: true,
+                status: true,
+              },
             },
           },
-          _count: { select: { vagas: true } },
-          usuarios: {
-            take: 1, // Traz o responsável principal
-            select: {
-              nome: true,
-              email: true,
-              status: true, // Importante para o Admin ver quem está pendente
-            },
-          },
-        },
-        orderBy: { nome_fantasia: "asc" },
-      }),
-    ]);
+          orderBy: { nome_fantasia: "asc" },
+        }),
+      ]);
 
-    // Mapeamento para manter o contrato da API limpo
     const dataFormatada = empresas.map((e) => ({
       id_empresa: e.id_empresa,
       nome_fantasia: e.nome_fantasia,
       cnpj: e.cnpj,
       tipo_vinculo_aci: e.tipo_vinculo_aci,
       cidade: e.endereco?.cidade || "N/A",
-      bairro: e.endereco?.bairro?.nome || "N/A",
+      bairro: e.endereco?.bairro || "N/A", // Mapeado como string direta
       vagas_count: e._count.vagas,
       responsavel: e.usuarios[0] || null,
     }));
@@ -160,6 +163,8 @@ export class AdminService {
         pagina,
         limite,
         total_paginas: Math.ceil(total / limite),
+        total_associadas: totalAssociadas,
+        total_nao_associadas: totalNaoAssociadas,
       },
       data: dataFormatada,
     };
@@ -1148,38 +1153,44 @@ export class AdminService {
     });
   }
 
-
   //gestão de marketing
   async listarPedidosAdmin(status?: any) {
     return await prisma.solicitacaoMidia.findMany({
       where: status ? { status } : {},
       include: {
         empresa: { select: { nome_fantasia: true } },
-        vaga: { select: { titulo: true, status: true } }
+        vaga: { select: { titulo: true, status: true } },
       },
-      orderBy: { criado_em: 'asc' }
+      orderBy: { criado_em: "asc" },
     });
   }
 
-  async atualizarStatusPedido(id_solicitacao: number, dados: any, id_autor: number) {
+  async atualizarStatusPedido(
+    id_solicitacao: number,
+    dados: any,
+    id_autor: number,
+  ) {
     return await prisma.$transaction(async (tx) => {
       const pedido = await tx.solicitacaoMidia.update({
         where: { id_solicitacao },
         data: {
           status: dados.status,
-          justificativa: dados.justificativa
-        }
+          justificativa: dados.justificativa,
+        },
       });
 
-      // Log de Auditoria 
+      // Log de Auditoria
       await tx.logAuditoria.create({
         data: {
           id_usuario: id_autor,
           acao: `MIDIA_STATUS_${dados.status}`,
           entidade: "SolicitacaoMidia",
           id_entidade: id_solicitacao,
-          detalhes: { status: dados.status, justificativa: dados.justificativa }
-        }
+          detalhes: {
+            status: dados.status,
+            justificativa: dados.justificativa,
+          },
+        },
       });
 
       return pedido;
