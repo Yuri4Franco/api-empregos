@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { AdminService } from "../services/AdminService.js";
+import { EmpresaService } from "../services/EmpresaService.js";
 import { BaseUserService } from "../services/BaseUserService.js";
 
 import { EmpresaSchema, QueryListagemSchema } from "../schemas/auth.schema.js";
@@ -8,6 +9,7 @@ import { prisma } from "../config/prisma.js";
 
 const adminService = new AdminService();
 const baseUserService = new BaseUserService();
+const empresaService = new EmpresaService ();
 
 export class AdminController {
   /** #region GESTÃO DE EMPRESAS:

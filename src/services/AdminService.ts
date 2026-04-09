@@ -34,7 +34,7 @@ export class AdminService {
     const senha_hash = await argon2.hash(dados.senha);
 
     return await prisma.$transaction(async (tx) => {
-      // 2. Criar o Endereço primeiro (Nova Regra de Negócio)
+
       const endereco = await tx.endereco.create({
         data: {
           logradouro: dados.logradouro,
@@ -43,7 +43,7 @@ export class AdminService {
           cep: dados.cep,
           cidade: dados.cidade || "Panambi",
           uf: dados.uf || "RS",
-          id_bairro: dados.id_bairro, // Uso da Taxonomia de Bairros para o BI
+          id_bairro: dados.id_bairro,
         },
       });
 
@@ -66,9 +66,10 @@ export class AdminService {
           email: dados.email,
           senha_hash,
           tipo_usuario: "EMPRESA",
-          status: "PENDENTE", // Aguardando Validação Manual do Admin
+          status: "ATIVO",
           id_empresa: empresa.id_empresa,
           exigir_troca_senha: true,
+          is_master: true,
         },
       });
 

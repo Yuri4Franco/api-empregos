@@ -51,7 +51,7 @@ const taxonomiaController = new TaxonomiaController();
 const candidatoController = new CandidatoController();
 const candidaturaController = new CandidaturaController();
 
-routes.post("/auth/login", authController.login);
+routes.post("/login", authController.login);
 
 // Rotas de Admin
 // Cadastrar nova empresa
