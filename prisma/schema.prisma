@@ -177,6 +177,7 @@ model Empresa {
   endereco            Endereco? @relation(fields: [id_endereco], references: [id_endereco])
   creditos_vagas      Int            @default(0)
   creditos_curriculos Int            @default(0)
+  status              StatusGeral  @default(ATIVO)
 
   usuarios             Usuario[]
   vagas                Vaga[]

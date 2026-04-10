@@ -125,6 +125,7 @@ export class AdminService {
             nome_fantasia: true,
             cnpj: true,
             tipo_vinculo_aci: true,
+            status: true,
             endereco: {
               select: {
                 cidade: true,
@@ -176,9 +177,10 @@ export class AdminService {
       where: { id_empresa },
       include: {
         usuarios: {
-          select: { id_usuario: true, nome: true, email: true, status: true }, // Evita trazer o hash da senha
+          select: { id_usuario: true, nome: true, email: true, status: true, ultimo_login: true }, // Evita trazer o hash da senha
         },
         vagas: true,
+        status: true,
         beneficios_padrao: { include: { beneficio: true } },
       },
     });
@@ -193,13 +195,20 @@ export class AdminService {
     acao: "ATIVAR" | "DESATIVAR",
     id_autor: number,
   ) {
+    
     return await prisma.$transaction(async (tx) => {
-      const statusUsuario = acao === "ATIVAR" ? "ATIVO" : "BLOQUEADO";
+      const novoStatus = acao === "ATIVAR" ? "ATIVO" : "BLOQUEADO";
+
+
+      await tx.empresa.update({
+      where: { id_empresa },
+      data: { status: novoStatus },
+    });
 
       // 1. Atualiza usuários em massa
       await tx.usuario.updateMany({
         where: { id_empresa },
-        data: { status: statusUsuario },
+        data: { status: novoStatus },
       });
 
       // 2. Regra de negócio: Se desativa a empresa, pausa as vagas
@@ -448,7 +457,7 @@ export class AdminService {
                 select: {
                   cidade: true,
                   uf: true,
-                  bairro: { select: { nome: true } },
+                  bairro: true,
                 },
               },
               // Acesso à Taxonomia de Área
@@ -474,7 +483,7 @@ export class AdminService {
       telefone: u.candidato?.telefone,
       whatsapp: u.candidato?.whatsapp,
       cidade: u.candidato?.endereco?.cidade || "N/A",
-      bairro: u.candidato?.endereco?.bairro?.nome || "Outro",
+      bairro: u.candidato?.endereco?.bairro || "Outro",
       area_atuacao: u.candidato?.area_atuacao?.nome || "Não definida",
       competencias: u.candidato?.competencias.map((c) => c.competencia.nome),
     }));

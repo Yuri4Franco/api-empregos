@@ -80,8 +80,6 @@ export class VagaService {
         });
       }
 
-      // 6. Configurar Etapas do Kanban (Etapa 3) [cite: 191, 194]
-      // Se não enviar nada, cria o padrão: Triagem > Entrevista > Oferta [cite: 193]
       const etapasPadrao = [
         { nome_etapa: "Inscritos", ordem: 0, tipo: "INICIAL" },
         { nome_etapa: "Triagem", ordem: 1, tipo: "INTERMEDIARIA" },
@@ -110,7 +108,6 @@ export class VagaService {
       await tx.configuracaoVaga.create({
         data: {
           id_vaga: vaga.id_vaga,
-          // Sugestão de campos padrão para o "Resumo Estratégico"
           campos_destaque: [
             "foto",
             "nome",
@@ -121,7 +118,6 @@ export class VagaService {
         },
       });
 
-      // 7. Consumo de Créditos (Apenas se for publicada/enviada para análise) [cite: 322, 329]
       if (
         statusFinal === "EM_ANALISE" &&
         empresa.tipo_vinculo_aci === "NAO_ASSOCIADA" &&
@@ -166,7 +162,7 @@ export class VagaService {
               cep: original.endereco.cep,
               cidade: original.endereco.cidade,
               uf: original.endereco.uf,
-              id_bairro: original.endereco.id_bairro,
+              bairro: original.endereco.bairro,
             },
           })
         : null;
@@ -652,7 +648,7 @@ export class VagaService {
             select: {
               cidade: true,
               uf: true,
-              bairro: { select: { nome: true } },
+              bairro: true,
             },
           },
           // Buscando nome da Área da Taxonomia
@@ -728,9 +724,7 @@ export class VagaService {
             },
             // Buscamos o endereço normalizado para pegar cidade/uf
             endereco: {
-              include: {
-                bairro: { select: { nome: true } }, // Para o BI e localização
-              },
+                select: { cidade: true, uf: true, bairro: true }, // Para o BI e localização
             },
             // Buscamos a área de atuação do candidato
             area_atuacao: { select: { nome: true } },
@@ -750,7 +744,7 @@ export class VagaService {
         // Acessamos cidade e UF através do objeto endereco
         cidade: c.candidato.endereco?.cidade || "Não informada",
         uf: c.candidato.endereco?.uf || "--",
-        bairro: c.candidato.endereco?.bairro?.nome || "Outro/Não informado",
+        bairro: c.candidato.endereco?.bairro || "Outro/Não informado",
         area_profissional: c.candidato.area_atuacao?.nome || "Não definida",
         status: c.status_atual,
         id_etapa_atual: c.id_etapa_atual,

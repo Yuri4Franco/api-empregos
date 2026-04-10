@@ -98,7 +98,7 @@ routes.post(
 
 // Gerenciamento de Usuários (Colaboradores) pelo Admin
 routes.put(
-  "/admin/usuarios/:id_usuario",
+  "/admin/usuarios/:id",
   authMiddleware(["ADM"]),
   validate(IdParamSchema, "params"),
   validate(AtualizarUsuarioSchema, "body"),
@@ -202,10 +202,13 @@ routes.post(
 
 // --- UTILITÁRIOS ---
 routes.patch(
-  "/admin/usuarios/:id_usuario/reset-senha",
+  "/admin/usuarios/:id/reset-senha",
   authMiddleware(["ADM"]),
+  validate(IdParamSchema, "params"),
   adminController.resetarSenhaUsuario,
 );
+
+
 routes.patch(
   "/admin/empresas/:id_empresa/creditos",
   authMiddleware(["ADM"]),
@@ -380,22 +383,6 @@ routes.patch(
   validate(IdParamSchema, "params"),
   validate(GerenciarMidiaSchema),
   adminController.gerenciarPedido,
-);
-
-//  CRUD - Bairros
-routes.get("/taxonomia/bairros", taxonomiaController.listarBairros);
-routes.post(
-  "/admin/taxonomia/bairros",
-  authMiddleware(["ADM"]),
-  validate(TaxonomiaSchema),
-  taxonomiaController.criarBairro,
-);
-
-routes.delete(
-  "/admin/taxonomia/bairros/:id",
-  authMiddleware(["ADM"]),
-  validate(IdParamSchema, "params"),
-  taxonomiaController.excluirBairro,
 );
 
 //  CRUD - Áreas

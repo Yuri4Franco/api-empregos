@@ -1,6 +1,5 @@
 import type { Request, Response } from "express";
 import { AdminService } from "../services/AdminService.js";
-import { EmpresaService } from "../services/EmpresaService.js";
 import { BaseUserService } from "../services/BaseUserService.js";
 
 import { EmpresaSchema, QueryListagemSchema } from "../schemas/auth.schema.js";
@@ -9,7 +8,6 @@ import { prisma } from "../config/prisma.js";
 
 const adminService = new AdminService();
 const baseUserService = new BaseUserService();
-const empresaService = new EmpresaService ();
 
 export class AdminController {
   /** #region GESTÃO DE EMPRESAS:
@@ -123,12 +121,12 @@ export class AdminController {
   // Atualizar nome, e-mail ou senha de um usuário empresa
   async atualizarUsuario(req: Request, res: Response) {
     try {
-      const { id_usuario } = req.params as unknown as { id_usuario: number };
+      const { id} = req.params as unknown as { id: number };
       const idAutor = req.user.id;
 
       // Chamamos a função do Base
       const usuario = await baseUserService.atualizarUsuario(
-        id_usuario,
+        id,
         req.body,
         idAutor,
       );
@@ -136,7 +134,7 @@ export class AdminController {
       return res.status(200).json({
         message: "Dados do usuário atualizados.",
         data: {
-          id_usuario: usuario.id_usuario,
+          id: usuario.id_usuario,
           nome: usuario.nome,
           email: usuario.email,
         },
@@ -149,7 +147,7 @@ export class AdminController {
   // Bloquear ou ativar um acesso individual
   async alternarStatusUsuario(req: Request, res: Response) {
     try {
-      const { id} = req.params as unknown as { id: number };
+      const { id } = req.params as unknown as { id: number };
       const { status } = req.body;
       const idAutor = req.user.id;
 
@@ -536,40 +534,11 @@ export class AdminController {
     try {
       const { id } = req.params;
       const id_autor = (req.user as any).id;
-      const resultado = await adminService.atualizarStatusPedido(
-        Number(id),
-        req.body,
-        id_autor,
-      );
+      const resultado = await adminService.atualizarStatusPedido(Number(id), req.body, id_autor);
       return res.status(200).json({ success: true, data: resultado });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
 
-  async atualizarPerfil(req: Request, res: Response) {
-    try {
-      // O ID vem do token (empresa logada) para segurança
-      const id_empresa = (req.user as any).id_empresa;
-
-      if (!id_empresa) {
-        return res
-          .status(403)
-          .json({ error: "Usuário não vinculado a uma empresa." });
-      }
-
-      const empresa = await empresaService.atualizarPerfilInstitucional(
-        id_empresa,
-        req.body,
-      );
-
-      return res.status(200).json({
-        success: true,
-        message: "Perfil atualizado com sucesso!",
-        data: empresa,
-      });
-    } catch (error: any) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-  }
 }
