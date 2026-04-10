@@ -107,7 +107,7 @@ routes.put(
 
 // Alternar status do usuário (Ativo <-> Bloqueado)
 routes.patch(
-  "/admin/usuarios/:id_usuario/status",
+  "/admin/usuarios/:id/status",
   authMiddleware(["ADM"]),
   validate(IdParamSchema, "params"),
   validate(StatusUsuarioSchema, "body"),

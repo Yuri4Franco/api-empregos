@@ -149,12 +149,12 @@ export class AdminController {
   // Bloquear ou ativar um acesso individual
   async alternarStatusUsuario(req: Request, res: Response) {
     try {
-      const { id_usuario } = req.params as unknown as { id_usuario: number };
+      const { id} = req.params as unknown as { id: number };
       const { status } = req.body;
       const idAutor = req.user.id;
 
       // Chamamos direto do baseUserService que o AdminService já possui/conhece
-      await baseUserService.alterarStatus(id_usuario, status, idAutor);
+      await baseUserService.alterarStatus(id, status, idAutor);
 
       return res.status(200).json({
         message: `Usuário ${status === "ATIVO" ? "ativado" : "bloqueado"} com sucesso.`,

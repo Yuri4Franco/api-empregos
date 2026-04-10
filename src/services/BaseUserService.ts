@@ -72,7 +72,6 @@ export class BaseUserService {
         where: { id_usuario },
         data: {
           status: novoStatus,
-          // Se for bloqueado, podemos marcar a data de exclusão lógica
           ...(novoStatus === "BLOQUEADO" && { data_exclusao: new Date() }),
         },
       });
