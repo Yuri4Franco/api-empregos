@@ -208,7 +208,7 @@ export class CandidatoService {
         candidato: {
           include: {
             usuario: { select: { nome: true, email: true } },
-            endereco: { include: { bairro: true } },
+            endereco: true,
             area_atuacao: true,
             experiencias: { orderBy: { data_inicio: "desc" } },
             formacoes: { orderBy: { data_conclusao: "desc" } },
@@ -252,7 +252,7 @@ export class CandidatoService {
     }
 
     if (camposEscolhidos.includes("localizacao")) {
-      resumo.cidade_bairro = `${candidatura.candidato.endereco?.cidade} - ${candidatura.candidato.endereco?.bairro?.nome}`;
+      resumo.cidade_bairro = `${candidatura.candidato.endereco?.cidade} - ${candidatura.candidato.endereco?.bairro}`;
     }
 
     return {

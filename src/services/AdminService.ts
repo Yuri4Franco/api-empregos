@@ -67,7 +67,7 @@ export class AdminService {
           email: dados.email,
           senha_hash,
           tipo_usuario: "EMPRESA",
-          status: "PENDENTE", // Aguardando Validação Manual do Admin
+          status: "PENDENTE", 
           id_empresa: empresa.id_empresa,
           exigir_troca_senha: true,
         },

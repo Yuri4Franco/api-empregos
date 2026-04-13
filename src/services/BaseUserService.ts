@@ -22,6 +22,26 @@ export class BaseUserService {
     });
   }
 
+  async TrocarSenha(id_usuario: number, nova_senha: string, id_autor: number) {
+    const senha_hash = await argon2.hash(nova_senha);
+    return await prisma.$transaction(async (tx) => {
+      const usuario = await tx.usuario.update({
+        where: { id_usuario },
+        data: { senha_hash, exigir_troca_senha: false },
+      });
+
+      await this.registrarLog(
+        tx,
+        id_autor,
+        "TROCAR_SENHA",
+        "Usuario",
+        id_usuario,
+      );
+
+      return usuario;
+    });
+  }
+
   // Função única de atualização para a tabela 'Usuario'
   async atualizarUsuario(id_usuario: number, dados: any, id_autor: number) {
     const usuarioExistente = await prisma.usuario.findUnique({
@@ -37,7 +57,6 @@ export class BaseUserService {
       if (dados.email) dataUpdate.email = dados.email;
       if (dados.status) dataUpdate.status = dados.status;
 
-      // Se houver senha, faz o hash e exige troca
       if (dados.senha) {
         dataUpdate.senha_hash = await argon2.hash(dados.senha);
         dataUpdate.exigir_troca_senha = true;
@@ -117,5 +136,32 @@ export class BaseUserService {
     // Higienização de dados sensíveis
     const { senha_hash, ...dadosSeguros } = usuario;
     return dadosSeguros;
+  }
+
+  async obterPerfil(id_usuario: number) {
+    const usuario = await prisma.usuario.findUnique({
+      where: { id_usuario },
+      select: {
+        id_usuario: true,
+        nome: true,
+        email: true,
+        tipo_usuario: true,
+        exigir_troca_senha: true,
+        // Trazemos a empresa se houver vínculo
+        empresa: {
+          select: {
+            id_empresa: true,
+            nome_fantasia: true,
+            status: true,
+            creditos_vagas: true,
+            creditos_curriculos: true,
+          },
+        },
+      },
+    });
+
+    if (!usuario) throw new Error("Usuário não encontrado.");
+
+    return usuario;
   }
 }

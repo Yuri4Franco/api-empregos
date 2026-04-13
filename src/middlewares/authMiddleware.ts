@@ -4,10 +4,9 @@ import jwt from "jsonwebtoken";
 interface TokenPayload {
   sub: number;
   role: "CANDIDATO" | "EMPRESA" | "ADM";
-  master: boolean; 
+  master: boolean;
 }
 
-// #region MIDDLEWARE DE AUTENTICAÇÃO E AUTORIZAÇÃO
 export function authMiddleware(roles?: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
@@ -40,7 +39,7 @@ export function authMiddleware(roles?: string[]) {
       req.user = { 
         id: decoded.sub, 
         role: decoded.role,
-        is_master: decoded.master
+        is_master: decoded.master,
       };
 
       return next();

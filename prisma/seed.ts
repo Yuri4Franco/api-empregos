@@ -16,7 +16,7 @@ async function main() {
 
     await prisma.usuario.create({
       data: {
-        nome: "Administrador Geral ACI",
+        nome: "Administrador Master",
         email: emailAdmin,
         senha_hash: senhaHash,
         tipo_usuario: "ADM",

@@ -4,49 +4,6 @@ import { TaxonomiaService } from "../services/TaxonomiaService.js";
 const taxonomiaService = new TaxonomiaService();
 
 export class TaxonomiaController {
-  // --- GESTÃO DE BAIRROS ---
-  async listarBairros(req: Request, res: Response) {
-    try {
-      const dados = await taxonomiaService.gerenciarBairros("LISTAR");
-      return res.status(200).json(dados);
-    } catch (error: any) {
-      return res.status(500).json({ success: false, error: error.message });
-    }
-  }
-
-  async criarBairro(req: Request, res: Response) {
-    try {
-      const { nome } = req.body;
-      const novo = await taxonomiaService.gerenciarBairros("CRIAR", { nome });
-      return res.status(201).json({ success: true, data: novo });
-    } catch (error: any) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: "Erro ao criar bairro. Verifique se o nome já existe.",
-        });
-    }
-  }
-
-  async excluirBairro(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      await taxonomiaService.gerenciarBairros("DELETAR", { id: Number(id) });
-      return res
-        .status(200)
-        .json({ success: true, message: "Bairro removido com sucesso." });
-    } catch (error: any) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error:
-            "Não é possível excluir um bairro que possui endereços vinculados.",
-        });
-    }
-  }
-
   // --- GESTÃO DE ÁREAS DE ATUAÇÃO ---
   async listarAreas(req: Request, res: Response) {
     try {

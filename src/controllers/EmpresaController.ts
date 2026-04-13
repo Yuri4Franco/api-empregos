@@ -77,7 +77,14 @@ export class EmpresaController {
   async dashboard(req: Request, res: Response) {
     try {
       const id_empresa = (req.user as any).id_empresa;
-      const dados = await empresaService.obterResumoDashboard(id_empresa);
+      // O validate já transformou em número pra gente
+      const { periodo_dias } = req.query as any;
+
+      const dados = await empresaService.obterResumoDashboard(
+        id_empresa,
+        periodo_dias,
+      );
+
       return res.json({ success: true, data: dados });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });

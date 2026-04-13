@@ -8,10 +8,10 @@ import { AdminVagaController } from "../controllers/AdminVagaController.js";
 import { EmpresaController } from "../controllers/EmpresaController.js";
 import { CandidatoController } from "../controllers/CandidatoController.js";
 import { CandidaturaController } from "../controllers/CandidaturaController.js";
+import { UserController } from "../controllers/UserController.js";
 import {
   AgendarEntrevistaSchema,
   AtualizarAdminSchema,
-  AtualizarDadosEmpresaSchema,
   AtualizarPerfilCompletoSchema,
   AtualizarPerfilEmpresaSchema,
   AtualizarUsuarioSchema,
@@ -36,6 +36,7 @@ import {
   StatusEmpresaSchema,
   StatusUsuarioSchema,
   TaxonomiaSchema,
+  TrocarSenha,
   vagaSchema,
   VincularCompetenciaSchema,
 } from "../schemas/auth.schema.js";
@@ -51,11 +52,12 @@ const empresaController = new EmpresaController();
 const taxonomiaController = new TaxonomiaController();
 const candidatoController = new CandidatoController();
 const candidaturaController = new CandidaturaController();
+const usuarioController = new UserController();
 
 routes.post("/login", authController.login);
 
 // Rotas de Admin
-// Cadastrar nova empresa
+// Cadastrar nova empresa - OK
 routes.post(
   "/admin/cadastrar-empresa",
   authMiddleware(["ADM"]),
@@ -63,7 +65,7 @@ routes.post(
   adminController.cadastrarEmpresa,
 );
 
-// Listar todas
+// Listar todas - OK
 routes.get(
   "/admin/empresas",
   authMiddleware(["ADM"]),
@@ -71,7 +73,7 @@ routes.get(
   adminController.listarEmpresas,
 );
 
-// Buscar uma específica
+// Detalhar empresa - OK
 routes.get(
   "/admin/empresas/:id",
   authMiddleware(["ADM"]),
@@ -79,7 +81,7 @@ routes.get(
   adminController.obterDetalhesEmpresa,
 );
 
-// Desativar empresa (Soft Delete)
+// Desativar empresa (Soft Delete) - SEMI-OK
 routes.patch(
   "/admin/empresas/:id/status",
   authMiddleware(["ADM"]),
@@ -125,7 +127,7 @@ routes.get(
 
 // Detalhes de um usuário específico
 routes.get(
-  "/admin/usuarios/:id_usuario",
+  "/admin/usuarios/:id",
   authMiddleware(["ADM"]),
   validate(IdParamSchema, "params"),
   adminController.obterDetalhesUsuario,
@@ -156,16 +158,6 @@ routes.post(
   validate(cadastroCandidatoManualSchema, "body"),
   adminController.cadastrarCandidatoManual,
 );
-
-// Editar dados básicos da empresa e seu endereço
-routes.put(
-  "/admin/empresas/:id",
-  authMiddleware(["ADM"]),
-  validate(IdParamSchema, "params"),
-  validate(AtualizarDadosEmpresaSchema, "body"),
-  adminController.atualizarEmpresa
-);
-
 
 // Obter currículo completo de um candidato
 routes.get(
@@ -219,13 +211,6 @@ routes.patch(
   adminController.resetarSenhaUsuario,
 );
 
-
-routes.patch(
-  "/admin/empresas/:id_empresa/creditos",
-  authMiddleware(["ADM"]),
-  adminController.atualizarCreditos,
-);
-
 // --- GESTÃO DE EQUIPE (MASTER) ---
 
 // Cadastrar novo admin
@@ -272,7 +257,7 @@ routes.patch(
 
 // Gerenciar créditos da empresa
 routes.patch(
-  "/admin/empresas/:id_empresa/creditos",
+  "/admin/empresas/:id/creditos",
   authMiddleware(["ADM"]),
   validate(IdParamSchema, "params"),
   validate(CreditosSchema, "body"),
@@ -544,6 +529,22 @@ routes.patch(
   validate(IdParamSchema, "params"),
   candidaturaController.desistir,
 );
+
+// Trocar senha
+routes.patch(
+  "/usuarios/:id/trocar-senha",
+  authMiddleware(["CANDIDATO", "EMPRESA", "ADM"]),
+  validate(IdParamSchema, "params"),
+  validate(TrocarSenha, "body"),
+  usuarioController.trocarSenha,
+);
+
+routes.get(
+  "/me",
+  authMiddleware(["ADM", "EMPRESA", "CANDIDATO"]),
+  usuarioController.obterPerfil
+);
+
 
 routes.get("/vagas/:id", vagaController.buscarDetalhes);
 

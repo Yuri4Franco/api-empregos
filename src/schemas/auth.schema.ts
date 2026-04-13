@@ -25,6 +25,10 @@ const EnderecoSchema = z.object({
   bairro: z.string().optional(),
 });
 
+export const TrocarSenha = z.object({
+  nova_senha: SenhaForte,
+});
+
 const CandidatoBaseSchema = z.object({
   cpf: z
     .string()

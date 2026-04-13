@@ -777,16 +777,15 @@ export class VagaService {
         select: { id_candidatura: true, id_etapa_atual: true },
       });
 
-      // 3. Mover esses candidatos para REPROVADO e marcar notificação pendente
+  
       if (candidatosPendentes.length > 0) {
         const ids = candidatosPendentes.map((c) => c.id_candidatura);
 
-        // Criar registros de movimentação para o histórico
         await tx.movimentoCandidatura.createMany({
           data: candidatosPendentes.map((c) => ({
             id_candidatura: c.id_candidatura,
             etapa_origem: c.id_etapa_atual,
-            etapa_destino: 0, // 0 ou ID da etapa de descarte
+            etapa_destino: 0, 
             status_destino: "REPROVADO",
             motivo: motivo,
           })),

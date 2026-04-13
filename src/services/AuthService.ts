@@ -33,6 +33,7 @@ export class AuthService {
       usuario.id_usuario,
       usuario.tipo_usuario,
       usuario.is_master,
+      usuario.exigir_troca_senha
     );
   }
 
@@ -70,13 +71,14 @@ export class AuthService {
       usuarioPrincipal.id_usuario,
       usuarioPrincipal.tipo_usuario,
       usuarioPrincipal.is_master,
+      usuarioPrincipal.exigir_troca_senha
     );
   }
 
   // #endregion FIM DAS FUNCIONALIDADES DE AUTENTICAÇÃO E GERAÇÃO DE TOKENS
 
   // #region FUNÇÃO AUXILIAR PARA GERAR TOKENS JWT
-  private gerarToken(id_usuario: number, tipo: string, is_master: boolean) {
+  private gerarToken(id_usuario: number, tipo: string, is_master: boolean, exigir_troca_senha: boolean  ) {
     if (typeof JWT_SECRET !== "string") {
       throw new Error("Erro interno: JWT_SECRET não definida.");
     }
@@ -85,6 +87,7 @@ export class AuthService {
       sub: id_usuario,
       role: tipo,
       master: is_master,
+      exigir_troca_senha: exigir_troca_senha,
     };
 
     const token = jwt.sign(payload, JWT_SECRET, {
@@ -93,7 +96,7 @@ export class AuthService {
         : {}),
     } as jwt.SignOptions);
 
-    return { token, tipo };
+    return { token, tipo, exigir_troca_senha };
   }
   // #endregion FIM DA FUNÇÃO AUXILIAR PARA GERAR TOKENS JWT
   async registrarCandidato(dados: any) {
