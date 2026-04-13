@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { AdminService } from "../services/AdminService.js";
+import { EmpresaService } from "../services/EmpresaService.js";
 import { BaseUserService } from "../services/BaseUserService.js";
 
 import { EmpresaSchema, QueryListagemSchema } from "../schemas/auth.schema.js";
@@ -8,6 +9,7 @@ import { prisma } from "../config/prisma.js";
 
 const adminService = new AdminService();
 const baseUserService = new BaseUserService();
+const empresaService = new EmpresaService ();
 
 export class AdminController {
   /** #region GESTÃO DE EMPRESAS:
@@ -29,16 +31,36 @@ export class AdminController {
     }
   }
 
+  // Atualizar empresa
+  async atualizarEmpresa(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const dados = req.body;
+    const id_autor = (req.user as any).id;
+
+    const resultado = await adminService.editarEmpresa(Number(id), dados, id_autor);
+
+    return res.json({
+      success: true,
+      message: "Dados da empresa atualizados com sucesso!",
+      data: resultado
+    });
+  } catch (error: any) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+}
+
   // Listar todas as empresas cadastradas -revisada-
   async listarEmpresas(req: Request, res: Response) {
     try {
       // O .parse valida e já transforma as strings em números conforme o schema
-      const { page, limit, search } = QueryListagemSchema.parse(req.query);
+      const { page, limit, search, status } = QueryListagemSchema.parse(req.query);
 
       const result = await adminService.listarTodasEmpresas(
         page,
         limit,
         search,
+        status
       );
 
       return res.status(200).json(result);
@@ -56,7 +78,6 @@ export class AdminController {
   // Buscar detalhes de uma empresa específica por ID
   async obterDetalhesEmpresa(req: Request, res: Response) {
     try {
-      // O id já vem como number aqui graças ao z.coerce do middleware
       const { id } = req.params as unknown as { id: number };
 
       const empresa = await adminService.buscarEmpresaPorId(id);
@@ -121,7 +142,7 @@ export class AdminController {
   // Atualizar nome, e-mail ou senha de um usuário empresa
   async atualizarUsuario(req: Request, res: Response) {
     try {
-      const { id} = req.params as unknown as { id: number };
+      const { id } = req.params as unknown as { id: number };
       const idAutor = req.user.id;
 
       // Chamamos a função do Base
@@ -134,7 +155,7 @@ export class AdminController {
       return res.status(200).json({
         message: "Dados do usuário atualizados.",
         data: {
-          id: usuario.id_usuario,
+          id_usuario: usuario.id_usuario,
           nome: usuario.nome,
           email: usuario.email,
         },
@@ -147,7 +168,7 @@ export class AdminController {
   // Bloquear ou ativar um acesso individual
   async alternarStatusUsuario(req: Request, res: Response) {
     try {
-      const { id } = req.params as unknown as { id: number };
+      const { id} = req.params as unknown as { id: number };
       const { status } = req.body;
       const idAutor = req.user.id;
 
@@ -534,11 +555,40 @@ export class AdminController {
     try {
       const { id } = req.params;
       const id_autor = (req.user as any).id;
-      const resultado = await adminService.atualizarStatusPedido(Number(id), req.body, id_autor);
+      const resultado = await adminService.atualizarStatusPedido(
+        Number(id),
+        req.body,
+        id_autor,
+      );
       return res.status(200).json({ success: true, data: resultado });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
 
+  async atualizarPerfil(req: Request, res: Response) {
+    try {
+      // O ID vem do token (empresa logada) para segurança
+      const id_empresa = (req.user as any).id_empresa;
+
+      if (!id_empresa) {
+        return res
+          .status(403)
+          .json({ error: "Usuário não vinculado a uma empresa." });
+      }
+
+      const empresa = await empresaService.atualizarPerfilInstitucional(
+        id_empresa,
+        req.body,
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Perfil atualizado com sucesso!",
+        data: empresa,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
 }

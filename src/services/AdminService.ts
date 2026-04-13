@@ -13,6 +13,7 @@ export class AdminService {
    * - Listar todas as empresas
    * - Obter detalhes de uma empresa específica
    * - Desativar empresa
+   * - Atualizar dados de uma empresa
    *
    */
 
@@ -89,23 +90,83 @@ export class AdminService {
     });
   }
 
+async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
+  const empresaExistente = await prisma.empresa.findUnique({
+    where: { id_empresa },
+    select: { id_endereco: true, nome_fantasia: true }
+  });
+
+  if (!empresaExistente) throw new Error("Empresa não encontrada.");
+  
+  if (!empresaExistente.id_endereco) {
+    throw new Error("Esta empresa não possui um endereço vinculado para editar.");
+  }
+
+  const idEnderecoValido: number = empresaExistente.id_endereco;
+
+  return await prisma.$transaction(async (tx) => {
+    // 1. Atualizar o Endereço
+    await tx.endereco.update({
+      where: { id_endereco: idEnderecoValido },
+      data: {
+        logradouro: dados.logradouro,
+        numero: dados.numero,
+        complemento: dados.complemento || null,
+        cep: dados.cep,
+        cidade: dados.cidade,
+        uf: dados.uf,
+        bairro: dados.bairro,
+      },
+    });
+
+    // 2. Atualizar a Empresa
+    const empresaAtualizada = await tx.empresa.update({
+      where: { id_empresa },
+      data: {
+        cnpj: dados.cnpj,
+        razao_social: dados.razao_social,
+        nome_fantasia: dados.nome_fantasia,
+        email: dados.email_institucional || null,
+        tipo_vinculo_aci: dados.tipo_vinculo_aci,
+      },
+    });
+
+    // 3. Registrar Log de Auditoria (ACI Panambi)
+    await tx.logAuditoria.create({
+      data: {
+        id_usuario: id_autor,
+        acao: "ATUALIZAR_EMPRESA",
+        detalhes: `Dados da empresa ${empresaExistente.nome_fantasia} (ID: ${id_empresa}) atualizados pelo administrador.`,
+        entidade: "EMPRESA",
+        id_entidade: id_empresa,
+      }
+    });
+
+    return empresaAtualizada;
+  });
+}
   // Listar todas as empresas com dados básicos e número de vagas
   async listarTodasEmpresas(
     pagina: number = 1,
     limite: number = 10,
     busca?: string,
+    status?: "ATIVO" | "BLOQUEADO",
   ) {
     const skip = (pagina - 1) * limite;
 
-    const onde: any = busca
-      ? {
-          OR: [
-            { nome_fantasia: { contains: busca, mode: "insensitive" } },
-            { cnpj: { contains: busca } },
-            { razao_social: { contains: busca, mode: "insensitive" } },
-          ],
-        }
-      : {};
+    const onde: any = {};
+
+ if (busca) {
+    onde.OR = [
+      { nome_fantasia: { contains: busca, mode: "insensitive" } },
+      { cnpj: { contains: busca } },
+      { razao_social: { contains: busca, mode: "insensitive" } },
+    ];
+  }
+
+  if (status) {
+    onde.status = status;
+  }
 
     const [total, totalAssociadas, totalNaoAssociadas, empresas] =
       await Promise.all([
@@ -180,7 +241,7 @@ export class AdminService {
           select: { id_usuario: true, nome: true, email: true, status: true, ultimo_login: true }, // Evita trazer o hash da senha
         },
         vagas: true,
-        status: true,
+        endereco: true,
         beneficios_padrao: { include: { beneficio: true } },
       },
     });

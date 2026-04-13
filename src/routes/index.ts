@@ -11,6 +11,7 @@ import { CandidaturaController } from "../controllers/CandidaturaController.js";
 import {
   AgendarEntrevistaSchema,
   AtualizarAdminSchema,
+  AtualizarDadosEmpresaSchema,
   AtualizarPerfilCompletoSchema,
   AtualizarPerfilEmpresaSchema,
   AtualizarUsuarioSchema,
@@ -155,6 +156,16 @@ routes.post(
   validate(cadastroCandidatoManualSchema, "body"),
   adminController.cadastrarCandidatoManual,
 );
+
+// Editar dados básicos da empresa e seu endereço
+routes.put(
+  "/admin/empresas/:id",
+  authMiddleware(["ADM"]),
+  validate(IdParamSchema, "params"),
+  validate(AtualizarDadosEmpresaSchema, "body"),
+  adminController.atualizarEmpresa
+);
+
 
 // Obter currículo completo de um candidato
 routes.get(

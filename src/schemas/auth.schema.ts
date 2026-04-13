@@ -136,6 +136,7 @@ export const QueryListagemSchema = z.object({
   page: z.coerce.number().default(1),
   limit: z.coerce.number().default(10),
   search: z.string().optional(),
+  status: z.enum(["ATIVO", "BLOQUEADO"]).optional(),
 });
 
 export const FiltroUsuarioSchema = QueryListagemSchema.extend({
@@ -331,3 +332,19 @@ export const RegisterCandidatoSchema = z
     message: "As senhas não coincidem",
     path: ["confirmar_senha"],
   });
+
+
+  export const AtualizarDadosEmpresaSchema = z.object({
+  razao_social: z.string().min(3, "Razão social muito curta"),
+  nome_fantasia: z.string().min(2, "Nome fantasia muito curto"),
+  email_institucional: z.string().email("E-mail institucional inválido").nullable(),
+  tipo_vinculo_aci: z.enum(["ASSOCIADA", "NAO_ASSOCIADA"]).optional(),
+  // Dados de Endereço
+  logradouro: z.string().min(3, "Logradouro obrigatório"),
+  numero: z.string().min(1, "Número obrigatório"),
+  complemento: z.string().nullable().optional(),
+  cep: z.string().min(8, "CEP inválido"),
+  cidade: z.string().default("Panambi"),
+  uf: z.string().length(2).default("RS"),
+  bairro: z.string().min(2, "Bairro obrigatório"),
+});
