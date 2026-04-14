@@ -412,4 +412,5 @@ export class CandidatoService {
       return candidatura;
     });
   }
+  
 }

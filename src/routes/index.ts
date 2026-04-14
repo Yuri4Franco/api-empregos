@@ -9,6 +9,7 @@ import { EmpresaController } from "../controllers/EmpresaController.js";
 import { CandidatoController } from "../controllers/CandidatoController.js";
 import { CandidaturaController } from "../controllers/CandidaturaController.js";
 import { UserController } from "../controllers/UserController.js";
+import { uploadBanner, uploadLogo, uploadCandidato } from "../middlewares/upload.js";
 import {
   AgendarEntrevistaSchema,
   AtualizarAdminSchema,
@@ -42,6 +43,7 @@ import {
 } from "../schemas/auth.schema.js";
 import { validate } from "../middlewares/validate.js";
 import { TaxonomiaController } from "../controllers/TaxonomiaController.js";
+import { validatePhotoUpload } from "../middlewares/validatePhotoUpload.js";
 
 const routes = Router();
 const vagaController = new VagaController();
@@ -404,6 +406,7 @@ routes.post(
   validate(TaxonomiaSchema),
   taxonomiaController.criarBeneficio,
 );
+
 routes.delete(
   "/admin/taxonomia/beneficios/:id",
   authMiddleware(["ADM"]),
@@ -542,9 +545,33 @@ routes.patch(
 routes.get(
   "/me",
   authMiddleware(["ADM", "EMPRESA", "CANDIDATO"]),
-  usuarioController.obterPerfil
+  usuarioController.obterPerfil,
 );
 
+// Rota de Logo (Empresa)
+routes.patch(
+  "/empresa/perfil/logo",
+  authMiddleware(["EMPRESA"]),
+  uploadLogo.single("logo"),
+  validatePhotoUpload,
+  empresaController.atualizarLogo,
+);
+
+// Rota de Banner (Empresa - Detalhes da Vaga)
+routes.patch(
+  "/empresa/perfil/banner",
+  authMiddleware(["EMPRESA"]),
+  uploadBanner.single("banner"),
+  validatePhotoUpload,
+  empresaController.atualizarBanner,
+);
+
+// Rota para a empresa logada ver seus próprios dados
+routes.get(
+  "/empresa/perfil",
+  authMiddleware(["EMPRESA"]),
+  empresaController.meuPerfil
+);
 
 routes.get("/vagas/:id", vagaController.buscarDetalhes);
 

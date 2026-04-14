@@ -92,8 +92,6 @@ export class EmpresaService {
         data: {
           nome_fantasia: dados.nome_fantasia,
           quem_somos: dados.quem_somos,
-          logotipo_url: dados.logotipo_url,
-          banner_url: dados.banner_url,
           site: dados.site,
           instagram: dados.instagram,
           linkedin: dados.linkedin,
@@ -232,5 +230,57 @@ export class EmpresaService {
         link: ent.local_link,
       })),
     };
+  }
+
+  async atualizarBannerEmpresa(id_empresa: number, url_banner: string) {
+    const empresa = await prisma.empresa.findUnique({
+      where: { id_empresa },
+    });
+
+    if (!empresa) throw new Error("Empresa não encontrada.");
+
+    return await prisma.empresa.update({
+      where: { id_empresa },
+      data: { banner_url: url_banner },
+      select: { banner_url: true },
+    });
+  }
+
+  async atualizarLogoEmpresa(id_empresa: number, url_logo: string) {
+    const empresa = await prisma.empresa.findUnique({
+      where: { id_empresa },
+    });
+
+    if (!empresa) throw new Error("Empresa não encontrada.");
+
+    return await prisma.empresa.update({
+      where: { id_empresa },
+      data: { logotipo_url: url_logo }, // Nome do campo no seu model
+      select: { logotipo_url: true },
+    });
+  }
+
+  async obterDadosEmpresaPorUsuario(id_usuario: number) {
+    const empresa = await prisma.empresa.findFirst({
+      where: {
+        usuarios: {
+          some: { id_usuario: id_usuario },
+        },
+      },
+      include: {
+        endereco: true,
+        beneficios_padrao: {
+          include: {
+            beneficio: true,
+          },
+        },
+      },
+    });
+
+    if (!empresa) {
+      throw new Error("Não encontramos uma empresa vinculada a este usuário.");
+    }
+
+    return empresa;
   }
 }

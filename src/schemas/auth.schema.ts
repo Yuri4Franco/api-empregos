@@ -6,12 +6,12 @@ const UsuarioBaseSchema = z.object({
   email: z.string().email("E-mail inválido"),
 });
 
-const SenhaForte = z
-  .string()
-  .min(8, "A senha deve ter no mínimo 8 caracteres")
-  .regex(/[A-Z]/, "Deve conter ao menos uma letra maiúscula")
-  .regex(/[0-9]/, "Deve conter ao menos um número")
-  .regex(/[^a-zA-Z0-9]/, "Deve conter ao menos um caractere especial");
+  const SenhaForte = z
+    .string()
+    .min(6, "A senha deve ter no mínimo 8 caracteres")
+    .regex(/[A-Z]/, "Deve conter ao menos uma letra maiúscula")
+    .regex(/[0-9]/, "Deve conter ao menos um número")
+    .regex(/[^a-zA-Z0-9]/, "Deve conter ao menos um caractere especial");
 
 const SenhaPadrao = z
   .string()

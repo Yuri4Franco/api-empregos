@@ -90,4 +90,76 @@ export class EmpresaController {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
+
+  async atualizarBanner(req: Request, res: Response) {
+    try {
+      const id_empresa = (req.user as any).id_empresa;
+
+      if (!req.file) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Nenhum banner enviado." });
+      }
+
+      const bannerUrl = req.file.path;
+
+      await empresaService.atualizarBannerEmpresa(id_empresa, bannerUrl);
+
+      return res.status(200).json({
+        success: true,
+        message: "Banner atualizado com sucesso!",
+        url: bannerUrl,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  async atualizarLogo(req: Request, res: Response) {
+    try {
+      const id_empresa = (req.user as any).id_empresa;
+
+      if (!req.file) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Nenhum logotipo enviado." });
+      }
+
+      // A URL gerada com transformação 400x400 fica em req.file.path
+      const logoUrl = req.file.path;
+
+      await empresaService.atualizarLogoEmpresa(id_empresa, logoUrl);
+
+      return res.status(200).json({
+        success: true,
+        message: "Logotipo atualizado com sucesso!",
+        url: logoUrl,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  async meuPerfil(req: Request, res: Response) {
+    try {
+      // No seu middleware, o ID costuma ser salvo em req.user.id
+      const id_usuario = (req.user as any).id;
+
+      console.log("Buscando empresa para o usuário:", id_usuario);
+
+      const empresa =
+        await empresaService.obterDadosEmpresaPorUsuario(id_usuario);
+
+      return res.json({
+        success: true,
+        data: empresa,
+      });
+    } catch (error: any) {
+      console.error("Erro no meuPerfil:", error.message);
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
 }
