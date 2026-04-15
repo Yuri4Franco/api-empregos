@@ -1,6 +1,7 @@
 // EmpresaController.ts
 import type { Request, Response } from "express";
 import { EmpresaService } from "../services/EmpresaService.js";
+import { prisma } from "../config/prisma.js";
 
 const empresaService = new EmpresaService();
 
@@ -48,31 +49,49 @@ export class EmpresaController {
     }
   }
 
-  async atualizarPerfil(req: Request, res: Response) {
-    try {
-      // O ID vem do token (empresa logada) para segurança
-      const id_empresa = (req.user as any).id_empresa;
+async atualizarPerfil(req: Request, res: Response) {
+  try {
+    // 1. Pegamos o ID do usuário autenticado no token
+    // (Ajuste para .id ou .id_usuario conforme seu middleware)
+    const id_usuario = (req.user as any).id; 
 
-      if (!id_empresa) {
-        return res
-          .status(403)
-          .json({ error: "Usuário não vinculado a uma empresa." });
-      }
+    // 2. Buscamos no banco a qual empresa esse usuário pertence
+    const vinculo = await prisma.usuario.findUnique({
+      where: { id_usuario },
+      select: { id_empresa: true }
+    });
 
-      const empresa = await empresaService.atualizarPerfilInstitucional(
-        id_empresa,
-        req.body,
-      );
-
-      return res.status(200).json({
-        success: true,
-        message: "Perfil atualizado com sucesso!",
-        data: empresa,
+    // 3. Verificação de segurança
+    if (!vinculo || !vinculo.id_empresa) {
+      return res.status(403).json({ 
+        success: false, 
+        error: "Acesso negado. Usuário não vinculado a uma empresa." 
       });
-    } catch (error: any) {
-      return res.status(400).json({ success: false, error: error.message });
     }
+
+    // 4. Agora sim, temos o ID real da empresa
+    const id_empresa_real = vinculo.id_empresa;
+
+    // 5. Chamamos o Service passando o ID correto e o corpo da requisição
+    const empresaAtualizada = await empresaService.atualizarPerfilInstitucional(
+      id_empresa_real,
+      req.body
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Perfil institucional atualizado com sucesso!",
+      data: empresaAtualizada,
+    });
+
+  } catch (error: any) {
+    console.error("Erro ao atualizar perfil:", error.message);
+    return res.status(400).json({ 
+      success: false, 
+      error: error.message || "Erro interno ao atualizar perfil." 
+    });
   }
+}
 
   async dashboard(req: Request, res: Response) {
     try {
@@ -93,7 +112,24 @@ export class EmpresaController {
 
   async atualizarBanner(req: Request, res: Response) {
     try {
-      const id_empresa = (req.user as any).id_empresa;
+      const id_usuario = (req.user as any).id; 
+
+    // 2. Buscamos no banco a qual empresa esse usuário pertence
+    const vinculo = await prisma.usuario.findUnique({
+      where: { id_usuario },
+      select: { id_empresa: true }
+    });
+
+    // 3. Verificação de segurança
+    if (!vinculo || !vinculo.id_empresa) {
+      return res.status(403).json({ 
+        success: false, 
+        error: "Acesso negado. Usuário não vinculado a uma empresa." 
+      });
+    }
+
+    // 4. Agora sim, temos o ID real da empresa
+    const id_empresa_real = vinculo.id_empresa;
 
       if (!req.file) {
         return res
@@ -102,8 +138,10 @@ export class EmpresaController {
       }
 
       const bannerUrl = req.file.path;
+      
+      console.log("iniciando atualização de banner")
 
-      await empresaService.atualizarBannerEmpresa(id_empresa, bannerUrl);
+      await empresaService.atualizarBannerEmpresa(id_empresa_real, bannerUrl);
 
       return res.status(200).json({
         success: true,
@@ -117,7 +155,24 @@ export class EmpresaController {
 
   async atualizarLogo(req: Request, res: Response) {
     try {
-      const id_empresa = (req.user as any).id_empresa;
+      const id_usuario = (req.user as any).id; 
+
+    // 2. Buscamos no banco a qual empresa esse usuário pertence
+    const vinculo = await prisma.usuario.findUnique({
+      where: { id_usuario },
+      select: { id_empresa: true }
+    });
+
+    // 3. Verificação de segurança
+    if (!vinculo || !vinculo.id_empresa) {
+      return res.status(403).json({ 
+        success: false, 
+        error: "Acesso negado. Usuário não vinculado a uma empresa." 
+      });
+    }
+
+    // 4. Agora sim, temos o ID real da empresa
+    const id_empresa_real = vinculo.id_empresa;
 
       if (!req.file) {
         return res
@@ -128,7 +183,7 @@ export class EmpresaController {
       // A URL gerada com transformação 400x400 fica em req.file.path
       const logoUrl = req.file.path;
 
-      await empresaService.atualizarLogoEmpresa(id_empresa, logoUrl);
+      await empresaService.atualizarLogoEmpresa(id_empresa_real, logoUrl);
 
       return res.status(200).json({
         success: true,

@@ -439,33 +439,37 @@ export class VagaService {
     });
   }
 
-  async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
-    const { page, limit, search, status } = filtros;
-    const skip = (page - 1) * limit;
+async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
+  // 1. Forçamos a conversão para número e definimos valores padrão caso venham nulos
+  const page = Number(filtros.page) || 1;
+  const limit = Number(filtros.limit) || 10;
+  const { search, status } = filtros;
 
-    const onde: any = {
-      id_empresa, // Trava de segurança obrigatória
-      AND: [
-        status ? { status } : {},
-        search
-          ? {
-              OR: [
-                { titulo: { contains: search, mode: "insensitive" } },
-                {
-                  area_profissional: { contains: search, mode: "insensitive" },
-                },
-              ],
-            }
-          : {},
-      ],
-    };
+  // 2. Cálculo do skip garantindo que seja um número
+  const skip = (page - 1) * limit;
 
+  const onde: any = {
+    id_empresa,
+    AND: [
+      status ? { status } : {},
+      search
+        ? {
+            OR: [
+              { titulo: { contains: search, mode: "insensitive" } },
+              { area_profissional: { contains: search, mode: "insensitive" } },
+            ],
+          }
+        : {},
+    ],
+  };
+
+  try {
     const [total, vagas] = await Promise.all([
       prisma.vaga.count({ where: onde }),
       prisma.vaga.findMany({
         where: onde,
-        skip,
-        take: limit,
+        skip: skip, // Agora é garantidamente um number
+        take: limit, // Agora é garantidamente um number
         include: {
           _count: { select: { candidaturas: true } },
         },
@@ -482,7 +486,12 @@ export class VagaService {
       },
       data: vagas,
     };
+  } catch (error) {
+    // Log detalhado no terminal para você ver se o banco reclamar de algum campo
+    console.error("Erro no Prisma ao listar vagas:", error);
+    throw new Error("Erro ao buscar vagas no banco de dados.");
   }
+}
 
   async listarVagasPendentes(filtros: any) {
     const { page = 1, limit = 10, search } = filtros;

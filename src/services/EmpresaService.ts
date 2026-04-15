@@ -106,7 +106,6 @@ export class EmpresaService {
           where: { id_empresa },
         });
 
-        // Adiciona os novos selecionados
         if (dados.beneficios_ids.length > 0) {
           await tx.empresaBeneficioPadrao.createMany({
             data: dados.beneficios_ids.map((id_ben: number) => ({

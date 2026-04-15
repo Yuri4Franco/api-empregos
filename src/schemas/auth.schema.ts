@@ -262,21 +262,10 @@ export const AtualizarPerfilEmpresaSchema = z.object({
     .string()
     .max(2000, "O texto 'Quem Somos' é muito longo")
     .optional(),
-  logotipo_url: z
-    .string()
-    .url("URL do logotipo inválida")
-    .optional()
-    .or(z.literal("")),
-  banner_url: z
-    .string()
-    .url("URL do banner inválida")
-    .optional()
-    .or(z.literal("")),
-  site: z.string().url().optional().or(z.literal("")),
+  site: z.string().optional().or(z.literal("")),
   instagram: z.string().optional().or(z.literal("")),
   linkedin: z.string().optional().or(z.literal("")),
   facebook: z.string().optional().or(z.literal("")),
-  // IDs dos benefícios que a empresa oferece (da tabela Beneficio)
   beneficios_ids: z.array(z.number()).optional(),
 });
 

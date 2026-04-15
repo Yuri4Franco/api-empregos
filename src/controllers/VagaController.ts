@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { VagaService } from "../services/VagaService.js";
 import { vagaSchema } from "../schemas/auth.schema.js"; // Importando o Zod que corrigimos
 import type { ModeloTrabalho } from "@prisma/client";
+import { prisma } from "../config/prisma.js";
 
 const vagaService = new VagaService();
 
@@ -71,11 +72,29 @@ export class VagaController {
       const id_empresa = (req.user as any).id_empresa;
       const id_usuario = (req.user as any).id_usuario;
       const is_admin = (req.user as any).tipo_usuario === "ADM";
+ 
+
+    // 2. Buscamos no banco a qual empresa esse usuário pertence
+    const vinculo = await prisma.usuario.findUnique({
+      where: { id_usuario },
+      select: { id_empresa: true }
+    });
+
+    // 3. Verificação de segurança
+    if (!vinculo || !vinculo.id_empresa) {
+      return res.status(403).json({ 
+        success: false, 
+        error: "Acesso negado. Usuário não vinculado a uma empresa." 
+      });
+    }
+
+    // 4. Agora sim, temos o ID real da empresa
+    const id_empresa_real = vinculo.id_empresa;
 
       // Passamos id_empresa para a trava de dono, ou null se for Admin
       const vaga = await vagaService.atualizarVaga(
         Number(id_vaga),
-        is_admin ? null : id_empresa,
+        is_admin ? null : id_empresa_real,
         req.body,
         is_admin,
         id_usuario,
@@ -97,17 +116,29 @@ export class VagaController {
    */
   async listarMinhasVagas(req: Request, res: Response) {
     try {
-      const idEmpresa = (req.user as any).id_empresa;
 
-      if (!idEmpresa) {
-        return res
-          .status(403)
-          .json({ error: "Usuário não vinculado a uma empresa." });
-      }
+   const id_usuario = (req.user as any).id; 
+
+    // 2. Buscamos no banco a qual empresa esse usuário pertence
+    const vinculo = await prisma.usuario.findUnique({
+      where: { id_usuario },
+      select: { id_empresa: true }
+    });
+
+    // 3. Verificação de segurança
+    if (!vinculo || !vinculo.id_empresa) {
+      return res.status(403).json({ 
+        success: false, 
+        error: "Acesso negado. Usuário não vinculado a uma empresa." 
+      });
+    }
+
+    // 4. Agora sim, temos o ID real da empresa
+    const id_empresa_real = vinculo.id_empresa;
 
       // req.query já validado pelo FiltroVagasEmpresaSchema
       const resultado = await vagaService.listarVagasPorEmpresa(
-        idEmpresa,
+        id_empresa_real,
         req.query,
       );
 

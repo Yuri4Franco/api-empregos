@@ -294,7 +294,7 @@ routes.post(
   adminVagaController.adminCadastrarVaga,
 );
 
-// A empresa só consegue atualizar se a vaga NÃO estiver "ATIVA" [Regra de Negócio]
+// A empresa atualizar
 routes.put(
   "/vagas/:id",
   authMiddleware(["EMPRESA"]),
@@ -414,7 +414,7 @@ routes.delete(
   taxonomiaController.excluirBeneficio,
 );
 
-// Empresa  - Gestão de Perfil Institucional (Logo, Banner, Quem Somos, Links)
+// Empresa  - Gestão de Perfil Institucional
 routes.put(
   "/empresa/perfil",
   authMiddleware(["EMPRESA"]),
