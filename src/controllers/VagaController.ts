@@ -18,9 +18,26 @@ export class VagaController {
       const dadosValidados = vagaSchema.parse(req.body);
 
       // 2. Pegamos o id_empresa do usuário logado (token)
-      const idEmpresa = (req.user as any).id_empresa;
+      const id_usuario = (req.user as any).id;
 
-      if (!idEmpresa) {
+      // 2. Buscamos no banco a qual empresa esse usuário pertence
+      const vinculo = await prisma.usuario.findUnique({
+        where: { id_usuario },
+        select: { id_empresa: true },
+      });
+
+      // 3. Verificação de segurança
+      if (!vinculo || !vinculo.id_empresa) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado. Usuário não vinculado a uma empresa.",
+        });
+      }
+
+      // 4. Agora sim, temos o ID real da empresa
+      const id_empresa_real = vinculo.id_empresa;
+
+      if (!id_empresa_real) {
         return res.status(403).json({
           success: false,
           error: "Usuário não está vinculado a uma conta de empresa.",
@@ -30,7 +47,7 @@ export class VagaController {
       // 3. Passamos 'dadosValidados' para o Service
       const vaga = await vagaService.criarVaga(
         dadosValidados,
-        idEmpresa,
+        id_empresa_real,
         false,
       );
 
@@ -54,12 +71,16 @@ export class VagaController {
       const { id_vaga } = req.params;
       const id_empresa = (req.user as any).id_empresa;
 
-      const novaVaga = await vagaService.duplicarVaga(Number(id_vaga), id_empresa);
+      const novaVaga = await vagaService.duplicarVaga(
+        Number(id_vaga),
+        id_empresa,
+      );
 
       return res.status(201).json({
         success: true,
-        message: "Vaga duplicada com sucesso! Verifique o rascunho para publicar.",
-        data: novaVaga
+        message:
+          "Vaga duplicada com sucesso! Verifique o rascunho para publicar.",
+        data: novaVaga,
       });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
@@ -72,24 +93,23 @@ export class VagaController {
       const id_empresa = (req.user as any).id_empresa;
       const id_usuario = (req.user as any).id_usuario;
       const is_admin = (req.user as any).tipo_usuario === "ADM";
- 
 
-    // 2. Buscamos no banco a qual empresa esse usuário pertence
-    const vinculo = await prisma.usuario.findUnique({
-      where: { id_usuario },
-      select: { id_empresa: true }
-    });
-
-    // 3. Verificação de segurança
-    if (!vinculo || !vinculo.id_empresa) {
-      return res.status(403).json({ 
-        success: false, 
-        error: "Acesso negado. Usuário não vinculado a uma empresa." 
+      // 2. Buscamos no banco a qual empresa esse usuário pertence
+      const vinculo = await prisma.usuario.findUnique({
+        where: { id_usuario },
+        select: { id_empresa: true },
       });
-    }
 
-    // 4. Agora sim, temos o ID real da empresa
-    const id_empresa_real = vinculo.id_empresa;
+      // 3. Verificação de segurança
+      if (!vinculo || !vinculo.id_empresa) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado. Usuário não vinculado a uma empresa.",
+        });
+      }
+
+      // 4. Agora sim, temos o ID real da empresa
+      const id_empresa_real = vinculo.id_empresa;
 
       // Passamos id_empresa para a trava de dono, ou null se for Admin
       const vaga = await vagaService.atualizarVaga(
@@ -116,25 +136,24 @@ export class VagaController {
    */
   async listarMinhasVagas(req: Request, res: Response) {
     try {
+      const id_usuario = (req.user as any).id;
 
-   const id_usuario = (req.user as any).id; 
-
-    // 2. Buscamos no banco a qual empresa esse usuário pertence
-    const vinculo = await prisma.usuario.findUnique({
-      where: { id_usuario },
-      select: { id_empresa: true }
-    });
-
-    // 3. Verificação de segurança
-    if (!vinculo || !vinculo.id_empresa) {
-      return res.status(403).json({ 
-        success: false, 
-        error: "Acesso negado. Usuário não vinculado a uma empresa." 
+      // 2. Buscamos no banco a qual empresa esse usuário pertence
+      const vinculo = await prisma.usuario.findUnique({
+        where: { id_usuario },
+        select: { id_empresa: true },
       });
-    }
 
-    // 4. Agora sim, temos o ID real da empresa
-    const id_empresa_real = vinculo.id_empresa;
+      // 3. Verificação de segurança
+      if (!vinculo || !vinculo.id_empresa) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado. Usuário não vinculado a uma empresa.",
+        });
+      }
+
+      // 4. Agora sim, temos o ID real da empresa
+      const id_empresa_real = vinculo.id_empresa;
 
       // req.query já validado pelo FiltroVagasEmpresaSchema
       const resultado = await vagaService.listarVagasPorEmpresa(

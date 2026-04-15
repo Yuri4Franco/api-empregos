@@ -6,12 +6,12 @@ const UsuarioBaseSchema = z.object({
   email: z.string().email("E-mail inválido"),
 });
 
-  const SenhaForte = z
-    .string()
-    .min(6, "A senha deve ter no mínimo 8 caracteres")
-    .regex(/[A-Z]/, "Deve conter ao menos uma letra maiúscula")
-    .regex(/[0-9]/, "Deve conter ao menos um número")
-    .regex(/[^a-zA-Z0-9]/, "Deve conter ao menos um caractere especial");
+const SenhaForte = z
+  .string()
+  .min(6, "A senha deve ter no mínimo 8 caracteres")
+  .regex(/[A-Z]/, "Deve conter ao menos uma letra maiúscula")
+  .regex(/[0-9]/, "Deve conter ao menos um número")
+  .regex(/[^a-zA-Z0-9]/, "Deve conter ao menos um caractere especial");
 
 const SenhaPadrao = z
   .string()
@@ -172,21 +172,47 @@ export const StatusUsuarioSchema = z.object({
 
 export const vagaSchema = z.object({
   titulo: z.string().min(3),
-  descricao: z.string().min(10),
-  requisitos: z.string().optional(),
-  beneficios: z.string().optional(),
-  salario: z.coerce.number().optional(),
-  tipo_contrato: z.enum(["CLT", "PJ", "ESTAGIO", "TEMPORARIO"]).optional(),
-  area_atuacao: z.string().optional(),
-  nivel_hierarquico: z
-    .enum(["JUNIOR", "PLENO", "SENIOR", "ESTAGIARIO"])
-    .optional(),
-  remoto: z.boolean().default(false),
-  cidade: z.string().optional(),
-  uf: z.string().length(2).optional(),
-  enviar_para_aprovacao: z.boolean().default(false),
+  id_area_atuacao: z.number().int().min(1, "Área de atuação é obrigatória"),
+  nivel_hierarquico: z.string(),
+  modelo_trabalho: z.string(),
+  tipo_contrato: z.string(),
 
-  // Adicione estes para o Service não quebrar
+  // Financeiro
+  salario_de: z.number().optional().nullable(),
+  salario_ate: z.number().optional().nullable(),
+  salario_a_combinar: z.boolean().default(false),
+  ocultar_salario: z.boolean().default(false),
+  empresa_confidencial: z.boolean().default(false),
+
+  // Textos
+  descricao: z.string().min(10),
+  responsabilidades: z.string().min(5),
+  requisitos_obrigatorios: z.string().min(5),
+  diferenciais: z.string().optional().default(""),
+
+  // Endereço
+  logradouro: z.string().optional(),
+  numero: z.string().optional(),
+  bairro: z.string().optional(),
+  cidade: z.string().default("Panambi"),
+  uf: z.string().length(2).default("RS"),
+
+  // Arrays e Fluxo
+  enviar_para_aprovacao: z.boolean().default(false),
+  beneficios_ids: z.array(z.number()).default([]),
+  perguntas_eliminatorias: z
+    .array(
+      z.object({
+        id_pergunta: z.number(),
+        resposta_esperada: z.boolean(),
+      }),
+    )
+    .default([]),
+
+  // Para o Admin cadastrar para outros
+  id_empresa_alvo: z.number().int().optional(),
+
+  // Etapas
   etapas: z
     .array(
       z.object({
@@ -196,9 +222,6 @@ export const vagaSchema = z.object({
       }),
     )
     .optional(),
-
-  // Para o Admin cadastrar para outros
-  id_empresa_alvo: z.number().int().optional(),
 });
 
 export const FiltroVagasEmpresaSchema = z.object({
@@ -326,11 +349,13 @@ export const RegisterCandidatoSchema = z
     path: ["confirmar_senha"],
   });
 
-
-  export const AtualizarDadosEmpresaSchema = z.object({
+export const AtualizarDadosEmpresaSchema = z.object({
   razao_social: z.string().min(3, "Razão social muito curta"),
   nome_fantasia: z.string().min(2, "Nome fantasia muito curto"),
-  email_institucional: z.string().email("E-mail institucional inválido").nullable(),
+  email_institucional: z
+    .string()
+    .email("E-mail institucional inválido")
+    .nullable(),
   tipo_vinculo_aci: z.enum(["ASSOCIADA", "NAO_ASSOCIADA"]).optional(),
   // Dados de Endereço
   logradouro: z.string().min(3, "Logradouro obrigatório"),

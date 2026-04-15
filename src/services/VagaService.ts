@@ -31,7 +31,7 @@ export class VagaService {
           numero: dados.numero,
           cidade: dados.cidade || "Panambi",
           uf: dados.uf || "RS",
-          id_bairro: dados.id_bairro,
+          bairro: dados.bairro,
         },
       });
 

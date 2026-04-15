@@ -282,4 +282,16 @@ export class EmpresaService {
 
     return empresa;
   }
+
+  async listarMeusBeneficiosPadrao(id_empresa: number) {
+    const vinculos = await prisma.empresaBeneficioPadrao.findMany({
+      where: { id_empresa },
+      include: {
+        beneficio: true, // Traz a descrição do benefício da tabela Beneficio
+      },
+    });
+
+    // Mapeamos para retornar uma lista limpa apenas com os dados do benefício
+    return vinculos.map((item) => item.beneficio);
+  }
 }

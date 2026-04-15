@@ -1,7 +1,6 @@
 import { prisma } from "../config/prisma.js";
 
 export class TaxonomiaService {
-  
   // --- GESTÃO DE ÁREAS DE ATUAÇÃO ---
   async gerenciarAreas(
     acao: "LISTAR" | "CRIAR" | "DELETAR",
@@ -40,5 +39,14 @@ export class TaxonomiaService {
         where: { id_beneficio: Number(dados.id) },
       });
     }
+  }
+
+  async listarPerguntasEliminatorias() {
+    // Busca perguntas que são marcadas como padrão do sistema ou cadastradas
+    return await prisma.perguntaEliminatoria.findMany({
+      orderBy: {
+        descricao: "asc",
+      },
+    });
   }
 }

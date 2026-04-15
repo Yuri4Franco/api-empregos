@@ -3,6 +3,9 @@ import argon2 from "argon2";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt"; // Certifique-se de ter 'npm install bcrypt' e '@types/bcrypt'
 import crypto from "node:crypto";
+import { EmailService } from "./EmailService.js";
+
+const emailService = new EmailService();
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
@@ -33,7 +36,7 @@ export class AuthService {
       usuario.id_usuario,
       usuario.tipo_usuario,
       usuario.is_master,
-      usuario.exigir_troca_senha
+      usuario.exigir_troca_senha,
     );
   }
 
@@ -71,14 +74,19 @@ export class AuthService {
       usuarioPrincipal.id_usuario,
       usuarioPrincipal.tipo_usuario,
       usuarioPrincipal.is_master,
-      usuarioPrincipal.exigir_troca_senha
+      usuarioPrincipal.exigir_troca_senha,
     );
   }
 
   // #endregion FIM DAS FUNCIONALIDADES DE AUTENTICAÇÃO E GERAÇÃO DE TOKENS
 
   // #region FUNÇÃO AUXILIAR PARA GERAR TOKENS JWT
-  private gerarToken(id_usuario: number, tipo: string, is_master: boolean, exigir_troca_senha: boolean  ) {
+  private gerarToken(
+    id_usuario: number,
+    tipo: string,
+    is_master: boolean,
+    exigir_troca_senha: boolean,
+  ) {
     if (typeof JWT_SECRET !== "string") {
       throw new Error("Erro interno: JWT_SECRET não definida.");
     }
@@ -99,49 +107,50 @@ export class AuthService {
     return { token, tipo, exigir_troca_senha };
   }
   // #endregion FIM DA FUNÇÃO AUXILIAR PARA GERAR TOKENS JWT
+export class AuthService {
+  // ... (login e outros métodos)
+
   async registrarCandidato(dados: any) {
     const { nome, email, senha } = dados;
 
     // 1. Verificação de existência
-    const usuarioExistente = await prisma.usuario.findUnique({
-      where: { email },
-    });
-
-    if (usuarioExistente) {
-      throw new Error("Este e-mail já está cadastrado.");
-    }
+    const usuarioExistente = await prisma.usuario.findUnique({ where: { email } });
+    if (usuarioExistente) throw new Error("Este e-mail já está cadastrado.");
 
     // 2. Preparação de Segurança
     const senhaHash = await bcrypt.hash(senha, 10);
     const tokenAtivacao = crypto.randomBytes(32).toString("hex");
 
-    // 3. Execução da Transação (Garante que cria Usuário E Candidato)
-    return await prisma.$transaction(async (tx) => {
+    // 3. Execução da Transação
+    const resultado = await prisma.$transaction(async (tx) => {
       const user = await tx.usuario.create({
         data: {
           nome,
           email,
-          senha_hash: senhaHash, // Nome exato do seu model [cite: 1]
-          tipo_usuario: "CANDIDATO", // Usando o Enum ou String [cite: 31]
-          status: "PENDENTE", // Status inicial conforme seu model
-          token_ativacao: tokenAtivacao, // Adicionado ao schema
+          senha_hash: senhaHash,
+          tipo_usuario: "CANDIDATO",
+          status: "PENDENTE",
+          token_ativacao: tokenAtivacao,
         },
       });
 
-      // Criação do perfil do candidato (Seção 1 do escopo) [cite: 31, 94]
       await tx.candidato.create({
-        data: {
-          id_usuario: user.id_usuario,
-          // Deixe o CPF como nulo/opcional no início conforme o fluxo simplificado [cite: 44]
-        },
+        data: { id_usuario: user.id_usuario },
       });
 
-      return {
-        id: user.id_usuario,
-        email: user.email,
-        token: tokenAtivacao,
-      };
+      return { id: user.id_usuario, email: user.email, nome: user.nome, token: tokenAtivacao };
     });
+
+    // 4. Enviar E-mail de Boas-vindas / Confirmação [cite: 50, 52]
+    try {
+      await emailService.enviarEmailAtivacao(resultado.email, resultado.nome, resultado.token);
+    } catch (error) {
+      console.error("Erro ao enviar e-mail:", error);
+      // Não travamos o registro se o e-mail falhar, 
+      // mas o usuário precisará pedir reenvio depois.
+    }
+
+    return { id: resultado.id, email: resultado.email };
   }
 
   async confirmarEmail(token: string) {

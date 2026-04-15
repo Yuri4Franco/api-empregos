@@ -34,13 +34,11 @@ export class TaxonomiaController {
         .status(200)
         .json({ success: true, message: "Área removida com sucesso." });
     } catch (error: any) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error:
-            "Não é possível excluir uma área vinculada a vagas ou candidatos.",
-        });
+      return res.status(400).json({
+        success: false,
+        error:
+          "Não é possível excluir uma área vinculada a vagas ou candidatos.",
+      });
     }
   }
 
@@ -76,13 +74,24 @@ export class TaxonomiaController {
         .status(200)
         .json({ success: true, message: "Benefício removido com sucesso." });
     } catch (error: any) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error:
-            "Não é possível excluir um benefício vinculado a vagas ou empresas.",
-        });
+      return res.status(400).json({
+        success: false,
+        error:
+          "Não é possível excluir um benefício vinculado a vagas ou empresas.",
+      });
+    }
+  }
+
+  async listarPerguntasEliminatorias(req: Request, res: Response) {
+    try {
+      const perguntas = await taxonomiaService.listarPerguntasEliminatorias();
+
+      return res.json({
+        success: true,
+        data: perguntas,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
     }
   }
 }

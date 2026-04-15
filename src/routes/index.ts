@@ -9,7 +9,11 @@ import { EmpresaController } from "../controllers/EmpresaController.js";
 import { CandidatoController } from "../controllers/CandidatoController.js";
 import { CandidaturaController } from "../controllers/CandidaturaController.js";
 import { UserController } from "../controllers/UserController.js";
-import { uploadBanner, uploadLogo, uploadCandidato } from "../middlewares/upload.js";
+import {
+  uploadBanner,
+  uploadLogo,
+  uploadCandidato,
+} from "../middlewares/upload.js";
 import {
   AgendarEntrevistaSchema,
   AtualizarAdminSchema,
@@ -367,7 +371,7 @@ routes.post(
   empresaController.criarSolicitacao,
 );
 
-// Rotas de Admin [cite: 41, 44]
+// Rotas de Admin
 routes.get(
   "/admin/midia/pedidos",
   authMiddleware(["ADM"]),
@@ -412,6 +416,12 @@ routes.delete(
   authMiddleware(["ADM"]),
   validate(IdParamSchema, "params"),
   taxonomiaController.excluirBeneficio,
+);
+
+routes.get(
+  "/perguntas-eliminatorias",
+  authMiddleware(["ADM", "EMPRESA"]),
+  taxonomiaController.listarPerguntasEliminatorias,
 );
 
 // Empresa  - Gestão de Perfil Institucional
@@ -570,7 +580,14 @@ routes.patch(
 routes.get(
   "/empresa/perfil",
   authMiddleware(["EMPRESA"]),
-  empresaController.meuPerfil
+  empresaController.meuPerfil,
+);
+
+// Retorna os benefícios que a empresa configurou no perfil dela
+routes.get(
+  "/empresa/meus-beneficios-padrao",
+  authMiddleware(["EMPRESA"]),
+  empresaController.meusBeneficiosPadrao,
 );
 
 routes.get("/vagas/:id", vagaController.buscarDetalhes);
