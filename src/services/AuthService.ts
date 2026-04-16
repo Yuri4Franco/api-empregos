@@ -1,7 +1,6 @@
 import { prisma } from "../config/prisma.js";
 import argon2 from "argon2";
 import jwt from "jsonwebtoken";
-import bcrypt from "bcrypt"; // Certifique-se de ter 'npm install bcrypt' e '@types/bcrypt'
 import crypto from "node:crypto";
 import { EmailService } from "./EmailService.js";
 

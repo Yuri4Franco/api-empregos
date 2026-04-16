@@ -349,6 +349,111 @@ export const RegisterCandidatoSchema = z
     path: ["confirmar_senha"],
   });
 
+export const updateCandidatoSchema = z.object({
+  // Dados Pessoais
+  cpf: z.string().length(11, "CPF deve ter 11 dígitos").optional().nullable(),
+  telefone: z.string().min(10).optional().nullable(),
+  whatsapp: z.string().min(10).optional().nullable(),
+  data_nascimento: z.string().pipe(z.coerce.date()).optional().nullable(),
+  genero: z.string().optional().nullable(),
+
+  // Links e Social
+  link_linkedin: z
+    .string()
+    .url("URL inválida")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  link_portfolio: z
+    .string()
+    .url("URL inválida")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+
+  // Profissional
+  objetivo_profissional: z.string().max(200).optional().nullable(),
+  pretensao_salarial: z.number().positive().optional().nullable(),
+  resumo_profissional: z.string().min(20).optional().nullable(),
+  id_area_atuacao: z.number().int().optional().nullable(),
+
+  // Preferências
+  disponibilidade_viagem: z.boolean().optional(),
+  disponibilidade_mudanca: z.boolean().optional(),
+  turno_preferido: z
+    .enum(["MANHA", "TARDE", "NOITE", "INTEGRAL", "FLEXIVEL"])
+    .optional()
+    .nullable(),
+  pcd: z.boolean().optional(),
+  tipo_pcd: z.string().optional().nullable(),
+
+  // Endereço (Nested)
+  endereco: z
+    .object({
+      logradouro: z.string().min(3),
+      numero: z.string(),
+      complemento: z.string().optional().nullable(),
+      bairro: z.string().min(2),
+      cidade: z.string().default("Panambi"),
+      uf: z.string().length(2).default("RS"),
+      cep: z.string().length(8),
+    })
+    .optional(),
+});
+
+export const experienciaSchema = z
+  .object({
+    empresa: z.string().min(2, "Nome da empresa é obrigatório"),
+    cargo: z.string().min(2, "Cargo é obrigatório"),
+    atividades: z
+      .string()
+      .max(1000, "Resumo de atividades muito longo")
+      .optional()
+      .nullable(),
+    data_inicio: z.string().pipe(z.coerce.date()),
+    data_fim: z.string().pipe(z.coerce.date()).optional().nullable(),
+    atual: z.boolean().default(false),
+  })
+  .refine(
+    (data) => {
+      if (!data.atual && !data.data_fim) return false;
+      return true;
+    },
+    {
+      message: "Data de fim é obrigatória se não for o emprego atual",
+      path: ["data_fim"],
+    },
+  );
+
+export const formacaoSchema = z
+  .object({
+    instituicao: z.string().min(2, "Nome da instituição é obrigatório"),
+    nivel: z.string().min(2, "Nível de escolaridade é obrigatório"), // Ex: Ensino Médio, Superior, Técnico
+    curso: z.string().min(2, "Nome do curso é obrigatório"),
+    status: z.string().min(2, "Status é obrigatório"), // Ex: Concluído, Cursando, Trancado
+    data_conclusao: z.string().pipe(z.coerce.date()).optional().nullable(),
+  })
+  .refine(
+    (data) => {
+      // Regra inteligente: Se marcou como concluído, tem que ter a data.
+      if (data.status.toUpperCase() === "CONCLUÍDO" && !data.data_conclusao) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: "A data de conclusão é obrigatória para cursos concluídos.",
+      path: ["data_conclusao"],
+    },
+  );
+
+export const candidatoCompetenciaSchema = z.object({
+  id_competencia: z.number().int().positive("Competência inválida"),
+  nivel: z
+    .enum(["BASICO", "INTERMEDIARIO", "AVANCADO", "ESPECIALISTA"])
+    .default("INTERMEDIARIO"),
+});
+
 export const AtualizarDadosEmpresaSchema = z.object({
   razao_social: z.string().min(3, "Razão social muito curta"),
   nome_fantasia: z.string().min(2, "Nome fantasia muito curto"),

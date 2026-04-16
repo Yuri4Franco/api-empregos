@@ -94,4 +94,17 @@ export class TaxonomiaController {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
+
+  async listarCompetencias(req: Request, res: Response) {
+    try {
+      const competencias = await taxonomiaService.listarCompetencias();
+      return res.json({
+        success: true,
+        data: competencias,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+  
 }

@@ -412,5 +412,81 @@ export class CandidatoService {
       return candidatura;
     });
   }
-  
+
+  async obterMeuCurriculo(id_usuario: number) {
+    const curriculo = await prisma.candidato.findUnique({
+      where: {
+        id_usuario: id_usuario,
+      },
+      include: {
+        // Traz o Nome e E-mail da tabela Usuario (PK)
+        usuario: {
+          select: {
+            nome: true,
+            email: true,
+            status: true,
+            criado_em: true,
+          },
+        },
+        // Traz Endereço e Área de Atuação
+        endereco: true,
+        area_atuacao: true,
+
+        // Traz as Experiências ordenadas por data_inicio decrescente (mais recentes primeiro)
+        experiencias: {
+          orderBy: {
+            data_inicio: "desc",
+          },
+        },
+
+        // Traz as Formações ordenadas por data_conclusao decrescente
+        formacoes: {
+          orderBy: {
+            data_conclusao: "desc",
+          },
+        },
+
+        // Traz as Competências e inclui os dados da tabela Competencia (ex: nome da skill)
+        competencias: {
+          include: {
+            competencia: true,
+          },
+        },
+      },
+    });
+
+    if (!curriculo) {
+      throw new Error("Currículo não encontrado para este usuário.");
+    }
+
+    return curriculo;
+  }
+
+  async actualizarDadosGerais(id_usuario: number, dados: any) {
+    const { endereco, ...dadosCandidato } = dados;
+    console.log("Dados recebidos para atualização:", dados);
+
+    return await prisma.$transaction(async (tx) => {
+
+      return await tx.candidato.update({
+        where: { id_usuario },
+        data: {
+          ...dadosCandidato,
+
+          ...(endereco && {
+            endereco: {
+              upsert: {
+                create: endereco,
+                update: endereco,
+              },
+            },
+          }),
+        },
+        include: {
+          endereco: true,
+          area_atuacao: true,
+        },
+      });
+    });
+  }
 }

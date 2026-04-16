@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { CandidatoService } from "../services/CandidatoService.js";
+import { updateCandidatoSchema } from "../schemas/auth.schema.js";
 
 const candidatoService = new CandidatoService();
 
@@ -200,6 +201,51 @@ export class CandidatoController {
       return res.json({
         success: true,
         data: historico,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  async meuCurriculo(req: Request, res: Response) {
+    try {
+      const id_usuario = (req.user as any).id;
+      console.log("ID do usuário autenticado:", id_usuario);
+
+      if (!id_usuario) {
+        return res
+          .status(401)
+          .json({ success: false, error: "Usuário não autenticado." });
+      }
+
+      const dadosCurriculo =
+        await candidatoService.obterMeuCurriculo(id_usuario);
+
+      return res.status(200).json({
+        success: true,
+        data: dadosCurriculo,
+      });
+    } catch (error: any) {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  async actualizar(req: Request, res: Response) {
+    try {
+      const id_usuario = (req.user as any).id;
+
+      const candidatoActualizado = await candidatoService.actualizarDadosGerais(
+        id_usuario,
+        req.body,
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Perfil atualizado com sucesso!",
+        data: candidatoActualizado,
       });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });

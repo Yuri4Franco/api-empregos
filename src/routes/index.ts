@@ -9,6 +9,9 @@ import { EmpresaController } from "../controllers/EmpresaController.js";
 import { CandidatoController } from "../controllers/CandidatoController.js";
 import { CandidaturaController } from "../controllers/CandidaturaController.js";
 import { UserController } from "../controllers/UserController.js";
+import { ExperienciaController } from "../controllers/ExperienciaController.js";
+import { FormacaoController } from "../controllers/FormacaoController.js";
+import { CompetenciaController } from "../controllers/CompetenciaController.js";
 import {
   uploadBanner,
   uploadLogo,
@@ -22,15 +25,18 @@ import {
   AtualizarUsuarioSchema,
   CadastroAdminSchema,
   cadastroCandidatoManualSchema,
+  candidatoCompetenciaSchema,
   CandidaturaSchema,
   ColaboradorSchema,
   ConfigurarDestaquesSchema,
   CreditosSchema,
   DashboardFiltroSchema,
   EmpresaSchema,
+  experienciaSchema,
   ExperienciaSchema,
   FiltroUsuarioSchema,
   FiltroVagasEmpresaSchema,
+  formacaoSchema,
   FormacaoSchema,
   GerenciarMidiaSchema,
   IdParamSchema,
@@ -42,6 +48,7 @@ import {
   StatusUsuarioSchema,
   TaxonomiaSchema,
   TrocarSenha,
+  updateCandidatoSchema,
   vagaSchema,
   VincularCompetenciaSchema,
 } from "../schemas/auth.schema.js";
@@ -59,12 +66,15 @@ const taxonomiaController = new TaxonomiaController();
 const candidatoController = new CandidatoController();
 const candidaturaController = new CandidaturaController();
 const usuarioController = new UserController();
+const experienciaController = new ExperienciaController();
+const formacaoController = new FormacaoController();
+const competenciaController = new CompetenciaController();
 
 routes.post("/login", authController.login);
 
 routes.post("/register", authController.register);
 
-routes.post("/ativar", authController.ativar)
+routes.post("/ativar", authController.ativar);
 
 routes.post("/auth/reenviar-ativacao", authController.reenviarAtivacao);
 
@@ -426,8 +436,12 @@ routes.delete(
 
 routes.get(
   "/perguntas-eliminatorias",
-  authMiddleware(["ADM", "EMPRESA"]),
   taxonomiaController.listarPerguntasEliminatorias,
+);
+
+routes.get(
+  "/taxonomia/competencias",
+  taxonomiaController.listarCompetencias,
 );
 
 // Empresa  - Gestão de Perfil Institucional
@@ -594,6 +608,76 @@ routes.get(
   "/empresa/meus-beneficios-padrao",
   authMiddleware(["EMPRESA"]),
   empresaController.meusBeneficiosPadrao,
+);
+
+// Rota para o candidato obter seu próprio currículo completo
+routes.get(
+  "/candidato/meu-curriculo",
+  authMiddleware(["CANDIDATO"]),
+  candidatoController.meuCurriculo,
+);
+
+routes.put(
+  "/candidato/meu-curriculo",
+  authMiddleware(["CANDIDATO"]),
+  validate(updateCandidatoSchema, "body"),
+  candidatoController.actualizar,
+);
+
+// Rotas de Experiência Profissional
+routes.post(
+  "/candidato/experiencias",
+  authMiddleware(["CANDIDATO"]),
+  validate(experienciaSchema), // Validação Zod aqui
+  experienciaController.store,
+);
+
+routes.put(
+  "/candidato/experiencias/:id",
+  authMiddleware(["CANDIDATO"]),
+  validate(experienciaSchema),
+  experienciaController.update,
+);
+
+routes.delete(
+  "/candidato/experiencias/:id",
+  authMiddleware(["CANDIDATO"]),
+  experienciaController.destroy,
+);
+
+// Rotas de Formação Acadêmica
+routes.post(
+  "/candidato/formacoes",
+  authMiddleware(["CANDIDATO"]),
+  validate(formacaoSchema),
+  formacaoController.store,
+);
+
+routes.put(
+  "/candidato/formacoes/:id",
+  authMiddleware(["CANDIDATO"]),
+  validate(formacaoSchema),
+  formacaoController.update,
+);
+
+routes.delete(
+  "/candidato/formacoes/:id",
+  authMiddleware(["CANDIDATO"]),
+  formacaoController.destroy,
+);
+
+// Rotas de Competências do Candidato
+routes.post(
+  "/candidato/competencias",
+  authMiddleware(["CANDIDATO"]),
+  validate(candidatoCompetenciaSchema),
+  competenciaController.store,
+);
+
+routes.delete(
+  "/candidato/competencias/:id_competencia",
+  authMiddleware(["CANDIDATO"]),
+  competenciaController.destroy,
 );
 
 routes.get("/vagas/:id", vagaController.buscarDetalhes);

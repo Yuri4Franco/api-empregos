@@ -49,4 +49,12 @@ export class TaxonomiaService {
       },
     });
   }
+
+  async listarCompetencias() {
+    return await prisma.competencia.findMany({
+      orderBy: {
+        nome: "asc",
+      },
+    });
+  }
 }
