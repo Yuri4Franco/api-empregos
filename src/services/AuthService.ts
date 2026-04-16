@@ -12,7 +12,7 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
 export class AuthService {
   // #region FUNCIONALIDADES DE AUTENTICAÇÃO E GERAÇÃO DE TOKENS
   async loginPorEmail(email: string, senha_pura: string) {
-    console.log("email que chegou:", email)
+    console.log("email que chegou:", email);
     const usuario = await prisma.usuario.findUnique({
       where: { email },
     });
@@ -31,9 +31,6 @@ export class AuthService {
 
     const senhaValida = await argon2.verify(usuario.senha_hash, senha_pura);
     if (!senhaValida) throw new Error("Credenciais inválidas.");
-
-
-
 
     return this.gerarToken(
       usuario.id_usuario,
@@ -109,12 +106,14 @@ export class AuthService {
 
     return { token, tipo, exigir_troca_senha };
   }
-  // #endregion FIM DA FUNÇÃO AUXILIAR PARA GERAR TOKENS JWT
 
+  // #endregion FIM DA FUNÇÃO AUXILIAR PARA GERAR TOKENS JWT
   async registrarCandidato(dados: any) {
     const { nome, email, senha } = dados;
 
-    const usuarioExistente = await prisma.usuario.findUnique({ where: { email } });
+    const usuarioExistente = await prisma.usuario.findUnique({
+      where: { email },
+    });
     if (usuarioExistente) throw new Error("Este e-mail já está cadastrado.");
 
     const senhaHash = await argon2.hash(senha);
@@ -136,11 +135,20 @@ export class AuthService {
         data: { id_usuario: user.id_usuario },
       });
 
-      return { id: user.id_usuario, email: user.email, nome: user.nome, token: tokenAtivacao };
+      return {
+        id: user.id_usuario,
+        email: user.email,
+        nome: user.nome,
+        token: tokenAtivacao,
+      };
     });
 
     try {
-      await emailService.enviarEmailAtivacao(resultado.email, resultado.nome, resultado.token);
+      await emailService.enviarEmailAtivacao(
+        resultado.email,
+        resultado.nome,
+        resultado.token,
+      );
     } catch (error) {
       console.error("Erro ao enviar e-mail:", error);
     }
@@ -148,7 +156,6 @@ export class AuthService {
   }
 
   async confirmarEmail(token: string) {
-
     const usuario = await prisma.usuario.findFirst({
       where: { token_ativacao: token },
     });
@@ -181,7 +188,6 @@ export class AuthService {
       throw new Error("Esta conta já está ativada. Você já pode fazer login.");
     }
 
-    // 3. Gera um NOVO token (invalida o antigo por segurança)
     const novoToken = crypto.randomBytes(32).toString("hex");
 
     // 4. Atualiza o banco com o novo token
@@ -192,10 +198,16 @@ export class AuthService {
 
     // 5. Reenvia o e-mail
     try {
-      await emailService.enviarEmailAtivacao(usuario.email, usuario.nome, novoToken);
+      await emailService.enviarEmailAtivacao(
+        usuario.email,
+        usuario.nome,
+        novoToken,
+      );
     } catch (error) {
       console.error("Erro ao reenviar e-mail:", error);
-      throw new Error("Não foi possível enviar o e-mail no momento. Tente novamente mais tarde.");
+      throw new Error(
+        "Não foi possível enviar o e-mail no momento. Tente novamente mais tarde.",
+      );
     }
 
     return true;

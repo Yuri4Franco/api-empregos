@@ -113,7 +113,7 @@ export class VagaService {
             "nome",
             "idade",
             "experiencia_recente",
-            "cidade_bairro",
+            "cidade",
           ],
         },
       });
