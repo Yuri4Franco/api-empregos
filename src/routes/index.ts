@@ -62,6 +62,12 @@ const usuarioController = new UserController();
 
 routes.post("/login", authController.login);
 
+routes.post("/register", authController.register);
+
+routes.post("/ativar", authController.ativar)
+
+routes.post("/auth/reenviar-ativacao", authController.reenviarAtivacao);
+
 // Rotas de Admin
 // Cadastrar nova empresa - OK
 routes.post(

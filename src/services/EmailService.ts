@@ -1,5 +1,6 @@
 import { transporter } from "../config/mailer";
 
+
 export class EmailService {
   async enviarEmailAtivacao(email: string, nome: string, token: string) {
     const urlAtivacao = `${process.env.APP_URL}/ativar/${token}`;

@@ -6,7 +6,12 @@ const authService = new AuthService();
 export class AuthController {
   async login(req: Request, res: Response) {
     try {
+      
       const { email, senha, cnpj } = req.body;
+
+      console.log("email:", email);
+      console.log("senha:", senha);
+
 
       let result;
       if (cnpj) {
@@ -31,13 +36,10 @@ export class AuthController {
     try {
       const resultado = await authService.registrarCandidato(req.body);
 
-      // Aqui, em produção, você não retornaria o token no JSON,
-      // mas enviaria por e-mail silenciosamente. [cite: 41, 53]
       return res.status(201).json({
         success: true,
         message:
           "Cadastro realizado com sucesso! Verifique seu e-mail para ativar a conta.",
-        token_simulado_desenvolvimento: resultado.token,
       });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
@@ -46,7 +48,9 @@ export class AuthController {
 
   async ativar(req: Request, res: Response) {
     try {
-      const token = req.params.token as string;
+      console.log("BODY RECEBIDO NO BACKEND:", req.body);
+      
+      const { token } = req.body;
 
       if (!token) {
         throw new Error("Token de ativação não fornecido.");
@@ -60,6 +64,31 @@ export class AuthController {
       });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  async reenviarAtivacao(req: Request, res: Response) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "O e-mail é obrigatório." 
+        });
+      }
+
+      await authService.reenviarLinkAtivacao(email);
+
+      return res.status(200).json({
+        success: true,
+        message: "Um novo link de ativação foi enviado para o seu e-mail.",
+      });
+    } catch (error: any) {
+      return res.status(400).json({ 
+        success: false, 
+        error: error.message 
+      });
     }
   }
 }
