@@ -6,7 +6,7 @@ const experienciaService = new ExperienciaService();
 export class ExperienciaController {
   async store(req: Request, res: Response) {
     try {
-      const id_usuario = (req as any).usuario.id;
+      const id_usuario = (req.user as any).id;
       const novaExp = await experienciaService.criar(id_usuario, req.body);
       return res.status(201).json({ success: true, data: novaExp });
     } catch (error: any) {
@@ -17,7 +17,7 @@ export class ExperienciaController {
   async update(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const id_usuario = (req as any).usuario.id;
+      const id_usuario = (req.user as any).id;
       const expAtualizada = await experienciaService.atualizar(
         Number(id),
         id_usuario,
@@ -32,7 +32,7 @@ export class ExperienciaController {
   async destroy(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const id_usuario = (req as any).usuario.id;
+      const id_usuario = (req.user as any).id;
       await experienciaService.deletar(Number(id), id_usuario);
       return res.json({ success: true, message: "Experiência removida." });
     } catch (error: any) {

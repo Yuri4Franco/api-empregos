@@ -251,4 +251,27 @@ export class CandidatoController {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
+
+  async toggleVisibilidade(req: Request, res: Response) {
+    try {
+      const id_usuario = (req.user as any).id;
+      
+      const { perfil_visivel_empresas } = req.body; 
+
+      const resultado = await candidatoService.atualizarVisibilidade(
+        id_usuario, 
+        perfil_visivel_empresas
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: perfil_visivel_empresas 
+          ? "Seu currículo agora está visível para as empresas." 
+          : "Seu currículo foi ocultado do banco de talentos.",
+        data: resultado,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
 }

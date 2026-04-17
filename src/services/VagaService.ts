@@ -601,90 +601,6 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
     });
   }
 
-  async listarVagasPublicas(filtros: {
-    id_bairro?: number; // Agora filtramos pelo ID da Taxonomia
-    cidade?: string;
-    uf?: string;
-    id_area_atuacao?: number; // Filtro por ID para precisão no BI
-    modelo?: ModeloTrabalho;
-    pagina?: number;
-  }) {
-    const itensPorPagina = 10;
-    const skip = ((filtros.pagina || 1) - 1) * itensPorPagina;
-
-    // Construção do Filtro com as novas relações
-    const where: any = {
-      status: "ATIVA", // Apenas o que o Admin aprovou [cite: 20]
-      AND: [
-        // Filtro de Localização (dentro da tabela Endereco)
-        filtros.cidade || filtros.uf || filtros.id_bairro
-          ? {
-              endereco: {
-                is: {
-                  ...(filtros.cidade && {
-                    cidade: { contains: filtros.cidade, mode: "insensitive" },
-                  }),
-                  ...(filtros.uf && { uf: filtros.uf }),
-                  ...(filtros.id_bairro && { id_bairro: filtros.id_bairro }),
-                },
-              },
-            }
-          : {},
-        // Filtro de Área (Taxonomia)
-        filtros.id_area_atuacao
-          ? { id_area_atuacao: filtros.id_area_atuacao }
-          : {},
-        // Filtro de Modelo
-        filtros.modelo ? { modelo_trabalho: filtros.modelo } : {},
-      ],
-    };
-
-    const [vagas, total] = await prisma.$transaction([
-      prisma.vaga.findMany({
-        where,
-        select: {
-          id_vaga: true,
-          titulo: true,
-          modelo_trabalho: true,
-          tipo_contrato: true,
-          faixa_salarial_de: true,
-          faixa_salarial_ate: true,
-          ocultar_salario: true,
-          empresa_confidencial: true,
-          data_publicacao: true,
-          // Buscando dados do Endereço normalizado
-          endereco: {
-            select: {
-              cidade: true,
-              uf: true,
-              bairro: true,
-            },
-          },
-          // Buscando nome da Área da Taxonomia
-          area_atuacao: {
-            select: { nome: true },
-          },
-          empresa: {
-            select: {
-              nome_fantasia: true,
-              logotipo_url: true,
-            },
-          },
-        },
-        orderBy: { data_publicacao: "desc" },
-        skip,
-        take: itensPorPagina,
-      }),
-      prisma.vaga.count({ where }),
-    ]);
-
-    return {
-      vagas,
-      totalPaginas: Math.ceil(total / itensPorPagina),
-      totalRegistros: total,
-    };
-  }
-
   async buscarPorId(id_vaga: number) {
     const vaga = await prisma.vaga.findUnique({
       where: { id_vaga },
@@ -713,7 +629,7 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
     return vaga;
   }
 
-  async listarCandidatosPorVaga(id_vaga: number, id_empresa: number) {
+async listarCandidatosPorVaga(id_vaga: number, id_empresa: number) {
     // 1. Validar se a vaga pertence à empresa
     const vaga = await prisma.vaga.findFirst({
       where: { id_vaga, id_empresa },
@@ -731,12 +647,13 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
             usuario: {
               select: { nome: true, email: true },
             },
-            // Buscamos o endereço normalizado para pegar cidade/uf
             endereco: {
-                select: { cidade: true, uf: true, bairro: true }, // Para o BI e localização
+                select: { cidade: true, uf: true, bairro: true },
             },
-            // Buscamos a área de atuação do candidato
-            area_atuacao: { select: { nome: true } },
+            // ✨ ATUALIZAÇÃO DO INCLUDE: Nova estrutura de áreas
+            areas_atuacao: { 
+              include: { area: { select: { nome: true } } } 
+            },
           },
         },
       },
@@ -750,11 +667,15 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
         id_candidato: c.id_candidato,
         nome: c.candidato.usuario.nome,
         email: c.candidato.usuario.email,
-        // Acessamos cidade e UF através do objeto endereco
         cidade: c.candidato.endereco?.cidade || "Não informada",
         uf: c.candidato.endereco?.uf || "--",
         bairro: c.candidato.endereco?.bairro || "Outro/Não informado",
-        area_profissional: c.candidato.area_atuacao?.nome || "Não definida",
+        
+        // ✨ ATUALIZAÇÃO DO MAPEAMENTO
+        areas_profissionais: c.candidato.areas_atuacao?.length 
+          ? c.candidato.areas_atuacao.map((a) => a.area.nome).join(", ") 
+          : "Não definida",
+          
         status: c.status_atual,
         id_etapa_atual: c.id_etapa_atual,
         data_inscricao: c.data_candidatura,
@@ -819,5 +740,107 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
         },
       });
     });
+  }
+
+async listarVagasPublicas(filtros: {
+    busca?: string | undefined;
+    cidade?: string | undefined;
+    pagina?: number | undefined;
+    limite?: number | undefined;
+  }) {
+    // Configurações padrão de paginação
+    const pagina = Number(filtros.pagina) || 1;
+    const limite = Number(filtros.limite) || 10;
+    const pular = (pagina - 1) * limite;
+
+    // Constrói a query de filtro dinamicamente
+    const whereClause: any = {
+      status: "ATIVA", // A regra de ouro: NUNCA mostrar vagas fechadas ou pausadas
+    };
+
+    // Se o usuário digitou algo na barra de pesquisa
+    if (filtros.busca) {
+      whereClause.OR = [
+        { titulo: { contains: filtros.busca, mode: "insensitive" } },
+        { descricao: { contains: filtros.busca, mode: "insensitive" } },
+      ];
+    }
+
+    // Se o usuário filtrou por cidade
+    if (filtros.cidade) {
+      whereClause.cidade = { contains: filtros.cidade, mode: "insensitive" };
+    }
+
+    // 1. Conta o total de vagas que batem com o filtro (para o frontend saber o total de páginas)
+    const totalVagas = await prisma.vaga.count({
+      where: whereClause,
+    });
+
+    // 2. Busca as vagas da página atual
+    const vagas = await prisma.vaga.findMany({
+      where: whereClause,
+      skip: pular,
+      take: limite,
+      orderBy: {
+        data_publicacao : "desc", // Vagas mais recentes primeiro
+      },
+      // Trazemos apenas os dados públicos da empresa para não vazar informações sensíveis (como CNPJ, faturamento, etc)
+      include: {
+        empresa: {
+          select: {
+            nome_fantasia: true,
+            logotipo_url: true, // Se você tiver um campo de logo
+          },
+        },
+        area_atuacao: {
+          select: { nome: true },
+        },
+      },
+    });
+
+    return {
+      dados: vagas,
+      paginacao: {
+        total: totalVagas,
+        pagina_atual: pagina,
+        total_paginas: Math.ceil(totalVagas / limite),
+      },
+    };
+  }
+
+  async obterDetalhesVagaPublica(id_vaga: number) {
+    const vaga = await prisma.vaga.findUnique({
+      where: { 
+        id_vaga: id_vaga 
+      },
+      include: {
+        // Área de atuação da vaga
+        area_atuacao: {
+          select: { nome: true }
+        },
+        // FILTRO DE SEGURANÇA: Traz apenas os campos públicos da Empresa
+        empresa: {
+          select: {
+            nome_fantasia: true,
+            email: true,
+            tipo_vinculo_aci: true,
+            logotipo_url: true,
+            banner_url: true,
+            quem_somos: true,
+            site: true,
+            instagram: true,
+            linkedin: true,
+            facebook: true,
+            endereco: true // Traz os dados da tabela de Endereço vinculada à empresa
+          }
+        }
+      }
+    });
+
+    if (!vaga) {
+      throw new Error("Vaga não encontrada.");
+    }
+    
+    return vaga;
   }
 }

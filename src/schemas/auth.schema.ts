@@ -381,7 +381,7 @@ export const updateCandidatoSchema = z.object({
   disponibilidade_viagem: z.boolean().optional(),
   disponibilidade_mudanca: z.boolean().optional(),
   turno_preferido: z
-    .enum(["MANHA", "TARDE", "NOITE", "INTEGRAL", "FLEXIVEL"])
+    .enum(["MATUTINO", "DIURNO", "NOTURNO", "VESPERTINO", "SEM_PREFERENCIA"])
     .optional()
     .nullable(),
   pcd: z.boolean().optional(),
@@ -454,6 +454,12 @@ export const candidatoCompetenciaSchema = z.object({
     .default("INTERMEDIARIO"),
 });
 
+export const visibilidadeSchema = z.object({
+  perfil_visivel_empresas: z.boolean({
+    message: "O status de visibilidade é obrigatório e deve ser verdadeiro ou falso.",
+  }),
+});
+
 export const AtualizarDadosEmpresaSchema = z.object({
   razao_social: z.string().min(3, "Razão social muito curta"),
   nome_fantasia: z.string().min(2, "Nome fantasia muito curto"),
@@ -471,3 +477,9 @@ export const AtualizarDadosEmpresaSchema = z.object({
   uf: z.string().length(2).default("RS"),
   bairro: z.string().min(2, "Bairro obrigatório"),
 });
+
+export const candidatoAreaSchema = z.object({
+  id_area: z.number().int().positive("Área de atuação inválida"),
+});
+
+

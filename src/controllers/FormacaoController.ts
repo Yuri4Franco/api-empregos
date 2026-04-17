@@ -6,7 +6,7 @@ const formacaoService = new FormacaoService();
 export class FormacaoController {
   async store(req: Request, res: Response) {
     try {
-      const id_usuario = (req as any).usuario.id;
+      const id_usuario = (req.user as any).id;
       const novaFormacao = await formacaoService.criar(id_usuario, req.body);
       return res.status(201).json({ success: true, data: novaFormacao });
     } catch (error: any) {
@@ -17,7 +17,7 @@ export class FormacaoController {
   async update(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const id_usuario = (req as any).usuario.id;
+      const id_usuario = (req.user as any).id;
       const formacaoAtualizada = await formacaoService.atualizar(
         Number(id),
         id_usuario,
@@ -32,7 +32,7 @@ export class FormacaoController {
   async destroy(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const id_usuario = (req as any).usuario.id;
+      const id_usuario = (req.user as any).id;
       await formacaoService.deletar(Number(id), id_usuario);
       return res.json({ success: true, message: "Formação removida." });
     } catch (error: any) {

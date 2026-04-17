@@ -167,35 +167,6 @@ export class VagaController {
     }
   }
 
-  async listarPublicas(req: Request, res: Response) {
-    try {
-      const { cidade, uf, area, modelo, pagina, bairro } = req.query;
-
-      const filtros: any = {};
-
-      if (cidade) filtros.cidade = cidade as string;
-      if (uf) filtros.uf = uf as string;
-      if (area) filtros.id_area_atuacao = Number(area);
-      if (bairro) filtros.id_bairro = Number(bairro);
-      if (modelo) filtros.modelo = modelo as ModeloTrabalho;
-
-      filtros.pagina = pagina ? Number(pagina) : 1;
-
-      const resultado = await vagaService.listarVagasPublicas(filtros);
-
-      return res.status(200).json({
-        success: true,
-        data: resultado.vagas,
-        meta: {
-          totalPaginas: resultado.totalPaginas,
-          totalRegistros: resultado.totalRegistros,
-        },
-      });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, error: error.message });
-    }
-  }
-
   async buscarDetalhes(req: Request, res: Response) {
     try {
       const { id } = req.params;
@@ -255,6 +226,50 @@ export class VagaController {
           "Vaga encerrada com sucesso. Candidatos pendentes foram movidos para reprovação e aguardam publicação de feedback.",
       });
     } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  async listarPublicas(req: Request, res: Response) {
+    try {
+      // Extrai os filtros da Query String (a interrogação na URL)
+      const { busca, cidade, pagina, limite } = req.query;
+
+      const resultado = await vagaService.listarVagasPublicas({
+        busca: busca as string,
+        cidade: cidade as string,
+        pagina: pagina ? Number(pagina) : undefined,
+        limite: limite ? Number(limite) : undefined,
+      });
+
+      return res.status(200).json({
+        success: true,
+        ...resultado,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  async detalharPublica(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      if (!id || isNaN(Number(id))) {
+        return res.status(400).json({ success: false, error: "ID da vaga inválido." });
+      }
+
+      const detalhesVaga = await vagaService.obterDetalhesVagaPublica(Number(id));
+
+      return res.status(200).json({
+        success: true,
+        data: detalhesVaga,
+      });
+    } catch (error: any) {
+      // Se não achar a vaga, retornamos 404 (Not Found), o que é ótimo pro Google SEO
+      if (error.message === "Vaga não encontrada.") {
+        return res.status(404).json({ success: false, error: error.message });
+      }
       return res.status(400).json({ success: false, error: error.message });
     }
   }

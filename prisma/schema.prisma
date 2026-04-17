@@ -118,10 +118,21 @@ model Endereco {
 model AreaAtuacao {
   id_area   Int      @id @default(autoincrement())
   nome      String   @unique
-  candidatos  Candidato[]
+  candidatos CandidatoAreaAtuacao[]
   vagas     Vaga[]
 
   @@map("taxonomia_areas")
+}
+
+model CandidatoAreaAtuacao {
+  id_candidato Int
+  id_area      Int
+
+  candidato    Candidato   @relation(fields: [id_candidato], references: [id_usuario])
+  area         AreaAtuacao @relation(fields: [id_area], references: [id_area])
+
+  @@id([id_candidato, id_area])
+  @@map("candidato_areas_atuacao")
 }
 
 model Candidato {
@@ -145,9 +156,8 @@ model Candidato {
   resumo_profissional     String?   @db.Text
   disponibilidade_viagem  Boolean   @default(false)
   disponibilidade_mudanca Boolean   @default(false)
-  turno_preferido         String?
-  id_area_atuacao         Int?
-  area_atuacao            AreaAtuacao? @relation(fields: [id_area_atuacao], references: [id_area])
+  turno_preferido         Turno?    @default(SEM_PREFERENCIA)
+  areas_atuacao           CandidatoAreaAtuacao[]
 
   experiencias            ExperienciaProfissional[]
   formacoes               FormacaoAcademica[]
@@ -157,6 +167,14 @@ model Candidato {
   relatos_ouvidoria       OuvidoriaRelato[]
 
   @@map("candidatos")
+}
+
+enum Turno {
+  MATUTINO
+  VESPERTINO
+  NOTURNO
+  DIURNO
+  SEM_PREFERENCIA
 }
 
 model Empresa {

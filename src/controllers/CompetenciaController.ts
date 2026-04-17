@@ -6,7 +6,7 @@ const competenciaService = new CompetenciaService();
 export class CompetenciaController {
   async store(req: Request, res: Response) {
     try {
-      const id_usuario = (req as any).usuario.id;
+      const id_usuario = (req.user as any).id;
       const novaCompetencia = await competenciaService.adicionar(
         id_usuario,
         req.body,
@@ -25,7 +25,7 @@ export class CompetenciaController {
   async destroy(req: Request, res: Response) {
     try {
       const { id_competencia } = req.params;
-      const id_usuario = (req as any).usuario.id;
+      const id_usuario = (req.user as any).id;
 
       await competenciaService.deletar(id_usuario, Number(id_competencia));
 

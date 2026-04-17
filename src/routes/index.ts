@@ -12,6 +12,7 @@ import { UserController } from "../controllers/UserController.js";
 import { ExperienciaController } from "../controllers/ExperienciaController.js";
 import { FormacaoController } from "../controllers/FormacaoController.js";
 import { CompetenciaController } from "../controllers/CompetenciaController.js";
+import { AreaAtuacaoController } from "../controllers/AreaAtuacaoController.js";
 import {
   uploadBanner,
   uploadLogo,
@@ -25,6 +26,7 @@ import {
   AtualizarUsuarioSchema,
   CadastroAdminSchema,
   cadastroCandidatoManualSchema,
+  candidatoAreaSchema,
   candidatoCompetenciaSchema,
   CandidaturaSchema,
   ColaboradorSchema,
@@ -69,6 +71,7 @@ const usuarioController = new UserController();
 const experienciaController = new ExperienciaController();
 const formacaoController = new FormacaoController();
 const competenciaController = new CompetenciaController();
+const areaController = new AreaAtuacaoController();
 
 routes.post("/login", authController.login);
 
@@ -628,7 +631,7 @@ routes.put(
 routes.post(
   "/candidato/experiencias",
   authMiddleware(["CANDIDATO"]),
-  validate(experienciaSchema), // Validação Zod aqui
+  validate(experienciaSchema),
   experienciaController.store,
 );
 
@@ -680,6 +683,29 @@ routes.delete(
   competenciaController.destroy,
 );
 
+routes.post(
+  "/candidato/areas",
+  authMiddleware(["CANDIDATO"]),
+  validate(candidatoAreaSchema),
+  areaController.store
+);
+
+routes.delete(
+  "/candidato/areas/:id_area",
+  authMiddleware(["CANDIDATO"]),
+  areaController.destroy
+);
+
+routes.patch(
+  "/candidato/visibilidade",
+  authMiddleware(["CANDIDATO"]),
+  candidatoController.toggleVisibilidade
+);
+
 routes.get("/vagas/:id", vagaController.buscarDetalhes);
+
+routes.get("/vagas", vagaController.listarPublicas);
+
+routes.get("/vagas/:id", vagaController.detalharPublica);
 
 export default routes;
