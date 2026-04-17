@@ -430,9 +430,9 @@ export class CandidatoService {
         },
         // Traz Endereço e Área de Atuação
         endereco: true,
-        areas_atuacao: { 
-                include: { area: { select: { nome: true } } } 
-              },
+        areas_atuacao: {
+          include: { area: { select: { nome: true } } },
+        },
 
         // Traz as Experiências ordenadas por data_inicio decrescente (mais recentes primeiro)
         experiencias: {
@@ -469,7 +469,6 @@ export class CandidatoService {
     console.log("Dados recebidos para atualização:", dados);
 
     return await prisma.$transaction(async (tx) => {
-
       return await tx.candidato.update({
         where: { id_usuario },
         data: {
@@ -486,7 +485,9 @@ export class CandidatoService {
         },
         include: {
           endereco: true,
-          area_atuacao: true,
+          areas_atuacao: {
+            include: { area: { select: { nome: true } } },
+          },
         },
       });
     });
@@ -499,8 +500,8 @@ export class CandidatoService {
         perfil_visivel_empresas: visivel,
       },
       select: {
-        perfil_visivel_empresas: true 
-      }
+        perfil_visivel_empresas: true,
+      },
     });
   }
 }
