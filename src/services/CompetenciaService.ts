@@ -35,7 +35,7 @@ export class CompetenciaService {
         nivel: dados.nivel,
       },
       include: {
-        competencia: true, // Retorna os dados da skill para o frontend mostrar o nome
+        competencia: true,
       },
     });
   }

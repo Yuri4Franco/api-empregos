@@ -5,7 +5,7 @@ export class ExperienciaService {
     return await prisma.experienciaProfissional.create({
       data: {
         ...dados,
-        id_candidato: id_usuario, // Vincula ao id do usuário (PK do Candidato)
+        id_candidato: id_usuario,
       },
     });
   }

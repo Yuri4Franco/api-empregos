@@ -449,7 +449,7 @@ async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
   }
 
   // Listar todos os candidatos com dados básicos
-  async listarTodosCandidatos(filtros: any) {
+async listarTodosCandidatos(filtros: any) {
     const {
       page = 1,
       limit = 10,
@@ -465,7 +465,6 @@ async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
       tipo_usuario: "CANDIDATO",
       AND: [
         status ? { status } : {},
-        // Busca por Nome, Email ou CPF
         search
           ? {
               OR: [
@@ -475,7 +474,6 @@ async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
               ],
             }
           : {},
-        // Filtros de Localização (dentro da relação endereco)
         cidade || id_bairro
           ? {
               candidato: {
@@ -490,9 +488,15 @@ async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
               },
             }
           : {},
-        // Filtro por Área de Atuação (Taxonomia)
+        // ✨ ATUALIZAÇÃO DO FILTRO: Usa o "some" para buscar na nova relação N:M
         id_area_atuacao
-          ? { candidato: { id_area_atuacao: Number(id_area_atuacao) } }
+          ? {
+              candidato: {
+                areas_atuacao: {
+                  some: { id_area: Number(id_area_atuacao) },
+                },
+              },
+            }
           : {},
       ],
     };
@@ -513,7 +517,6 @@ async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
               cpf: true,
               telefone: true,
               whatsapp: true,
-              // Acesso ao novo modelo de Endereço
               endereco: {
                 select: {
                   cidade: true,
@@ -521,8 +524,10 @@ async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
                   bairro: true,
                 },
               },
-              // Acesso à Taxonomia de Área
-              area_atuacao: { select: { nome: true } },
+              // ✨ ATUALIZAÇÃO DO SELECT: Trazemos a lista de áreas
+              areas_atuacao: { 
+                include: { area: { select: { nome: true } } } 
+              },
               competencias: {
                 include: { competencia: { select: { nome: true } } },
                 take: 3,
@@ -534,7 +539,7 @@ async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
       }),
     ]);
 
-    // Formatação para manter a API limpa e fácil de usar no front-end
+    // ✨ ATUALIZAÇÃO DA FORMATAÇÃO: Transforma o array em uma string separada por vírgula
     const dataFormatada = candidatos.map((u) => ({
       id_usuario: u.id_usuario,
       nome: u.nome,
@@ -545,7 +550,10 @@ async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
       whatsapp: u.candidato?.whatsapp,
       cidade: u.candidato?.endereco?.cidade || "N/A",
       bairro: u.candidato?.endereco?.bairro || "Outro",
-      area_atuacao: u.candidato?.area_atuacao?.nome || "Não definida",
+      // Mapeia e junta com vírgula. Se estiver vazio, exibe "Não definida"
+      areas_atuacao: u.candidato?.areas_atuacao?.length 
+        ? u.candidato.areas_atuacao.map((a) => a.area.nome).join(", ") 
+        : "Não definida",
       competencias: u.candidato?.competencias.map((c) => c.competencia.nome),
     }));
 
