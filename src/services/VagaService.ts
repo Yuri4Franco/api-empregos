@@ -22,18 +22,17 @@ export class VagaService {
     }
 
     return await prisma.$transaction(async (tx) => {
-      // 2. Criar o Endereço (Vaga pode ter endereço próprio ou da empresa) [cite: 171]
+
       const endereco = await tx.endereco.create({
         data: {
           logradouro: dados.logradouro,
           numero: dados.numero,
-          cidade: dados.cidade || "Panambi",
+          cidade: dados.cidade || "PANAMBI",
           uf: dados.uf || "RS",
           bairro: dados.bairro,
         },
       });
 
-      // 3. Criar a Vaga Base (Etapa 1 e 2 do Wizard) [cite: 165, 177]
       const vaga = await tx.vaga.create({
         data: {
           id_empresa,
@@ -41,8 +40,8 @@ export class VagaService {
           id_area_atuacao: dados.id_area_atuacao,
           titulo: dados.titulo,
           nivel_hierarquico: dados.nivel_hierarquico,
-          modelo_trabalho: dados.modelo_trabalho, // PRESENCIAL, HIBRIDO, REMOTO [cite: 172]
-          tipo_contrato: dados.tipo_contrato, // CLT, PJ, etc [cite: 172]
+          modelo_trabalho: dados.modelo_trabalho,
+          tipo_contrato: dados.tipo_contrato,
           faixa_salarial_de: dados.salario_de,
           faixa_salarial_ate: dados.salario_ate,
           salario_a_combinar: dados.salario_a_combinar || false,
