@@ -68,7 +68,6 @@ export class AdminVagaController {
 
   async listarPendentes(req: Request, res: Response) {
     try {
-      // Apenas ADM acessa a fila de moderação
       const resultado = await vagaService.listarVagasPendentes(req.query);
 
       return res.status(200).json(resultado);
@@ -83,6 +82,7 @@ export class AdminVagaController {
       const { id } = req.params as any; // Validado pelo IdParamSchema
       const { acao, motivo } = req.body; // Validado pelo ModeracaoVagaSchema
       const idAutor = req.user.id;
+      console.log("Ação de moderação recebida:", { id, acao, motivo, idAutor });
 
       if (acao === "REPROVAR" && !motivo) {
         throw new Error(
@@ -105,6 +105,37 @@ export class AdminVagaController {
       });
     } catch (error: any) {
       return res.status(400).json({ error: error.message });
+    }
+  }
+
+  async confirmarPagamento(req: Request, res: Response) {
+    try {
+      const { id } = req.params as any;
+      console.log("Fazendo confirmação de pagamento para vaga ID")
+      console.log("ID da vaga para confirmação de pagamento:", id);
+
+      const id_admin = req.user.id;
+      
+      console.log("ID do admin que está confirmando o pagamento:", id_admin);
+
+      if (!id || isNaN(Number(id))) {
+        return res
+          .status(400)
+          .json({ success: false, error: "ID da vaga inválido." });
+      }
+
+      await vagaService.confirmarPagamento(Number(id), id_admin);
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Pagamento confirmado! A vaga agora está pública para os candidatos.",
+      });
+    } catch (error: any) {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
     }
   }
 }

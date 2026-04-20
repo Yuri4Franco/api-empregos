@@ -256,10 +256,14 @@ export class VagaController {
       const { id } = req.params;
 
       if (!id || isNaN(Number(id))) {
-        return res.status(400).json({ success: false, error: "ID da vaga inválido." });
+        return res
+          .status(400)
+          .json({ success: false, error: "ID da vaga inválido." });
       }
 
-      const detalhesVaga = await vagaService.obterDetalhesVagaPublica(Number(id));
+      const detalhesVaga = await vagaService.obterDetalhesVagaPublica(
+        Number(id),
+      );
 
       return res.status(200).json({
         success: true,
@@ -270,6 +274,27 @@ export class VagaController {
       if (error.message === "Vaga não encontrada.") {
         return res.status(404).json({ success: false, error: error.message });
       }
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  async listarAdmin(req: Request, res: Response) {
+    try {
+      const { busca, status, id_empresa, pagina, limite } = req.query;
+
+      const resultado = await vagaService.listarTodasVagasAdmin({
+        busca: busca as string | undefined,
+        status: status as string | undefined,
+        id_empresa: id_empresa ? Number(id_empresa) : undefined,
+        pagina: pagina ? Number(pagina) : undefined,
+        limite: limite ? Number(limite) : undefined,
+      });
+
+      return res.status(200).json({
+        success: true,
+        ...resultado,
+      });
+    } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
     }
   }

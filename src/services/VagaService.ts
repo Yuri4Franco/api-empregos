@@ -12,7 +12,7 @@ export class VagaService {
 
     let statusFinal: StatusVaga = "RASCUNHO";
     if (is_admin) {
-      statusFinal = "ATIVA"; 
+      statusFinal = "ATIVA";
     } else if (dados.enviar_para_aprovacao) {
       statusFinal =
         empresa.tipo_vinculo_aci === "NAO_ASSOCIADA" &&
@@ -22,7 +22,6 @@ export class VagaService {
     }
 
     return await prisma.$transaction(async (tx) => {
-
       const endereco = await tx.endereco.create({
         data: {
           logradouro: dados.logradouro,
@@ -128,6 +127,97 @@ export class VagaService {
 
       return vaga;
     });
+  }
+
+  async listarTodasVagasAdmin(filtros: {
+    busca?: string | undefined;
+    status?: string | undefined;
+    id_empresa?: number | undefined;
+    pagina?: number | undefined;
+    limite?: number | undefined;
+  }) {
+    const pagina = filtros.pagina || 1;
+    const limite = filtros.limite || 10;
+    const skip = (pagina - 1) * limite;
+
+    // Constrói a cláusula WHERE dinamicamente
+    const whereClause: any = {
+      AND: [], // Usamos AND para combinar múltiplos filtros
+    };
+
+    // 1. Filtro Exato por Status (ex: ATIVA, PAUSADA, PREENCHIDA)
+    if (filtros.status) {
+      whereClause.AND.push({ status: filtros.status });
+    }
+
+    // 2. Filtro Exato por Empresa (útil se o admin clicar em "Ver vagas desta empresa")
+    if (filtros.id_empresa) {
+      whereClause.AND.push({ id_empresa: filtros.id_empresa });
+    }
+
+    // 3. Busca em Texto Aberto (Procura no Título da Vaga OU no Nome da Empresa)
+    if (filtros.busca) {
+      whereClause.AND.push({
+        OR: [
+          { titulo: { contains: filtros.busca, mode: "insensitive" } },
+          {
+            empresa: {
+              nome_fantasia: { contains: filtros.busca, mode: "insensitive" },
+            },
+          },
+          {
+            empresa: {
+              razao_social: { contains: filtros.busca, mode: "insensitive" },
+            },
+          },
+        ],
+      });
+    }
+
+    // Se o array AND ficar vazio, deletamos para não quebrar o Prisma
+    if (whereClause.AND.length === 0) {
+      delete whereClause.AND;
+    }
+
+    // Busca Paralela para Performance (Conta o total e busca a página ao mesmo tempo)
+    const [totalVagas, vagas] = await Promise.all([
+      prisma.vaga.count({ where: whereClause }),
+
+      prisma.vaga.findMany({
+        where: whereClause,
+        skip: skip,
+        take: limite,
+        orderBy: {
+          data_publicacao: "desc", // Vagas mais recentes no topo
+        },
+        // O Admin precisa ver detalhes de quem criou
+        include: {
+          empresa: {
+            select: {
+              id_empresa: true,
+              nome_fantasia: true,
+              cnpj: true, // Admin pode ver CNPJ
+            },
+          },
+          area_atuacao: {
+            select: { nome: true },
+          },
+          // Opcional: Contar quantos candidatos já se aplicaram pra essa vaga
+          _count: {
+            select: { candidaturas: true },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      dados: vagas,
+      paginacao: {
+        total: totalVagas,
+        pagina_atual: pagina,
+        total_paginas: Math.ceil(totalVagas / limite),
+      },
+    };
   }
 
   async duplicarVaga(id_vaga: number, id_empresa: number) {
@@ -436,62 +526,67 @@ export class VagaService {
     });
   }
 
-async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
-  // 1. Forçamos a conversão para número e definimos valores padrão caso venham nulos
-  const page = Number(filtros.page) || 1;
-  const limit = Number(filtros.limit) || 10;
-  const { search, status } = filtros;
+  async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
+    // 1. Forçamos a conversão para número e definimos valores padrão caso venham nulos
+    const page = Number(filtros.page) || 1;
+    const limit = Number(filtros.limit) || 10;
+    const { search, status } = filtros;
 
-  // 2. Cálculo do skip garantindo que seja um número
-  const skip = (page - 1) * limit;
+    // 2. Cálculo do skip garantindo que seja um número
+    const skip = (page - 1) * limit;
 
-  const onde: any = {
-    id_empresa,
-    AND: [
-      status ? { status } : {},
-      search
-        ? {
-            OR: [
-              { titulo: { contains: search, mode: "insensitive" } },
-              { area_profissional: { contains: search, mode: "insensitive" } },
-            ],
-          }
-        : {},
-    ],
-  };
-
-  try {
-    const [total, vagas] = await Promise.all([
-      prisma.vaga.count({ where: onde }),
-      prisma.vaga.findMany({
-        where: onde,
-        skip: skip, // Agora é garantidamente um number
-        take: limit, // Agora é garantidamente um number
-        include: {
-          _count: { select: { candidaturas: true } },
-        },
-        orderBy: { data_publicacao: "desc" },
-      }),
-    ]);
-
-    return {
-      meta: {
-        total,
-        page,
-        limit,
-        total_paginas: Math.ceil(total / limit),
-      },
-      data: vagas,
+    const onde: any = {
+      id_empresa,
+      AND: [
+        status ? { status } : {},
+        search
+          ? {
+              OR: [
+                { titulo: { contains: search, mode: "insensitive" } },
+                {
+                  area_profissional: { contains: search, mode: "insensitive" },
+                },
+              ],
+            }
+          : {},
+      ],
     };
-  } catch (error) {
-    // Log detalhado no terminal para você ver se o banco reclamar de algum campo
-    console.error("Erro no Prisma ao listar vagas:", error);
-    throw new Error("Erro ao buscar vagas no banco de dados.");
+
+    try {
+      const [total, vagas] = await Promise.all([
+        prisma.vaga.count({ where: onde }),
+        prisma.vaga.findMany({
+          where: onde,
+          skip: skip, // Agora é garantidamente um number
+          take: limit, // Agora é garantidamente um number
+          include: {
+            _count: { select: { candidaturas: true } },
+          },
+          orderBy: { data_publicacao: "desc" },
+        }),
+      ]);
+
+      return {
+        meta: {
+          total,
+          page,
+          limit,
+          total_paginas: Math.ceil(total / limit),
+        },
+        data: vagas,
+      };
+    } catch (error) {
+      // Log detalhado no terminal para você ver se o banco reclamar de algum campo
+      console.error("Erro no Prisma ao listar vagas:", error);
+      throw new Error("Erro ao buscar vagas no banco de dados.");
+    }
   }
-}
 
   async listarVagasPendentes(filtros: any) {
-    const { page = 1, limit = 10, search } = filtros;
+    const page = Number(filtros.page) || 1;
+    const limit = Number(filtros.limit) || 10;
+    const search = filtros.search;
+
     const skip = (page - 1) * limit;
 
     const onde: any = {
@@ -562,13 +657,12 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
     }
 
     return await prisma.$transaction(async (tx) => {
-      // 1. Atualiza a vaga
       const vagaAtualizada = await tx.vaga.update({
         where: { id_vaga },
         data: {
           status: novoStatus,
           data_publicacao: novoStatus === "ATIVA" ? new Date() : null,
-          observacoes_admin: motivo, // Usando o campo de observações para o motivo
+          observacoes_admin: motivo,
         },
       });
 
@@ -596,6 +690,66 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
 
       return vagaAtualizada;
     });
+  }
+
+  async confirmarPagamento(id_vaga: number, id_admin: number) {
+    // 1. Busca a vaga para verificar o status atual
+    const vaga = await prisma.vaga.findUnique({
+      where: { id_vaga },
+      select: {
+        status: true,
+        empresa: {
+          select: { nome_fantasia: true, email: true },
+        },
+      },
+    });
+
+    if (!vaga) {
+      throw new Error("Vaga não encontrada no sistema.");
+    }
+
+    // 2. Trava de segurança: Evita reativar vagas canceladas ou que já estão ativas
+    if (vaga.status === "ATIVA") {
+      throw new Error(
+        "O pagamento desta vaga já foi confirmado e ela já está ativa.",
+      );
+    }
+
+    if (vaga.status === "EM_ANALISE") {
+      throw new Error(
+        "O pagamento desta vaga já foi confirmado e ela já está análise.",
+      );
+    }
+
+    if (vaga.status !== "AGUARDANDO_PAGAMENTO") {
+      throw new Error(
+        "Esta vaga não está aguardando confirmação de pagamento.",
+      );
+    }
+
+    // 3. Atualiza o status da vaga para EM_ANALISE
+    const vagaAtivada = await prisma.vaga.update({
+      where: { id_vaga },
+      data: {
+        status: "EM_ANALISE",
+        data_publicacao: new Date(),
+      },
+    });
+
+    await prisma.logAuditoria.create({
+      data: {
+        id_usuario: id_admin,
+        acao: "CONFIRMACAO_PAGAMENTO_VAGA",
+        detalhes: `Vaga ID ${id_vaga} da empresa ${vaga.empresa.nome_fantasia} liberada.`,
+        entidade: "VAGA",
+        id_entidade: id_vaga,
+      },
+    });
+
+    // Dica para o futuro: Aqui seria o lugar perfeito para disparar um e-mail
+    // avisando a empresa: "Seu pagamento foi confirmado e sua vaga já está no ar!"
+
+    return vagaAtivada;
   }
 
   async buscarPorId(id_vaga: number) {
@@ -626,7 +780,7 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
     return vaga;
   }
 
-async listarCandidatosPorVaga(id_vaga: number, id_empresa: number) {
+  async listarCandidatosPorVaga(id_vaga: number, id_empresa: number) {
     // 1. Validar se a vaga pertence à empresa
     const vaga = await prisma.vaga.findFirst({
       where: { id_vaga, id_empresa },
@@ -645,11 +799,11 @@ async listarCandidatosPorVaga(id_vaga: number, id_empresa: number) {
               select: { nome: true, email: true },
             },
             endereco: {
-                select: { cidade: true, uf: true, bairro: true },
+              select: { cidade: true, uf: true, bairro: true },
             },
             // ✨ ATUALIZAÇÃO DO INCLUDE: Nova estrutura de áreas
-            areas_atuacao: { 
-              include: { area: { select: { nome: true } } } 
+            areas_atuacao: {
+              include: { area: { select: { nome: true } } },
             },
           },
         },
@@ -667,12 +821,12 @@ async listarCandidatosPorVaga(id_vaga: number, id_empresa: number) {
         cidade: c.candidato.endereco?.cidade || "Não informada",
         uf: c.candidato.endereco?.uf || "--",
         bairro: c.candidato.endereco?.bairro || "Outro/Não informado",
-        
+
         // ✨ ATUALIZAÇÃO DO MAPEAMENTO
-        areas_profissionais: c.candidato.areas_atuacao?.length 
-          ? c.candidato.areas_atuacao.map((a) => a.area.nome).join(", ") 
+        areas_profissionais: c.candidato.areas_atuacao?.length
+          ? c.candidato.areas_atuacao.map((a) => a.area.nome).join(", ")
           : "Não definida",
-          
+
         status: c.status_atual,
         id_etapa_atual: c.id_etapa_atual,
         data_inscricao: c.data_candidatura,
@@ -704,7 +858,6 @@ async listarCandidatosPorVaga(id_vaga: number, id_empresa: number) {
         select: { id_candidatura: true, id_etapa_atual: true },
       });
 
-  
       if (candidatosPendentes.length > 0) {
         const ids = candidatosPendentes.map((c) => c.id_candidatura);
 
@@ -712,7 +865,7 @@ async listarCandidatosPorVaga(id_vaga: number, id_empresa: number) {
           data: candidatosPendentes.map((c) => ({
             id_candidatura: c.id_candidatura,
             etapa_origem: c.id_etapa_atual,
-            etapa_destino: 0, 
+            etapa_destino: 0,
             status_destino: "REPROVADO",
             motivo: motivo,
           })),
@@ -739,7 +892,7 @@ async listarCandidatosPorVaga(id_vaga: number, id_empresa: number) {
     });
   }
 
-async listarVagasPublicas(filtros: {
+  async listarVagasPublicas(filtros: {
     busca?: string | undefined;
     cidade?: string | undefined;
     pagina?: number | undefined;
@@ -779,7 +932,7 @@ async listarVagasPublicas(filtros: {
       skip: pular,
       take: limite,
       orderBy: {
-        data_publicacao : "desc", // Vagas mais recentes primeiro
+        data_publicacao: "desc", // Vagas mais recentes primeiro
       },
       // Trazemos apenas os dados públicos da empresa para não vazar informações sensíveis (como CNPJ, faturamento, etc)
       include: {
@@ -807,15 +960,19 @@ async listarVagasPublicas(filtros: {
 
   async obterDetalhesVagaPublica(id_vaga: number) {
     const vaga = await prisma.vaga.findUnique({
-      where: { 
-        id_vaga: id_vaga 
+      where: {
+        id_vaga: id_vaga,
       },
       include: {
-        // Área de atuação da vaga
         area_atuacao: {
-          select: { nome: true }
+          select: { nome: true },
         },
-        // FILTRO DE SEGURANÇA: Traz apenas os campos públicos da Empresa
+        beneficios: {
+          include: {
+            beneficio: { select: { descricao: true } },
+          },
+        },
+
         empresa: {
           select: {
             nome_fantasia: true,
@@ -828,16 +985,16 @@ async listarVagasPublicas(filtros: {
             instagram: true,
             linkedin: true,
             facebook: true,
-            endereco: true // Traz os dados da tabela de Endereço vinculada à empresa
-          }
-        }
-      }
+            endereco: true,
+          },
+        },
+      },
     });
 
     if (!vaga) {
       throw new Error("Vaga não encontrada.");
     }
-    
+
     return vaga;
   }
 }

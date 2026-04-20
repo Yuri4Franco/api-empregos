@@ -359,6 +359,12 @@ routes.patch(
   adminVagaController.moderar,
 );
 
+routes.patch(
+  "/admin/vagas/:id/confirmar-pagamento",
+  authMiddleware(["ADM"]),
+  adminVagaController.confirmarPagamento,
+);
+
 // --- OUVIDORIA (Relatos de Candidatos) ---
 routes.get(
   "/admin/ouvidoria",
@@ -442,10 +448,7 @@ routes.get(
   taxonomiaController.listarPerguntasEliminatorias,
 );
 
-routes.get(
-  "/taxonomia/competencias",
-  taxonomiaController.listarCompetencias,
-);
+routes.get("/taxonomia/competencias", taxonomiaController.listarCompetencias);
 
 // Empresa  - Gestão de Perfil Institucional
 routes.put(
@@ -686,20 +689,22 @@ routes.post(
   "/candidato/areas",
   authMiddleware(["CANDIDATO"]),
   validate(candidatoAreaSchema),
-  areaController.store
+  areaController.store,
 );
 
 routes.delete(
   "/candidato/areas/:id_area",
   authMiddleware(["CANDIDATO"]),
-  areaController.destroy
+  areaController.destroy,
 );
 
 routes.patch(
   "/candidato/visibilidade",
   authMiddleware(["CANDIDATO"]),
-  candidatoController.toggleVisibilidade
+  candidatoController.toggleVisibilidade,
 );
+
+routes.get("/admin/vagas", authMiddleware(["ADM"]), vagaController.listarAdmin);
 
 routes.get("/vagas", vagaController.listarPublicas);
 
