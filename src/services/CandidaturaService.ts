@@ -5,7 +5,6 @@ export class CandidaturaService {
   async candidatar(
     id_vaga: number,
     id_candidato: number,
-    respostas: { id_pergunta: number; resposta: any }[],
   ) {
     // 1. Trava de Segurança: Verificar se já existe candidatura ativa para este usuário nesta vaga
     const candidaturaExistente = await prisma.candidatura.findFirst({
@@ -31,28 +30,6 @@ export class CandidaturaService {
     // 2. Processamento da Triagem Inteligente
     let reprovadoNaTriagem = false;
 
-    const respostasFormatadas = vaga.perguntas_eliminatorias.map(
-      (perguntaVaga) => {
-        const respCandidato = respostas.find(
-          (r) => r.id_pergunta === perguntaVaga.id_pergunta,
-        );
-
-        // Se a pergunta era obrigatória e não veio resposta, tratamos como fora do perfil
-        const valorRespostaStr = String(respCandidato?.resposta ?? "");
-
-        const isForaDoPerfil =
-          valorRespostaStr !== perguntaVaga.resposta_esperada;
-
-        if (isForaDoPerfil) reprovadoNaTriagem = true;
-
-        return {
-          id_pergunta: perguntaVaga.id_pergunta,
-          resposta: valorRespostaStr,
-          fora_do_perfil: isForaDoPerfil,
-        };
-      },
-    );
-
     // 3. Definição da Etapa Inicial
     const primeiraEtapa = vaga.etapas[0]?.id_etapa;
     if (!primeiraEtapa) {
@@ -69,10 +46,7 @@ export class CandidaturaService {
         status_atual: reprovadoNaTriagem
           ? StatusCandidatura.REPROVADO
           : StatusCandidatura.INSCRITO,
-        data_candidatura: new Date(),
-        respostas: {
-          create: respostasFormatadas,
-        },
+        data_candidatura: new Date()
       },
       include: {
         vaga: { select: { titulo: true } }, // Para facilitar o retorno ao usuário

@@ -8,13 +8,12 @@ const candidaturaService = new CandidaturaService();
 export class CandidaturaController {
   async aplicar(req: Request, res: Response) {
     try {
-      const { id_vaga, respostas } = req.body;
+      const {id_vaga } = req.params;
       const user = req.user as any;
 
       const candidatura = await candidaturaService.candidatar(
         Number(id_vaga),
-        user.id,
-        respostas,
+        user.id
       );
 
       const mensagem =

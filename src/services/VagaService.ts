@@ -10,12 +10,10 @@ export class VagaService {
 
     if (!empresa) throw new Error("Empresa não encontrada.");
 
-    // 1. Definição de Status conforme Escopo [cite: 151, 205]
     let statusFinal: StatusVaga = "RASCUNHO";
     if (is_admin) {
-      statusFinal = "ATIVA"; // Cadastro via Balcão [cite: 14]
+      statusFinal = "ATIVA"; 
     } else if (dados.enviar_para_aprovacao) {
-      // Se for Não-Associada e não tiver pago, cai em aguardando pagamento [cite: 322, 328]
       statusFinal =
         empresa.tipo_vinculo_aci === "NAO_ASSOCIADA" &&
         empresa.creditos_vagas <= 0
@@ -55,7 +53,7 @@ export class VagaService {
           diferenciais: dados.diferenciais,
           empresa_confidencial: dados.empresa_confidencial || false,
           status: statusFinal,
-          data_publicacao: statusFinal === "ATIVA" ? new Date() : null,
+          data_publicacao: statusFinal === "ATIVA" ? new Date() : new Date(),
         },
       });
 

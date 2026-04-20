@@ -177,7 +177,7 @@ export const vagaSchema = z.object({
   modelo_trabalho: z.string(),
   tipo_contrato: z.string(),
 
-  // Financeiro
+
   salario_de: z.number().optional().nullable(),
   salario_ate: z.number().optional().nullable(),
   salario_a_combinar: z.boolean().default(false),
@@ -194,7 +194,7 @@ export const vagaSchema = z.object({
   logradouro: z.string().optional(),
   numero: z.string().optional(),
   bairro: z.string().optional(),
-  cidade: z.string().default("Panambi"),
+  cidade: z.string().default("PANAMBI").transform((val) => val.toUpperCase()),
   uf: z.string().length(2).default("RS"),
 
   // Arrays e Fluxo

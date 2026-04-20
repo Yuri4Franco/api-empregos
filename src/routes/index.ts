@@ -552,9 +552,8 @@ routes.get(
 
 // Rota para o candidato se inscrever em uma vaga
 routes.post(
-  "/candidatos/inscrever",
+  "/vagas/:id_vaga/candidatar",
   authMiddleware(["CANDIDATO"]),
-  validate(CandidaturaSchema, "body"),
   candidaturaController.aplicar,
 );
 
@@ -701,8 +700,6 @@ routes.patch(
   authMiddleware(["CANDIDATO"]),
   candidatoController.toggleVisibilidade
 );
-
-routes.get("/vagas/:id", vagaController.buscarDetalhes);
 
 routes.get("/vagas", vagaController.listarPublicas);
 
