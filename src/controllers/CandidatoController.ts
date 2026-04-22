@@ -1,21 +1,39 @@
 import type { Request, Response } from "express";
 import { CandidatoService } from "../services/CandidatoService.js";
 import { updateCandidatoSchema } from "../schemas/auth.schema.js";
+import { prisma } from "../config/prisma.js";
 
 const candidatoService = new CandidatoService();
 
 export class CandidatoController {
   /**
-   * Retorna os dados organizados para o quadro visual (Kanban) [cite: 242, 243]
+   * Retorna os dados organizados para o quadro visual
    */
   async index(req: Request, res: Response) {
     try {
       const { id_vaga } = req.params;
-      const id_empresa = (req.user as any).id_empresa;
+      const id_usuario = (req.user as any).id;
+
+      // 2. Buscamos no banco a qual empresa esse usuário pertence
+      const vinculo = await prisma.usuario.findUnique({
+        where: { id_usuario },
+        select: { id_empresa: true },
+      });
+
+      // 3. Verificação de segurança
+      if (!vinculo || !vinculo.id_empresa) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado. Usuário não vinculado a uma empresa.",
+        });
+      }
+
+      // 4. Agora sim, temos o ID real da empresa
+      const id_empresa_real = vinculo.id_empresa;
 
       const dadosKanban = await candidatoService.kanban(
         Number(id_vaga),
-        id_empresa,
+        id_empresa_real,
       );
 
       return res.status(200).json({
@@ -34,12 +52,29 @@ export class CandidatoController {
     try {
       const { id_candidatura } = req.params;
       const { id_etapa_destino } = req.body;
-      const id_empresa = (req.user as any).id_empresa;
+      const id_usuario = (req.user as any).id;
+
+      // 2. Buscamos no banco a qual empresa esse usuário pertence
+      const vinculo = await prisma.usuario.findUnique({
+        where: { id_usuario },
+        select: { id_empresa: true },
+      });
+
+      // 3. Verificação de segurança
+      if (!vinculo || !vinculo.id_empresa) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado. Usuário não vinculado a uma empresa.",
+        });
+      }
+
+      // 4. Agora sim, temos o ID real da empresa
+      const id_empresa_real = vinculo.id_empresa;
 
       const resultado = await candidatoService.moverCandidato(
         Number(id_candidatura),
         Number(id_etapa_destino),
-        id_empresa,
+        id_empresa_real,
       );
 
       return res.status(200).json({
@@ -82,11 +117,28 @@ export class CandidatoController {
   async publicarNotificacoes(req: Request, res: Response) {
     try {
       const { id_vaga } = req.params;
-      const id_empresa = (req.user as any).id_empresa;
+      const id_usuario = (req.user as any).id;
+
+      // 2. Buscamos no banco a qual empresa esse usuário pertence
+      const vinculo = await prisma.usuario.findUnique({
+        where: { id_usuario },
+        select: { id_empresa: true },
+      });
+
+      // 3. Verificação de segurança
+      if (!vinculo || !vinculo.id_empresa) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado. Usuário não vinculado a uma empresa.",
+        });
+      }
+
+      // 4. Agora sim, temos o ID real da empresa
+      const id_empresa_real = vinculo.id_empresa;
 
       await candidatoService.processarNotificacoesPendentes(
         Number(id_vaga),
-        id_empresa,
+        id_empresa_real,
       );
 
       return res.status(200).json({
@@ -132,11 +184,28 @@ export class CandidatoController {
   async verPerfil(req: Request, res: Response) {
     try {
       const { id_candidatura } = req.params;
-      const id_empresa = (req.user as any).id_empresa;
+      const id_usuario = (req.user as any).id;
+
+      // 2. Buscamos no banco a qual empresa esse usuário pertence
+      const vinculo = await prisma.usuario.findUnique({
+        where: { id_usuario },
+        select: { id_empresa: true },
+      });
+
+      // 3. Verificação de segurança
+      if (!vinculo || !vinculo.id_empresa) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado. Usuário não vinculado a uma empresa.",
+        });
+      }
+
+      // 4. Agora sim, temos o ID real da empresa
+      const id_empresa_real = vinculo.id_empresa;
 
       const perfil = await candidatoService.obterPerfilCompleto(
         Number(id_candidatura),
-        id_empresa,
+        id_empresa_real,
       );
       return res.json({ success: true, data: perfil });
     } catch (error: any) {
@@ -255,18 +324,18 @@ export class CandidatoController {
   async toggleVisibilidade(req: Request, res: Response) {
     try {
       const id_usuario = (req.user as any).id;
-      
-      const { perfil_visivel_empresas } = req.body; 
+
+      const { perfil_visivel_empresas } = req.body;
 
       const resultado = await candidatoService.atualizarVisibilidade(
-        id_usuario, 
-        perfil_visivel_empresas
+        id_usuario,
+        perfil_visivel_empresas,
       );
 
       return res.status(200).json({
         success: true,
-        message: perfil_visivel_empresas 
-          ? "Seu currículo agora está visível para as empresas." 
+        message: perfil_visivel_empresas
+          ? "Seu currículo agora está visível para as empresas."
           : "Seu currículo foi ocultado do banco de talentos.",
         data: resultado,
       });

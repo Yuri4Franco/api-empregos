@@ -19,11 +19,11 @@ export class CandidatoService {
         candidato: {
           include: {
             usuario: { select: { nome: true, email: true } },
-            area_atuacao: true,
+            areas_atuacao: true,
           },
         },
         respostas: true,
-        agendamento: true, // Incluímos o agendamento para visualização no card
+        agendamento: true,
       },
     });
 
@@ -209,7 +209,7 @@ export class CandidatoService {
           include: {
             usuario: { select: { nome: true, email: true } },
             endereco: true,
-            area_atuacao: true,
+            areas_atuacao: true,
             experiencias: { orderBy: { data_inicio: "desc" } },
             formacoes: { orderBy: { data_conclusao: "desc" } },
             competencias: { include: { competencia: true } },

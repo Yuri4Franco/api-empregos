@@ -115,7 +115,7 @@ routes.patch(
   adminController.alterarStatusEmpresa,
 );
 
-// Adicionar usuário a empresa
+// Adicionar usuário a empres - fora do piloto
 routes.post(
   "/admin/empresas/:id/usuarios",
   authMiddleware(["ADM"]),
@@ -124,7 +124,7 @@ routes.post(
   adminController.cadastrarUsuarioEmEmpresa,
 );
 
-// Gerenciamento de Usuários (Colaboradores) pelo Admin
+// Gerenciamento de Usuários - fora do piloto
 routes.put(
   "/admin/usuarios/:id",
   authMiddleware(["ADM"]),
@@ -133,7 +133,7 @@ routes.put(
   adminController.atualizarUsuario,
 );
 
-// Alternar status do usuário (Ativo <-> Bloqueado)
+// Alternar status do usuário - ok 
 routes.patch(
   "/admin/usuarios/:id/status",
   authMiddleware(["ADM"]),
@@ -142,7 +142,7 @@ routes.patch(
   adminController.alternarStatusUsuario,
 );
 
-// Visualização de Usuários Empresa
+// Visualização de Usuários Empresa - ok 
 routes.get(
   "/admin/usuarios-empresa",
   authMiddleware(["ADM"]),
@@ -150,7 +150,7 @@ routes.get(
   adminController.listarUsuariosEmpresa,
 );
 
-// Detalhes de um usuário específico
+// Detalhes de um usuário específico - fora do piloto
 routes.get(
   "/admin/usuarios/:id",
   authMiddleware(["ADM"]),
@@ -158,7 +158,7 @@ routes.get(
   adminController.obterDetalhesUsuario,
 );
 
-// Deletar um admin
+// Deletar um admin - fora do piloto
 routes.delete(
   "/admin/equipe/:id",
   authMiddleware(["ADM"]),
@@ -168,7 +168,7 @@ routes.delete(
 
 // --- CANDIDATOS ---
 
-// Listar todos os candidatos
+// Listar todos os candidatos - fora do piloto
 routes.get(
   "/admin/candidatos",
   authMiddleware(["ADM"]),
@@ -176,7 +176,7 @@ routes.get(
   adminController.listarCandidatos,
 );
 
-// Cadastrar candidato manualmente
+// Cadastrar candidato manualmente - pode ser
 routes.post(
   "/admin/candidatos/manual",
   authMiddleware(["ADM"]),
@@ -184,7 +184,7 @@ routes.post(
   adminController.cadastrarCandidatoManual,
 );
 
-// Obter currículo completo de um candidato
+// Obter currículo completo de um candidat - fora do piloto
 routes.get(
   "/admin/candidatos/:id/curriculo",
   authMiddleware(["ADM"]),
@@ -192,16 +192,16 @@ routes.get(
   adminController.obterCurriculo,
 );
 
-// Atualizar perfil completo do candidato (dados pessoais + perfil profissional)
+// Atualizar perfil completo do candidato (dados pessoais + perfil profissional)- fora do piloto
 routes.put(
-  "/admin/candidatos/:id/perfil-completo",
+  "/admin/candidatos/:id/perfil-completo", 
   authMiddleware(["ADM"]),
   validate(IdParamSchema, "params"),
   validate(AtualizarPerfilCompletoSchema, "body"),
   adminController.atualizarPerfilCompleto,
 );
 
-// Adicionar experiência profissional ao candidato
+// Adicionar experiência profissional ao candidato - pode ser
 routes.post(
   "/admin/candidatos/:id_usuario/formacao",
   authMiddleware(["ADM"]),
@@ -210,7 +210,7 @@ routes.post(
   adminController.addFormacao,
 );
 
-// Adicionar formação acadêmica ao candidato
+// Adicionar formação acadêmica ao candidato - pode ser
 routes.post(
   "/admin/candidatos/:id_usuario/experiencia",
   authMiddleware(["ADM"]),
@@ -219,7 +219,7 @@ routes.post(
   adminController.addExperiencia,
 );
 
-// Adicionar competência ao candidato
+// Adicionar competência ao candidato - pode ser
 routes.post(
   "/admin/candidatos/:id_usuario/competencia",
   authMiddleware(["ADM"]),
@@ -228,7 +228,7 @@ routes.post(
   adminController.addCompetencia,
 );
 
-// --- UTILITÁRIOS ---
+// --- UTILITÁRIOS --- ok
 routes.patch(
   "/admin/usuarios/:id/reset-senha",
   authMiddleware(["ADM"]),
@@ -238,7 +238,7 @@ routes.patch(
 
 // --- GESTÃO DE EQUIPE (MASTER) ---
 
-// Cadastrar novo admin
+// Cadastrar novo admin - pode ser
 routes.post(
   "/admin/equipe",
   authMiddleware(["ADM"]),
@@ -246,7 +246,7 @@ routes.post(
   adminController.cadastrarNovoAdmin,
 );
 
-// Listar todos os admins
+// Listar todos os admins - pode ser
 routes.get(
   "/admin/equipe",
   authMiddleware(["ADM"]),
@@ -254,7 +254,7 @@ routes.get(
   adminController.listarAdmins,
 );
 
-// Atualizar dados de um admin (incluindo status e senha)
+// Atualizar dados de um admin (incluindo status e senha) - pode ser
 routes.put(
   "/admin/equipe/:id",
   authMiddleware(["ADM"]),
@@ -263,7 +263,7 @@ routes.put(
   adminController.atualizarAdmin,
 );
 
-// Excluir um admin (Soft Delete, na verdade só desativa)
+// Excluir um admin (Soft Delete, na verdade só desativa) - fora do piloto
 routes.delete(
   "/admin/equipe/:id",
   authMiddleware(["ADM"]),
@@ -271,7 +271,7 @@ routes.delete(
   adminController.excluirAdmin,
 );
 
-// Resetar senha de um usuário
+// Resetar senha de um usuário - ok
 routes.patch(
   "/admin/usuarios/:id/reset-senha",
   authMiddleware(["ADM"]),
@@ -280,7 +280,7 @@ routes.patch(
   adminController.resetarSenhaUsuario,
 );
 
-// Gerenciar créditos da empresa
+// Gerenciar créditos da empresa - ok
 routes.patch(
   "/admin/empresas/:id/creditos",
   authMiddleware(["ADM"]),
@@ -292,7 +292,7 @@ routes.patch(
 // VAGAS
 
 // Rota da Empresa (Cria como Rascunho ou Analise)
-// Criar Rascunho (Etapa 1) [cite: 161, 163, 165]
+// Criar Rascunho (Etapa 1) - ok
 routes.post(
   "/vagas",
   authMiddleware(["EMPRESA"]),
@@ -300,7 +300,7 @@ routes.post(
   vagaController.cadastrar,
 );
 
-// Atualizar Etapas do Wizard
+// Atualizar Etapas do Wizard -ok
 routes.put(
   "/vagas/:id",
   authMiddleware(["EMPRESA"]),
@@ -326,7 +326,7 @@ routes.put(
   vagaController.atualizar,
 );
 
-// O Admin tem poder de superusuário para editar qualquer vaga
+// O Admin tem poder de superusuário para editar qualquer vaga - fora do piloto
 routes.put(
   "/admin/vagas/:id",
   authMiddleware(["ADM"]),
@@ -343,7 +343,7 @@ routes.get(
   vagaController.listarMinhasVagas,
 );
 
-// Listar vagas pendentes para moderação (Apenas ADM)
+// Listar vagas pendentes para moderação (Apenas ADM) - ok
 routes.get(
   "/admin/vagas/pendentes",
   authMiddleware(["ADM"]),
@@ -351,6 +351,7 @@ routes.get(
   adminVagaController.listarPendentes,
 );
 
+// ok
 routes.patch(
   "/admin/vagas/:id/moderacao",
   authMiddleware(["ADM"]),
@@ -359,6 +360,7 @@ routes.patch(
   adminVagaController.moderar,
 );
 
+//ok
 routes.patch(
   "/admin/vagas/:id/confirmar-pagamento",
   authMiddleware(["ADM"]),
@@ -462,7 +464,6 @@ routes.put(
 routes.get(
   "/empresa/vagas/:id_vaga/kanban",
   authMiddleware(["EMPRESA"]),
-  validate(IdParamSchema, "params"),
   candidatoController.index,
 );
 
@@ -470,7 +471,6 @@ routes.get(
 routes.patch(
   "/empresa/candidaturas/:id_candidatura/mover",
   authMiddleware(["EMPRESA"]),
-  validate(IdParamSchema, "params"),
   candidatoController.mover,
 );
 
@@ -485,7 +485,6 @@ routes.post(
 routes.post(
   "/empresa/vagas/:id_vaga/notificar-candidatos",
   authMiddleware(["EMPRESA"]),
-  validate(IdParamSchema, "params"),
   candidatoController.publicarNotificacoes,
 );
 
@@ -507,7 +506,6 @@ routes.post(
 routes.post(
   "/empresa/candidaturas/:id_candidatura/agendar",
   authMiddleware(["EMPRESA"]),
-  validate(IdParamSchema, "params"),
   validate(AgendarEntrevistaSchema, "body"),
   candidatoController.agendar,
 );
@@ -516,7 +514,7 @@ routes.post(
 routes.patch(
   "/empresa/vagas/:id_vaga/configurar-destaques",
   authMiddleware(["EMPRESA"]),
-  validate(IdParamSchema, "params"),
+
   validate(ConfigurarDestaquesSchema, "body"),
   candidatoController.salvarConfiguracaoDestaques,
 );
