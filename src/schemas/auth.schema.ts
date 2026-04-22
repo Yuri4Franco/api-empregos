@@ -218,7 +218,6 @@ export const vagaSchema = z.object({
       z.object({
         nome: z.string(),
         ordem: z.number().int(),
-        tipo: z.enum(["INICIAL", "INTERMEDIARIA", "FINAL"]),
       }),
     )
     .optional(),

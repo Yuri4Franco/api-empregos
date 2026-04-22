@@ -474,6 +474,20 @@ routes.patch(
   candidatoController.mover,
 );
 
+// Avançar candidato para a próxima etapa
+routes.patch(
+  "/empresa/candidaturas/:id_candidatura/avancar",
+  authMiddleware(["EMPRESA"]),
+  candidaturaController.avancar
+);
+
+// Avançar em massa
+routes.patch(
+  "/empresa/candidaturas/avancar-massa",
+  authMiddleware(["EMPRESA"]),
+  candidaturaController.avancarMassa
+);
+
 // Ações em Massa (Reprovar)
 routes.post(
   "/empresa/candidaturas/reprovar-lote",

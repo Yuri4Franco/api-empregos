@@ -77,28 +77,33 @@ export class VagaService {
       }
 
       const etapasPadrao = [
-        { nome_etapa: "Inscritos", ordem: 0, tipo: "INICIAL" },
-        { nome_etapa: "Triagem", ordem: 1, tipo: "INTERMEDIARIA" },
-        {
-          nome_etapa: "Entrevista",
-          ordem: 2,
-          tipo: "INTERMEDIARIA",
-          requer_agendamento: true,
-        },
-        { nome_etapa: "Finalistas", ordem: 3, tipo: "FINAL" },
+        { nome_etapa: "Inscritos", requer_agendamento: false },
+        { nome_etapa: "Triagem", requer_agendamento: false },
+        { nome_etapa: "Entrevista", requer_agendamento: true },
+        { nome_etapa: "Finalistas", requer_agendamento: false },
       ];
 
+      // Pega as etapas do Front-end ou usa o padrão
       const etapasParaCriar =
         dados.etapas?.length > 0 ? dados.etapas : etapasPadrao;
+      const totalEtapas = etapasParaCriar.length;
 
       await tx.etapaProcesso.createMany({
-        data: etapasParaCriar.map((e: any, idx: number) => ({
-          id_vaga: vaga.id_vaga,
-          nome_etapa: e.nome_etapa || e.nome,
-          ordem: e.ordem !== undefined ? e.ordem : idx,
-          tipo: e.tipo || "INTERMEDIARIA",
-          requer_agendamento: e.requer_agendamento || false,
-        })),
+        data: etapasParaCriar.map((e: any, idx: number) => {
+          let tipoSeguro = "INTERMEDIARIA";
+          if (idx === 0)
+            tipoSeguro = "INICIAL";
+          else if (idx === totalEtapas - 1) tipoSeguro = "FINAL"; 
+
+          return {
+            id_vaga: vaga.id_vaga,
+            nome_etapa: e.nome_etapa || e.nome,
+            // Forçamos a ordem a ser exatamente o índice do array, evitando furos
+            ordem: idx,
+            tipo: tipoSeguro,
+            requer_agendamento: e.requer_agendamento || false,
+          };
+        }),
       });
 
       await tx.configuracaoVaga.create({

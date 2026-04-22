@@ -24,6 +24,7 @@ export class CandidatoService {
         },
         respostas: true,
         agendamento: true,
+        avaliacao: true,
       },
     });
 
@@ -41,6 +42,8 @@ export class CandidatoService {
             data_inscricao: c.data_candidatura,
             possui_agendamento: !!c.agendamento,
             data_entrevista: c.agendamento?.data_hora || null,
+            avaliacao_nota: c.avaliacao?.pontuacao || null,
+            whatsapp: c.candidato.whatsapp || null,
           })),
       })),
     };

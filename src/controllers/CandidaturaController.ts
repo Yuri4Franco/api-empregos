@@ -8,12 +8,12 @@ const candidaturaService = new CandidaturaService();
 export class CandidaturaController {
   async aplicar(req: Request, res: Response) {
     try {
-      const {id_vaga } = req.params;
+      const { id_vaga } = req.params;
       const user = req.user as any;
 
       const candidatura = await candidaturaService.candidatar(
         Number(id_vaga),
-        user.id
+        user.id,
       );
 
       const mensagem =
@@ -25,6 +25,45 @@ export class CandidaturaController {
         success: true,
         message: mensagem,
         data: candidatura,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  async avancar(req: Request, res: Response) {
+    try {
+      const { id_candidatura } = req.params;
+
+      // Assumindo que o usuário logado pertence a uma empresa e tem esse ID no token
+      const id_usuario = (req.user as any).id;
+
+      // 2. Buscamos no banco a qual empresa esse usuário pertence
+      const vinculo = await prisma.usuario.findUnique({
+        where: { id_usuario },
+        select: { id_empresa: true },
+      });
+
+      // 3. Verificação de segurança
+      if (!vinculo || !vinculo.id_empresa) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado. Usuário não vinculado a uma empresa.",
+        });
+      }
+
+      // 4. Agora sim, temos o ID real da empresa
+      const id_empresa_real = vinculo.id_empresa;
+
+      const resultado = await candidaturaService.avancarCandidato(
+        Number(id_candidatura),
+        id_empresa_real,
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Candidato avançado para a próxima etapa com sucesso!",
+        data: resultado,
       });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
@@ -74,6 +113,38 @@ export class CandidaturaController {
       return res.status(200).json({ success: true, data: notificacoes });
     } catch (error: any) {
       return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  async avancarMassa(req: Request, res: Response) {
+    try {
+      const id_empresa = (req as any).usuario.id_empresa;
+      const { id_candidaturas } = req.body; // Recebe um array numérico [1, 5, 8]
+
+      if (!id_empresa) {
+        return res
+          .status(403)
+          .json({ success: false, error: "Acesso restrito." });
+      }
+
+      if (!Array.isArray(id_candidaturas) || id_candidaturas.length === 0) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Nenhum candidato selecionado." });
+      }
+
+      const resultado = await candidaturaService.avancarEmMassa(
+        id_candidaturas,
+        id_empresa,
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: `${resultado.avancados} candidato(s) avançado(s) com sucesso.`,
+        data: resultado,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
     }
   }
 
