@@ -35,10 +35,16 @@ enum ModeloTrabalho {
 }
 
 enum TipoContrato {
-  CLT
+  CLT_EFETIVO
+  CLT_TEMPORARIO
+  CLT_INTERMITENTE
   PJ
+  AUTONOMO
+  FREELANCE
   ESTAGIO
-  TEMPORARIO
+  JOVEM_APRENDIZ
+  COOPERADO
+  OUTROS
 }
 
 enum StatusVaga {
@@ -207,13 +213,35 @@ model Empresa {
   @@map("empresas")
 }
 
+enum TipoDiversidade {
+  AMPLA_CONCORRENCIA 
+  VAGA_INCLUSIVA     
+  EXCLUSIVA_PCD
+}
+
+enum NivelHierarquico {
+  JOVEM_APRENDIZ
+  ESTAGIO
+  TRAINEE
+  OPERACIONAL
+  ASSISTENTE
+  JUNIOR
+  PLENO
+  SENIOR
+  ESPECIALISTA
+  SUPERVISAO
+  GERENCIA
+  DIRETORIA
+  NAO_SE_APLICA
+}
+
 model Vaga {
   id_vaga           Int             @id @default(autoincrement())
   id_empresa        Int
   empresa           Empresa         @relation(fields: [id_empresa], references: [id_empresa])
   
   titulo                  String
-  nivel_hierarquico       String
+  nivel_hierarquico       NivelHierarquico @default(NAO_SE_APLICA)
   id_endereco             Int?      @unique
   endereco                Endereco? @relation(fields: [id_endereco], references: [id_endereco])
   modelo_trabalho         ModeloTrabalho
@@ -231,6 +259,7 @@ model Vaga {
   data_publicacao         DateTime?
   data_encerramento       DateTime?
   observacoes_admin       String?          @db.Text
+  tipo_diversidade        TipoDiversidade @default(AMPLA_CONCORRENCIA)
 
   id_area_atuacao         Int
   area_atuacao            AreaAtuacao     @relation(fields: [id_area_atuacao], references: [id_area])

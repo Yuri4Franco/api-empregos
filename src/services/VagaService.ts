@@ -39,6 +39,7 @@ export class VagaService {
           id_area_atuacao: dados.id_area_atuacao,
           titulo: dados.titulo,
           nivel_hierarquico: dados.nivel_hierarquico,
+          tipo_diversidade: dados.tipo_diversidade || "AMPLA_CONCORRENCIA",
           modelo_trabalho: dados.modelo_trabalho,
           tipo_contrato: dados.tipo_contrato,
           faixa_salarial_de: dados.salario_de,
