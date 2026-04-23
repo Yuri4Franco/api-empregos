@@ -144,6 +144,8 @@ model CandidatoAreaAtuacao {
 model Candidato {
   id_usuario              Int       @id
   usuario                 Usuario   @relation(fields: [id_usuario], references: [id_usuario])
+
+  foto_url                String?
   
   cpf                     String?    @unique
   telefone                String?

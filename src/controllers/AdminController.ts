@@ -32,13 +32,17 @@ export class AdminController {
   // Listar todas as empresas cadastradas -revisada-
   async listarEmpresas(req: Request, res: Response) {
     try {
-      // O .parse valida e já transforma as strings em números conforme o schema
+      // O .parse valida page, limit e search
       const { page, limit, search } = QueryListagemSchema.parse(req.query);
+
+      // Pegamos o status direto da query da requisição
+      const status = req.query.status as "ATIVO" | "BLOQUEADO" | undefined;
 
       const result = await adminService.listarTodasEmpresas(
         page,
         limit,
         search,
+        status, // <--- AGORA SIM! O parâmetro sendo passado para o Service
       );
 
       return res.status(200).json(result);
@@ -121,7 +125,7 @@ export class AdminController {
   // Atualizar nome, e-mail ou senha de um usuário empresa
   async atualizarUsuario(req: Request, res: Response) {
     try {
-      const { id} = req.params as unknown as { id: number };
+      const { id } = req.params as unknown as { id: number };
       const idAutor = req.user.id;
 
       // Chamamos a função do Base
@@ -534,11 +538,14 @@ export class AdminController {
     try {
       const { id } = req.params;
       const id_autor = (req.user as any).id;
-      const resultado = await adminService.atualizarStatusPedido(Number(id), req.body, id_autor);
+      const resultado = await adminService.atualizarStatusPedido(
+        Number(id),
+        req.body,
+        id_autor,
+      );
       return res.status(200).json({ success: true, data: resultado });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
-
 }

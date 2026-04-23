@@ -35,7 +35,7 @@ export class AdminService {
     const senha_hash = await argon2.hash(dados.senha);
 
     return await prisma.$transaction(async (tx) => {
-      // 2. Criar o Endereço primeiro (Nova Regra de Negócio)
+
       const endereco = await tx.endereco.create({
         data: {
           logradouro: dados.logradouro,
@@ -48,7 +48,6 @@ export class AdminService {
         },
       });
 
-      // 3. Criar a Empresa vinculada ao endereço
       const empresa = await tx.empresa.create({
         data: {
           cnpj: cnpjLimpo,
@@ -60,20 +59,18 @@ export class AdminService {
         },
       });
 
-      // 4. Criar o Usuário vinculado à Empresa
       const usuario = await tx.usuario.create({
         data: {
           nome: dados.nome,
           email: dados.email,
           senha_hash,
           tipo_usuario: "EMPRESA",
-          status: "PENDENTE", 
+          status: "ATIVO",
           id_empresa: empresa.id_empresa,
           exigir_troca_senha: true,
         },
       });
 
-      // 5. Registro de Auditoria (Escopo: Histórico de ações críticas [cite: 58])
       await baseUser.registrarLog(
         tx,
         id_autor,
@@ -90,61 +87,63 @@ export class AdminService {
     });
   }
 
-async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
-  const empresaExistente = await prisma.empresa.findUnique({
-    where: { id_empresa },
-    select: { id_endereco: true, nome_fantasia: true }
-  });
-
-  if (!empresaExistente) throw new Error("Empresa não encontrada.");
-  
-  if (!empresaExistente.id_endereco) {
-    throw new Error("Esta empresa não possui um endereço vinculado para editar.");
-  }
-
-  const idEnderecoValido: number = empresaExistente.id_endereco;
-
-  return await prisma.$transaction(async (tx) => {
-    // 1. Atualizar o Endereço
-    await tx.endereco.update({
-      where: { id_endereco: idEnderecoValido },
-      data: {
-        logradouro: dados.logradouro,
-        numero: dados.numero,
-        complemento: dados.complemento || null,
-        cep: dados.cep,
-        cidade: dados.cidade,
-        uf: dados.uf,
-        bairro: dados.bairro,
-      },
-    });
-
-    // 2. Atualizar a Empresa
-    const empresaAtualizada = await tx.empresa.update({
+  async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
+    const empresaExistente = await prisma.empresa.findUnique({
       where: { id_empresa },
-      data: {
-        cnpj: dados.cnpj,
-        razao_social: dados.razao_social,
-        nome_fantasia: dados.nome_fantasia,
-        email: dados.email_institucional || null,
-        tipo_vinculo_aci: dados.tipo_vinculo_aci,
-      },
+      select: { id_endereco: true, nome_fantasia: true },
     });
 
-    // 3. Registrar Log de Auditoria (ACI Panambi)
-    await tx.logAuditoria.create({
-      data: {
-        id_usuario: id_autor,
-        acao: "ATUALIZAR_EMPRESA",
-        detalhes: `Dados da empresa ${empresaExistente.nome_fantasia} (ID: ${id_empresa}) atualizados pelo administrador.`,
-        entidade: "EMPRESA",
-        id_entidade: id_empresa,
-      }
-    });
+    if (!empresaExistente) throw new Error("Empresa não encontrada.");
 
-    return empresaAtualizada;
-  });
-}
+    if (!empresaExistente.id_endereco) {
+      throw new Error(
+        "Esta empresa não possui um endereço vinculado para editar.",
+      );
+    }
+
+    const idEnderecoValido: number = empresaExistente.id_endereco;
+
+    return await prisma.$transaction(async (tx) => {
+      // 1. Atualizar o Endereço
+      await tx.endereco.update({
+        where: { id_endereco: idEnderecoValido },
+        data: {
+          logradouro: dados.logradouro,
+          numero: dados.numero,
+          complemento: dados.complemento || null,
+          cep: dados.cep,
+          cidade: dados.cidade,
+          uf: dados.uf,
+          bairro: dados.bairro,
+        },
+      });
+
+      // 2. Atualizar a Empresa
+      const empresaAtualizada = await tx.empresa.update({
+        where: { id_empresa },
+        data: {
+          cnpj: dados.cnpj,
+          razao_social: dados.razao_social,
+          nome_fantasia: dados.nome_fantasia,
+          email: dados.email_institucional || null,
+          tipo_vinculo_aci: dados.tipo_vinculo_aci,
+        },
+      });
+
+      // 3. Registrar Log de Auditoria (ACI Panambi)
+      await tx.logAuditoria.create({
+        data: {
+          id_usuario: id_autor,
+          acao: "ATUALIZAR_EMPRESA",
+          detalhes: `Dados da empresa ${empresaExistente.nome_fantasia} (ID: ${id_empresa}) atualizados pelo administrador.`,
+          entidade: "EMPRESA",
+          id_entidade: id_empresa,
+        },
+      });
+
+      return empresaAtualizada;
+    });
+  }
   // Listar todas as empresas com dados básicos e número de vagas
   async listarTodasEmpresas(
     pagina: number = 1,
@@ -156,17 +155,17 @@ async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
 
     const onde: any = {};
 
- if (busca) {
-    onde.OR = [
-      { nome_fantasia: { contains: busca, mode: "insensitive" } },
-      { cnpj: { contains: busca } },
-      { razao_social: { contains: busca, mode: "insensitive" } },
-    ];
-  }
+    if (busca) {
+      onde.OR = [
+        { nome_fantasia: { contains: busca, mode: "insensitive" } },
+        { cnpj: { contains: busca } },
+        { razao_social: { contains: busca, mode: "insensitive" } },
+      ];
+    }
 
-  if (status) {
-    onde.status = status;
-  }
+    if (status) {
+      onde.status = status;
+    }
 
     const [total, totalAssociadas, totalNaoAssociadas, empresas] =
       await Promise.all([
@@ -191,7 +190,7 @@ async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
               select: {
                 cidade: true,
                 uf: true,
-                bairro: true, // Agora como string (true), não objeto select
+                bairro: true,
               },
             },
             _count: { select: { vagas: true } },
@@ -212,6 +211,7 @@ async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
       id_empresa: e.id_empresa,
       nome_fantasia: e.nome_fantasia,
       cnpj: e.cnpj,
+      status: e.status,
       tipo_vinculo_aci: e.tipo_vinculo_aci,
       cidade: e.endereco?.cidade || "N/A",
       bairro: e.endereco?.bairro || "N/A", // Mapeado como string direta
@@ -238,7 +238,13 @@ async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
       where: { id_empresa },
       include: {
         usuarios: {
-          select: { id_usuario: true, nome: true, email: true, status: true, ultimo_login: true }, // Evita trazer o hash da senha
+          select: {
+            id_usuario: true,
+            nome: true,
+            email: true,
+            status: true,
+            ultimo_login: true,
+          }, 
         },
         vagas: true,
         endereco: true,
@@ -256,15 +262,13 @@ async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
     acao: "ATIVAR" | "DESATIVAR",
     id_autor: number,
   ) {
-    
     return await prisma.$transaction(async (tx) => {
       const novoStatus = acao === "ATIVAR" ? "ATIVO" : "BLOQUEADO";
 
-
       await tx.empresa.update({
-      where: { id_empresa },
-      data: { status: novoStatus },
-    });
+        where: { id_empresa },
+        data: { status: novoStatus },
+      });
 
       // 1. Atualiza usuários em massa
       await tx.usuario.updateMany({
@@ -449,7 +453,7 @@ async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
   }
 
   // Listar todos os candidatos com dados básicos
-async listarTodosCandidatos(filtros: any) {
+  async listarTodosCandidatos(filtros: any) {
     const {
       page = 1,
       limit = 10,
@@ -525,8 +529,8 @@ async listarTodosCandidatos(filtros: any) {
                 },
               },
               // ✨ ATUALIZAÇÃO DO SELECT: Trazemos a lista de áreas
-              areas_atuacao: { 
-                include: { area: { select: { nome: true } } } 
+              areas_atuacao: {
+                include: { area: { select: { nome: true } } },
               },
               competencias: {
                 include: { competencia: { select: { nome: true } } },
@@ -551,8 +555,8 @@ async listarTodosCandidatos(filtros: any) {
       cidade: u.candidato?.endereco?.cidade || "N/A",
       bairro: u.candidato?.endereco?.bairro || "Outro",
       // Mapeia e junta com vírgula. Se estiver vazio, exibe "Não definida"
-      areas_atuacao: u.candidato?.areas_atuacao?.length 
-        ? u.candidato.areas_atuacao.map((a) => a.area.nome).join(", ") 
+      areas_atuacao: u.candidato?.areas_atuacao?.length
+        ? u.candidato.areas_atuacao.map((a) => a.area.nome).join(", ")
         : "Não definida",
       competencias: u.candidato?.competencias.map((c) => c.competencia.nome),
     }));

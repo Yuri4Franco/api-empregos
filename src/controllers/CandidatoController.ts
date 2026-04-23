@@ -343,4 +343,35 @@ export class CandidatoController {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
+
+  async uploadFoto(req: Request, res: Response) {
+    try {
+      const id_usuario = (req as any).usuario.id;
+
+      // 1. Verifica se o middleware do Multer realmente anexou o arquivo
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: "Nenhuma imagem foi enviada.",
+        });
+      }
+
+      // 2. O multer-storage-cloudinary expõe a URL final diretamente no req.file.path
+      const foto_url = req.file.path;
+
+      // 3. Salva no banco de dados
+      const resultado = await candidatoService.atualizarFotoPerfil(
+        id_usuario,
+        foto_url,
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Foto de perfil atualizada com sucesso!",
+        data: resultado,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
 }

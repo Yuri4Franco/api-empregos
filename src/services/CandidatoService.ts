@@ -507,4 +507,19 @@ export class CandidatoService {
       },
     });
   }
+
+  async atualizarFotoPerfil(id_usuario: number, foto_url: string) {
+
+    return await prisma.candidato.update({
+      where: { id_usuario },
+      data: {
+        foto_url: foto_url, // Altere para 'avatar_url' ou o nome exato do seu schema
+      },
+      select: {
+        id_usuario: true,
+        nome: true,
+        foto_url: true, // Retorna a foto para o frontend atualizar o Header imediatamente
+      },
+    });
+  }
 }

@@ -196,7 +196,10 @@ export const vagaSchema = z.object({
   logradouro: z.string().optional(),
   numero: z.string().optional(),
   bairro: z.string().optional(),
-  cidade: z.string().default("PANAMBI").transform((val) => val.toUpperCase()),
+  cidade: z
+    .string()
+    .default("PANAMBI")
+    .transform((val) => val.toUpperCase()),
   uf: z.string().length(2).default("RS"),
 
   // Arrays e Fluxo
@@ -223,6 +226,13 @@ export const vagaSchema = z.object({
       }),
     )
     .optional(),
+});
+
+export const sincronizarAreasSchema = z.object({
+  areas_ids: z
+    .array(z.number("Os IDs das áreas devem ser números."))
+    .max(3, "Você pode selecionar no máximo 3 áreas de atuação.")
+    .min(1, "Selecione pelo menos uma área."), 
 });
 
 export const FiltroVagasEmpresaSchema = z.object({
@@ -457,7 +467,8 @@ export const candidatoCompetenciaSchema = z.object({
 
 export const visibilidadeSchema = z.object({
   perfil_visivel_empresas: z.boolean({
-    message: "O status de visibilidade é obrigatório e deve ser verdadeiro ou falso.",
+    message:
+      "O status de visibilidade é obrigatório e deve ser verdadeiro ou falso.",
   }),
 });
 
@@ -482,5 +493,3 @@ export const AtualizarDadosEmpresaSchema = z.object({
 export const candidatoAreaSchema = z.object({
   id_area: z.number().int().positive("Área de atuação inválida"),
 });
-
-

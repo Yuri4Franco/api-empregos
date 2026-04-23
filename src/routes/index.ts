@@ -45,6 +45,7 @@ import {
   ModeracaoVagaSchema,
   QueryListagemSchema,
   ResetSenhaSchema,
+  sincronizarAreasSchema,
   SolicitacaoMidiaSchema,
   StatusEmpresaSchema,
   StatusUsuarioSchema,
@@ -133,7 +134,7 @@ routes.put(
   adminController.atualizarUsuario,
 );
 
-// Alternar status do usuário - ok 
+// Alternar status do usuário - ok
 routes.patch(
   "/admin/usuarios/:id/status",
   authMiddleware(["ADM"]),
@@ -142,7 +143,7 @@ routes.patch(
   adminController.alternarStatusUsuario,
 );
 
-// Visualização de Usuários Empresa - ok 
+// Visualização de Usuários Empresa - ok
 routes.get(
   "/admin/usuarios-empresa",
   authMiddleware(["ADM"]),
@@ -194,7 +195,7 @@ routes.get(
 
 // Atualizar perfil completo do candidato (dados pessoais + perfil profissional)- fora do piloto
 routes.put(
-  "/admin/candidatos/:id/perfil-completo", 
+  "/admin/candidatos/:id/perfil-completo",
   authMiddleware(["ADM"]),
   validate(IdParamSchema, "params"),
   validate(AtualizarPerfilCompletoSchema, "body"),
@@ -478,14 +479,14 @@ routes.patch(
 routes.patch(
   "/empresa/candidaturas/:id_candidatura/avancar",
   authMiddleware(["EMPRESA"]),
-  candidaturaController.avancar
+  candidaturaController.avancar,
 );
 
 // Avançar em massa
 routes.patch(
   "/empresa/candidaturas/avancar-massa",
   authMiddleware(["EMPRESA"]),
-  candidaturaController.avancarMassa
+  candidaturaController.avancarMassa,
 );
 
 // Ações em Massa (Reprovar)
@@ -634,6 +635,7 @@ routes.get(
   candidatoController.meuCurriculo,
 );
 
+// Rota para o candidato atualizar seu próprio currículo completo
 routes.put(
   "/candidato/meu-curriculo",
   authMiddleware(["CANDIDATO"]),
@@ -714,6 +716,20 @@ routes.patch(
   "/candidato/visibilidade",
   authMiddleware(["CANDIDATO"]),
   candidatoController.toggleVisibilidade,
+);
+
+routes.put(
+  "/candidato/areas/sync",
+  authMiddleware(["CANDIDATO"]),
+  validate(sincronizarAreasSchema),
+  areaController.sync,
+);
+
+routes.patch(
+  "/candidato/foto-perfil",
+  authMiddleware(["CANDIDATO"]),
+  uploadCandidato.single("foto"),
+  candidatoController.uploadFoto,
 );
 
 routes.get("/admin/vagas", authMiddleware(["ADM"]), vagaController.listarAdmin);
