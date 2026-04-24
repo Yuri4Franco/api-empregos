@@ -232,7 +232,7 @@ export const sincronizarAreasSchema = z.object({
   areas_ids: z
     .array(z.number("Os IDs das áreas devem ser números."))
     .max(3, "Você pode selecionar no máximo 3 áreas de atuação.")
-    .min(1, "Selecione pelo menos uma área."), 
+    .min(1, "Selecione pelo menos uma área."),
 });
 
 export const FiltroVagasEmpresaSchema = z.object({
@@ -381,22 +381,41 @@ export const updateCandidatoSchema = z.object({
     .optional()
     .nullable()
     .or(z.literal("")),
+    link_outro: z
+    .string()
+    .url("URL inválida")
+    .optional()
+    .or(z.literal(""))
+    .nullable(),
 
   // Profissional
   objetivo_profissional: z.string().max(200).optional().nullable(),
   pretensao_salarial: z.number().positive().optional().nullable(),
   resumo_profissional: z.string().min(20).optional().nullable(),
   id_area_atuacao: z.number().int().optional().nullable(),
+  primeiro_emprego: z.boolean().default(false),
 
-  // Preferências
   disponibilidade_viagem: z.boolean().optional(),
   disponibilidade_mudanca: z.boolean().optional(),
   turno_preferido: z
-    .enum(["MATUTINO", "DIURNO", "NOTURNO", "VESPERTINO", "SEM_PREFERENCIA"])
+    .enum([
+      "PRIMEIRO_TURNO",
+      "SEGUNDO_TURNO",
+      "TERCEIRO_TURNO",
+      "HORARIO_COMERCIAL",
+      "QUALQUER_TURNO",
+    ])
     .optional()
     .nullable(),
+  tipo_contato: z
+    .enum(["WHATSAPP", "EMAIL", "LIGACAO", "QUALQUER_UM"])
+    .optional()
+    .nullable(),
+
   pcd: z.boolean().optional(),
   tipo_pcd: z.string().optional().nullable(),
+  necessidade: z.string().max(300, "Texto muito longo").optional().nullable(),
+  
 
   // Endereço (Nested)
   endereco: z

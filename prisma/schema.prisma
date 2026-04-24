@@ -16,6 +16,13 @@ enum TipoUsuario {
   EMPRESA
 }
 
+enum TipoContato {
+  WHATSAPP
+  EMAIL
+  LIGACAO
+  QUALQUER_UM
+}
+
 enum StatusGeral {
   ATIVO
   PENDENTE
@@ -156,15 +163,21 @@ model Candidato {
   genero                  String?
   link_linkedin           String?
   link_portfolio          String?
+  link_outro              String?
+  primeiro_emprego        Boolean?  @default(false)
+
   pcd                     Boolean   @default(false)
   tipo_pcd                String?
+  necessidade             String?
+
+  tipo_contato            TipoContato? @default(WHATSAPP)
   perfil_visivel_empresas Boolean   @default(true)
   objetivo_profissional   String?
   pretensao_salarial      Decimal?  @db.Decimal(10, 2)
   resumo_profissional     String?   @db.Text
   disponibilidade_viagem  Boolean   @default(false)
   disponibilidade_mudanca Boolean   @default(false)
-  turno_preferido         Turno?    @default(SEM_PREFERENCIA)
+  turno_preferido         TurnoPreferido?    @default(QUALQUER_TURNO)
   areas_atuacao           CandidatoAreaAtuacao[]
 
   experiencias            ExperienciaProfissional[]
@@ -173,16 +186,34 @@ model Candidato {
   candidaturas            Candidatura[]
   avaliacoes_feitas       AvaliacaoEmpresa[]
   relatos_ouvidoria       OuvidoriaRelato[]
+  desbloqueado_por CurriculoDesbloqueado[]
+  salvo_por CurriculoSalvo[]
 
   @@map("candidatos")
 }
 
-enum Turno {
-  MATUTINO
-  VESPERTINO
-  NOTURNO
-  DIURNO
-  SEM_PREFERENCIA
+model CurriculoSalvo {
+  id_salvo     Int      @id @default(autoincrement())
+  id_empresa   Int
+  id_candidato Int
+  observacoes  String?  @db.Text // Anotação privada da empresa
+  criado_em    DateTime @default(now())
+
+  // Relações
+  empresa   Empresa   @relation(fields: [id_empresa], references: [id_empresa])
+  candidato Candidato @relation(fields: [id_candidato], references: [id_usuario])
+
+  // Evita que a empresa salve o mesmo candidato duas vezes
+  @@unique([id_empresa, id_candidato])
+  @@map("curriculos_salvos")
+}
+
+enum TurnoPreferido {
+  PRIMEIRO_TURNO
+  SEGUNDO_TURNO
+  TERCEIRO_TURNO
+  HORARIO_COMERCIAL
+  QUALQUER_TURNO
 }
 
 model Empresa {
@@ -210,9 +241,26 @@ model Empresa {
   beneficios_padrao    EmpresaBeneficioPadrao[]
   avaliacoes_recebidas AvaliacaoEmpresa[]
   solicitacoes_midia SolicitacaoMidia[]
+  curriculos_desbloqueados CurriculoDesbloqueado[]
+  curriculos_salvos CurriculoSalvo[]
   
 
   @@map("empresas")
+}
+
+model CurriculoDesbloqueado {
+  id               Int      @id @default(autoincrement())
+  id_empresa       Int
+  id_candidato     Int
+  data_desbloqueio DateTime @default(now())
+
+  // Relações
+  empresa   Empresa   @relation(fields: [id_empresa], references: [id_empresa])
+  candidato Candidato @relation(fields: [id_candidato], references: [id_usuario])
+
+  // Um currículo só pode ser desbloqueado uma vez pela mesma empresa
+  @@unique([id_empresa, id_candidato])
+  @@map("curriculos_desbloqueados")
 }
 
 enum TipoDiversidade {

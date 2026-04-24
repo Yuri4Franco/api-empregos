@@ -36,7 +36,7 @@ export class AreaAtuacaoController {
 
   async sync(req: Request, res: Response) {
     try {
-      const id_usuario = (req as any).usuario.id;
+      const id_usuario = (req.user as any).id;
       const { areas_ids } = req.body; // Array validado pelo Zod
 
       const areasAtualizadas = await areaService.sincronizarAreas(

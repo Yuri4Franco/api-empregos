@@ -346,7 +346,7 @@ export class CandidatoController {
 
   async uploadFoto(req: Request, res: Response) {
     try {
-      const id_usuario = (req as any).usuario.id;
+      const id_usuario = (req.user as any).id;
 
       // 1. Verifica se o middleware do Multer realmente anexou o arquivo
       if (!req.file) {

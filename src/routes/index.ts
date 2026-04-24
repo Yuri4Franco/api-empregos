@@ -13,6 +13,7 @@ import { ExperienciaController } from "../controllers/ExperienciaController.js";
 import { FormacaoController } from "../controllers/FormacaoController.js";
 import { CompetenciaController } from "../controllers/CompetenciaController.js";
 import { AreaAtuacaoController } from "../controllers/AreaAtuacaoController.js";
+import { BancoTalentosController } from "../controllers/BancoTalentosController.js";
 import {
   uploadBanner,
   uploadLogo,
@@ -73,6 +74,7 @@ const experienciaController = new ExperienciaController();
 const formacaoController = new FormacaoController();
 const competenciaController = new CompetenciaController();
 const areaController = new AreaAtuacaoController();
+const bancoController = new BancoTalentosController();
 
 routes.post("/login", authController.login);
 
@@ -732,6 +734,54 @@ routes.patch(
   candidatoController.uploadFoto,
 );
 
+// ✅ CORRETO: As rotas fixas (estáticas) vêm primeiro!
+routes.get(
+  "/empresas/banco-talentos",
+  authMiddleware(["EMPRESA"]), 
+  bancoController.listar
+);
+
+routes.get(
+  "/empresas/banco-talentos/areas", 
+  authMiddleware(["EMPRESA"]), 
+  bancoController.listarAreasDash
+);
+
+// 1. Listar os Favoritos (Coloque antes de rotas com :param)
+routes.get(
+  "/empresas/banco-talentos/favoritos", 
+  authMiddleware(["EMPRESA"]), 
+  bancoController.listarFavoritos
+);
+
+// 👇 Agora sim, as rotas com parâmetros dinâmicos (:id_candidato) ficam por último
+routes.get(
+  "/empresas/banco-talentos/:id_candidato",
+  authMiddleware(["EMPRESA"]), 
+  bancoController.detalharCurriculo
+);
+
+routes.post(
+  "/empresas/banco-talentos/:id_candidato/desbloquear",
+  authMiddleware(["EMPRESA"]),
+  bancoController.desbloquear
+);
+
+routes.get(
+  "/empresas/meus-desbloqueados", 
+  authMiddleware(["EMPRESA"]), 
+  bancoController.listarGaveta
+);
+
+
+
+
+// 2. Alternar Favorito (Botão de Salvar/Remover)
+routes.post(
+  "/empresas/banco-talentos/:id_candidato/favorito", 
+  authMiddleware(["EMPRESA"]), 
+  bancoController.alternarFavorito
+);
 routes.get("/admin/vagas", authMiddleware(["ADM"]), vagaController.listarAdmin);
 
 routes.get("/vagas", vagaController.listarPublicas);

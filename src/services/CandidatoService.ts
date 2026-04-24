@@ -509,17 +509,28 @@ export class CandidatoService {
   }
 
   async atualizarFotoPerfil(id_usuario: number, foto_url: string) {
-
-    return await prisma.candidato.update({
-      where: { id_usuario },
-      data: {
-        foto_url: foto_url, // Altere para 'avatar_url' ou o nome exato do seu schema
-      },
-      select: {
-        id_usuario: true,
-        nome: true,
-        foto_url: true, // Retorna a foto para o frontend atualizar o Header imediatamente
-      },
-    });
+  return await prisma.candidato.update({
+    where: { 
+      id_usuario: id_usuario 
+    },
+    data: {
+      foto_url: foto_url,
+    },
+    // No select, podemos inclusive trazer o nome que está na tabela Usuario 
+    // para que o Front-end receba o objeto completo do perfil
+    select: {
+      id_usuario: true,
+      foto_url: true,
+      usuario: {
+        select: {
+          nome: true
+        }
+      }
+    },
+  });
   }
+
+  
+
+
 }
