@@ -59,6 +59,7 @@ import {
 import { validate } from "../middlewares/validate.js";
 import { TaxonomiaController } from "../controllers/TaxonomiaController.js";
 import { validatePhotoUpload } from "../middlewares/validatePhotoUpload.js";
+import { DashboardCandidatoController } from "../controllers/DashboardCandidatoController.js";
 
 const routes = Router();
 const vagaController = new VagaController();
@@ -75,6 +76,7 @@ const formacaoController = new FormacaoController();
 const competenciaController = new CompetenciaController();
 const areaController = new AreaAtuacaoController();
 const bancoController = new BancoTalentosController();
+const dashboardCandidatoController = new DashboardCandidatoController();
 
 routes.post("/login", authController.login);
 
@@ -773,15 +775,30 @@ routes.get(
   bancoController.listarGaveta
 );
 
-
-
-
-// 2. Alternar Favorito (Botão de Salvar/Remover)
 routes.post(
   "/empresas/banco-talentos/:id_candidato/favorito", 
   authMiddleware(["EMPRESA"]), 
   bancoController.alternarFavorito
 );
+
+routes.get(
+  "/candidato/dashboard/metricas",
+  authMiddleware(["CANDIDATO"]),
+  dashboardCandidatoController.metricas
+);
+
+routes.get(
+  "/candidato/dashboard/candidaturas-recentes",
+  authMiddleware(["CANDIDATO"]),
+  dashboardCandidatoController.candidaturasRecentes
+);
+
+routes.get(
+  "/candidato/dashboard/vagas-recomendadas",
+  authMiddleware(["CANDIDATO"]),
+  dashboardCandidatoController.vagasRecomendadas
+);
+
 routes.get("/admin/vagas", authMiddleware(["ADM"]), vagaController.listarAdmin);
 
 routes.get("/vagas", vagaController.listarPublicas);
