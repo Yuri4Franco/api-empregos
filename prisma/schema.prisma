@@ -351,11 +351,11 @@ model EtapaProcesso {
 
 model AgendamentoEntrevista {
   id_agendamento Int         @id @default(autoincrement())
-  id_candidatura Int         @unique // Uma entrevista ativa por vez por candidatura
+  id_candidatura Int         @unique
   candidatura    Candidatura @relation(fields: [id_candidatura], references: [id_candidatura])
   
-  data_hora      DateTime    // Data e horário da entrevista [cite: 265]
-  local_link     String      // Endereço físico ou link do Google Meet/Zoom 
+  data_hora      DateTime
+  local_link     String
   observacoes    String?     @db.Text
   
   criado_em      DateTime    @default(now())

@@ -773,9 +773,6 @@ routes.get(
   bancoController.listarGaveta
 );
 
-
-
-
 // 2. Alternar Favorito (Botão de Salvar/Remover)
 routes.post(
   "/empresas/banco-talentos/:id_candidato/favorito", 
@@ -787,5 +784,7 @@ routes.get("/admin/vagas", authMiddleware(["ADM"]), vagaController.listarAdmin);
 routes.get("/vagas", vagaController.listarPublicas);
 
 routes.get("/vagas/:id", vagaController.detalharPublica);
+
+
 
 export default routes;

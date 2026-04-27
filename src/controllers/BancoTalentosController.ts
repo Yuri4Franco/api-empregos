@@ -5,25 +5,22 @@ import { prisma } from "../config/prisma.js";
 const bancoService = new BancoTalentosService();
 
 export class BancoTalentosController {
-    
   async listar(req: Request, res: Response) {
     try {
-      const { 
-        area, 
-        turno, 
-        primeiro_emprego, 
-        pcd, 
-        pagina, 
-        limite 
-      } = req.query;
+      const { area, turno, primeiro_emprego, pcd, pagina, limite } = req.query;
 
       const resultado = await bancoService.listarVitrine({
         id_area: area ? Number(area) : undefined,
         turno: turno as string | undefined,
-        
-        primeiro_emprego: primeiro_emprego === "true" ? true : (primeiro_emprego === "false" ? false : undefined),
-        pcd: pcd === "true" ? true : (pcd === "false" ? false : undefined),
-        
+
+        primeiro_emprego:
+          primeiro_emprego === "true"
+            ? true
+            : primeiro_emprego === "false"
+              ? false
+              : undefined,
+        pcd: pcd === "true" ? true : pcd === "false" ? false : undefined,
+
         pagina: pagina ? Number(pagina) : undefined,
         limite: limite ? Number(limite) : undefined,
       });
@@ -42,35 +39,39 @@ export class BancoTalentosController {
     try {
       const { id_candidato } = req.params;
       const id_usuario = (req.user as any).id;
-      
-            // 2. Buscamos no banco a qual empresa esse usuário pertence
-            const vinculo = await prisma.usuario.findUnique({
-              where: { id_usuario },
-              select: { id_empresa: true },
-            });
-      
-            // 3. Verificação de segurança
-            if (!vinculo || !vinculo.id_empresa) {
-              return res.status(403).json({
-                success: false,
-                error: "Acesso negado. Usuário não vinculado a uma empresa.",
-              });
-            }
-      
-            // 4. Agora sim, temos o ID real da empresa
-            const id_empresa_real = vinculo.id_empresa;
+
+      // 2. Buscamos no banco a qual empresa esse usuário pertence
+      const vinculo = await prisma.usuario.findUnique({
+        where: { id_usuario },
+        select: { id_empresa: true },
+      });
+
+      // 3. Verificação de segurança
+      if (!vinculo || !vinculo.id_empresa) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado. Usuário não vinculado a uma empresa.",
+        });
+      }
+
+      // 4. Agora sim, temos o ID real da empresa
+      const id_empresa_real = vinculo.id_empresa;
 
       if (!id_empresa_real) {
-        return res.status(403).json({ success: false, error: "Acesso restrito a empresas." });
+        return res
+          .status(403)
+          .json({ success: false, error: "Acesso restrito a empresas." });
       }
 
       if (!id_candidato || isNaN(Number(id_candidato))) {
-        return res.status(400).json({ success: false, error: "ID de candidato inválido." });
+        return res
+          .status(400)
+          .json({ success: false, error: "ID de candidato inválido." });
       }
 
       const resultado = await bancoService.obterCurriculo(
-        Number(id_candidato), 
-        id_empresa_real
+        Number(id_candidato),
+        id_empresa_real,
       );
 
       return res.status(200).json({
@@ -80,7 +81,7 @@ export class BancoTalentosController {
     } catch (error: any) {
       // Se não achar o candidato (ou ele estiver oculto), devolve 404
       if (error.message.includes("não está disponível")) {
-         return res.status(404).json({ success: false, error: error.message });
+        return res.status(404).json({ success: false, error: error.message });
       }
       return res.status(400).json({ success: false, error: error.message });
     }
@@ -89,19 +90,40 @@ export class BancoTalentosController {
   async desbloquear(req: Request, res: Response) {
     try {
       const { id_candidato } = req.params;
-      const id_empresa = (req as any).usuario.id_empresa;
+      const id_usuario = (req.user as any).id;
 
-      if (!id_empresa) {
-        return res.status(403).json({ success: false, error: "Acesso restrito a empresas." });
+      // 2. Buscamos no banco a qual empresa esse usuário pertence
+      const vinculo = await prisma.usuario.findUnique({
+        where: { id_usuario },
+        select: { id_empresa: true },
+      });
+
+      // 3. Verificação de segurança
+      if (!vinculo || !vinculo.id_empresa) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado. Usuário não vinculado a uma empresa.",
+        });
+      }
+
+      // 4. Agora sim, temos o ID real da empresa
+      const id_empresa_real = vinculo.id_empresa;
+
+      if (!id_empresa_real) {
+        return res
+          .status(403)
+          .json({ success: false, error: "Acesso restrito a empresas." });
       }
 
       if (!id_candidato || isNaN(Number(id_candidato))) {
-        return res.status(400).json({ success: false, error: "ID de candidato inválido." });
+        return res
+          .status(400)
+          .json({ success: false, error: "ID de candidato inválido." });
       }
 
       const resultado = await bancoService.desbloquearCurriculoTransacao(
         Number(id_candidato),
-        id_empresa
+        id_empresa_real,
       );
 
       return res.status(200).json({
@@ -109,13 +131,13 @@ export class BancoTalentosController {
         message: "Currículo desbloqueado com sucesso! 1 crédito foi consumido.",
         data: resultado, // Retorna os dados do candidato já com telefone/email liberados
       });
-
     } catch (error: any) {
       // Captura o erro específico de saldo e joga o 403
       if (error.message === "SALDO_INSUFICIENTE") {
-        return res.status(403).json({ 
-          success: false, 
-          error: "Saldo de créditos insuficiente. Adquira mais créditos para continuar." 
+        return res.status(403).json({
+          success: false,
+          error:
+            "Saldo de créditos insuficiente. Adquira mais créditos para continuar.",
         });
       }
 
@@ -126,20 +148,38 @@ export class BancoTalentosController {
 
   async listarGaveta(req: Request, res: Response) {
     try {
-      const id_empresa = (req as any).usuario.id_empresa;
+      const id_usuario = (req.user as any).id;
 
-      if (!id_empresa) {
-        return res.status(403).json({ success: false, error: "Acesso restrito a empresas." });
+      // 2. Buscamos no banco a qual empresa esse usuário pertence
+      const vinculo = await prisma.usuario.findUnique({
+        where: { id_usuario },
+        select: { id_empresa: true },
+      });
+
+      // 3. Verificação de segurança
+      if (!vinculo || !vinculo.id_empresa) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado. Usuário não vinculado a uma empresa.",
+        });
       }
 
-      const resultado = await bancoService.listarMeusDesbloqueados(id_empresa);
+      // 4. Agora sim, temos o ID real da empresa
+      const id_empresa_real = vinculo.id_empresa;
+
+      if (!id_empresa_real) {
+        return res
+          .status(403)
+          .json({ success: false, error: "Acesso restrito a empresas." });
+      }
+
+      const resultado = await bancoService.listarMeusDesbloqueados(id_empresa_real);
 
       return res.status(200).json({
         success: true,
         total: resultado.length,
         data: resultado,
       });
-
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
     }
@@ -147,9 +187,8 @@ export class BancoTalentosController {
 
   async listarAreasDash(req: Request, res: Response) {
     try {
-
       const resultado = await bancoService.listarAreasComContagem();
-      
+
       return res.status(200).json({
         success: true,
         data: resultado,
@@ -164,14 +203,35 @@ export class BancoTalentosController {
     try {
       const { id_candidato } = req.params;
       const { observacoes } = req.body;
-      const id_empresa = (req as any).usuario.id_empresa;
+      const id_usuario = (req.user as any).id;
 
-      if (!id_empresa) return res.status(403).json({ success: false, error: "Acesso restrito." });
-      
+      // 2. Buscamos no banco a qual empresa esse usuário pertence
+      const vinculo = await prisma.usuario.findUnique({
+        where: { id_usuario },
+        select: { id_empresa: true },
+      });
+
+      // 3. Verificação de segurança
+      if (!vinculo || !vinculo.id_empresa) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado. Usuário não vinculado a uma empresa.",
+        });
+      }
+
+      // 4. Agora sim, temos o ID real da empresa
+      const id_empresa_real = vinculo.id_empresa;
+
+
+      if (!id_empresa_real)
+        return res
+          .status(403)
+          .json({ success: false, error: "Acesso restrito." });
+
       const resultado = await bancoService.alternarCurriculoSalvo(
-        Number(id_candidato), 
-        id_empresa, 
-        observacoes
+        Number(id_candidato),
+        id_empresa_real,
+        observacoes,
       );
 
       return res.status(200).json({ success: true, data: resultado });
@@ -182,15 +242,37 @@ export class BancoTalentosController {
 
   async listarFavoritos(req: Request, res: Response) {
     try {
-      const id_empresa = (req as any).usuario.id_empresa;
-      if (!id_empresa) return res.status(403).json({ success: false, error: "Acesso restrito." });
+      const id_usuario = (req.user as any).id;
 
-      const resultado = await bancoService.listarCurriculosSalvos(id_empresa);
+      // 2. Buscamos no banco a qual empresa esse usuário pertence
+      const vinculo = await prisma.usuario.findUnique({
+        where: { id_usuario },
+        select: { id_empresa: true },
+      });
 
-      return res.status(200).json({ success: true, total: resultado.length, data: resultado });
+      // 3. Verificação de segurança
+      if (!vinculo || !vinculo.id_empresa) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado. Usuário não vinculado a uma empresa.",
+        });
+      }
+
+      // 4. Agora sim, temos o ID real da empresa
+      const id_empresa_real = vinculo.id_empresa;
+
+      if (!id_empresa_real)
+        return res
+          .status(403)
+          .json({ success: false, error: "Acesso restrito." });
+
+      const resultado = await bancoService.listarCurriculosSalvos(id_empresa_real);
+
+      return res
+        .status(200)
+        .json({ success: true, total: resultado.length, data: resultado });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
-
 }

@@ -156,14 +156,31 @@ export class CandidatoController {
   async agendar(req: Request, res: Response) {
     try {
       const { id_candidatura } = req.params;
-      const id_empresa = (req.user as any).id_empresa;
+      const id_usuario = (req.user as any).id;
+
+      // 2. Buscamos no banco a qual empresa esse usuário pertence
+      const vinculo = await prisma.usuario.findUnique({
+        where: { id_usuario },
+        select: { id_empresa: true },
+      });
+
+      // 3. Verificação de segurança
+      if (!vinculo || !vinculo.id_empresa) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado. Usuário não vinculado a uma empresa.",
+        });
+      }
+
+      // 4. Agora sim, temos o ID real da empresa
+      const id_empresa_real = vinculo.id_empresa;
 
       // O middleware de rota já validou o body, mas garantimos a tipagem aqui
       const dadosAgendamento = req.body;
 
       const agendamento = await candidatoService.agendarEntrevista(
         Number(id_candidatura),
-        id_empresa,
+        id_empresa_real,
         {
           ...dadosAgendamento,
           data_hora: new Date(dadosAgendamento.data_hora),
@@ -346,9 +363,10 @@ export class CandidatoController {
 
   async uploadFoto(req: Request, res: Response) {
     try {
+      console.log("Iniciando upload de foto de perfil...");
       const id_usuario = (req.user as any).id;
 
-      // 1. Verifica se o middleware do Multer realmente anexou o arquivo
+      console.log("ID do usuário autenticado para upload de foto:", id_usuario);
       if (!req.file) {
         return res.status(400).json({
           success: false,
@@ -356,10 +374,9 @@ export class CandidatoController {
         });
       }
 
-      // 2. O multer-storage-cloudinary expõe a URL final diretamente no req.file.path
       const foto_url = req.file.path;
+      console.log("URL da foto recebida:", foto_url);
 
-      // 3. Salva no banco de dados
       const resultado = await candidatoService.atualizarFotoPerfil(
         id_usuario,
         foto_url,
