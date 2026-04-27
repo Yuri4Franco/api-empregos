@@ -577,14 +577,6 @@ routes.post(
   candidaturaController.aplicar,
 );
 
-// Candidato desiste de uma vaga específica
-routes.patch(
-  "/candidatos/candidaturas/:id_candidatura/desistir",
-  authMiddleware(["CANDIDATO"]),
-  validate(IdParamSchema, "params"),
-  candidaturaController.desistir,
-);
-
 // Trocar senha
 routes.patch(
   "/usuarios/:id/trocar-senha",
@@ -593,6 +585,8 @@ routes.patch(
   validate(TrocarSenha, "body"),
   usuarioController.trocarSenha,
 );
+
+
 
 routes.get(
   "/me",
@@ -739,68 +733,83 @@ routes.patch(
 // ✅ CORRETO: As rotas fixas (estáticas) vêm primeiro!
 routes.get(
   "/empresas/banco-talentos",
-  authMiddleware(["EMPRESA"]), 
-  bancoController.listar
+  authMiddleware(["EMPRESA"]),
+  bancoController.listar,
 );
 
 routes.get(
-  "/empresas/banco-talentos/areas", 
-  authMiddleware(["EMPRESA"]), 
-  bancoController.listarAreasDash
+  "/empresas/banco-talentos/areas",
+  authMiddleware(["EMPRESA"]),
+  bancoController.listarAreasDash,
 );
 
 // 1. Listar os Favoritos (Coloque antes de rotas com :param)
 routes.get(
-  "/empresas/banco-talentos/favoritos", 
-  authMiddleware(["EMPRESA"]), 
-  bancoController.listarFavoritos
+  "/empresas/banco-talentos/favoritos",
+  authMiddleware(["EMPRESA"]),
+  bancoController.listarFavoritos,
 );
 
 // 👇 Agora sim, as rotas com parâmetros dinâmicos (:id_candidato) ficam por último
 routes.get(
   "/empresas/banco-talentos/:id_candidato",
-  authMiddleware(["EMPRESA"]), 
-  bancoController.detalharCurriculo
+  authMiddleware(["EMPRESA"]),
+  bancoController.detalharCurriculo,
 );
 
 routes.post(
   "/empresas/banco-talentos/:id_candidato/desbloquear",
   authMiddleware(["EMPRESA"]),
-  bancoController.desbloquear
+  bancoController.desbloquear,
 );
 
 routes.get(
-  "/empresas/meus-desbloqueados", 
-  authMiddleware(["EMPRESA"]), 
-  bancoController.listarGaveta
+  "/empresas/meus-desbloqueados",
+  authMiddleware(["EMPRESA"]),
+  bancoController.listarGaveta,
 );
-
-
-
 
 // 2. Alternar Favorito (Botão de Salvar/Remover)
 routes.post(
-  "/empresas/banco-talentos/:id_candidato/favorito", 
-  authMiddleware(["EMPRESA"]), 
-  bancoController.alternarFavorito
+  "/empresas/banco-talentos/:id_candidato/favorito",
+  authMiddleware(["EMPRESA"]),
+  bancoController.alternarFavorito,
 );
 
 routes.get(
   "/candidato/dashboard/metricas",
   authMiddleware(["CANDIDATO"]),
-  dashboardCandidatoController.metricas
+  dashboardCandidatoController.metricas,
 );
 
 routes.get(
   "/candidato/dashboard/candidaturas-recentes",
   authMiddleware(["CANDIDATO"]),
-  dashboardCandidatoController.candidaturasRecentes
+  dashboardCandidatoController.candidaturasRecentes,
 );
 
 routes.get(
   "/candidato/dashboard/vagas-recomendadas",
   authMiddleware(["CANDIDATO"]),
-  dashboardCandidatoController.vagasRecomendadas
+  dashboardCandidatoController.vagasRecomendadas,
+);
+
+routes.get(
+  "/candidato/minhas-candidaturas",
+  authMiddleware(["CANDIDATO"]),
+  candidaturaController.listarMinhasCandidaturas,
+);
+
+routes.get(
+  "/candidato/agendamentos",
+  authMiddleware(["CANDIDATO"]),
+  candidaturaController.listarAgendamentos
+);
+
+routes.patch(
+  "/candidato/candidaturas/:id_candidatura/desistir",
+  authMiddleware(["CANDIDATO"]),
+  candidaturaController.desistir
 );
 
 routes.get("/admin/vagas", authMiddleware(["ADM"]), vagaController.listarAdmin);
@@ -808,7 +817,5 @@ routes.get("/admin/vagas", authMiddleware(["ADM"]), vagaController.listarAdmin);
 routes.get("/vagas", vagaController.listarPublicas);
 
 routes.get("/vagas/:id", vagaController.detalharPublica);
-
-
 
 export default routes;

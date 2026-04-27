@@ -151,7 +151,7 @@ export class CandidaturaController {
   async marcarLida(req: Request, res: Response) {
     try {
       const { id_notificacao } = req.params;
-      const user = req.user as any;
+      const user = (req.user as any).id;
 
       await prisma.notificacao.updateMany({
         where: { id_notificacao: Number(id_notificacao), id_usuario: user.id },
@@ -166,19 +166,71 @@ export class CandidaturaController {
     }
   }
 
+  async listarMinhasCandidaturas(req: Request, res: Response) {
+    try {
+      const id_usuario = (req.user as any).id;
+
+      if (!id_usuario) {
+        return res
+          .status(401)
+          .json({ success: false, error: "Usuário não autenticado." });
+      }
+
+      const dados =
+        await candidaturaService.listarHistoricoCompleto(id_usuario);
+
+      return res.status(200).json({
+        success: true,
+        total: dados.length,
+        data: dados,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
   async desistir(req: Request, res: Response) {
     try {
-      const id_candidato = (req.user as any).id;
       const { id_candidatura } = req.params;
+      const id_usuario = (req.user as any).id;
+
+      if (!id_candidatura || isNaN(Number(id_candidatura))) {
+        return res
+          .status(400)
+          .json({ success: false, error: "ID de candidatura inválido." });
+      }
 
       await candidaturaService.desistirCandidatura(
         Number(id_candidatura),
-        id_candidato,
+        id_usuario,
       );
 
-      return res.json({
+      return res.status(200).json({
         success: true,
-        message: "Você desistiu deste processo seletivo com sucesso.",
+        message:
+          "Sua candidatura foi cancelada com sucesso. A empresa será notificada.",
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  async listarAgendamentos(req: Request, res: Response) {
+    try {
+      const id_usuario = (req.user as any).id;
+
+      if (!id_usuario) {
+        return res
+          .status(401)
+          .json({ success: false, error: "Usuário não autenticado." });
+      }
+
+      const dados = await candidaturaService.listarMeusAgendamentos(id_usuario);
+
+      return res.status(200).json({
+        success: true,
+        total: dados.length,
+        data: dados,
       });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });

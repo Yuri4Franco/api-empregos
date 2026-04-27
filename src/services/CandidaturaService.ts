@@ -247,18 +247,198 @@ export class CandidaturaService {
     });
   }
 
-  async desistirCandidatura(id_candidatura: number, id_candidato: number) {
-    // 1. Validar se a candidatura pertence ao usuário logado
-    const candidatura = await prisma.candidatura.findFirst({
-      where: { id_candidatura, id_candidato },
+  async listarHistoricoCompleto(id_usuario: number) {
+    const candidaturas = await prisma.candidatura.findMany({
+      where: { id_candidato: id_usuario },
+      orderBy: { data_candidatura: "desc" }, // Da mais nova para a mais antiga
+      include: {
+        vaga: {
+          select: {
+            titulo: true,
+            modelo_trabalho: true,
+            tipo_contrato: true,
+            empresa_confidencial: true,
+            endereco: { select: { cidade: true, uf: true } },
+            empresa: { select: { nome_fantasia: true, logotipo_url: true } },
+          },
+        },
+        agendamento: true,
+
+        // ✨ O Pulo do Gato para o Feedback:
+        // Trazemos apenas a movimentação onde o cara foi Reprovado para pegar o "motivo"
+        movimentacoes: {
+          where: { status_destino: "REPROVADO" },
+          orderBy: { criado_em: "desc" },
+          take: 1,
+          select: { motivo: true },
+        },
+      },
     });
 
-    if (!candidatura) throw new Error("Candidatura não encontrada.");
+    // Mapeamento e Blindagem de Dados
+    return candidaturas.map((c) => {
+      const isConfidencial = c.vaga.empresa_confidencial;
+      const endereco = c.vaga.endereco;
 
-    // 2. Atualizar para o status de DESISTENCIA
-    return await prisma.candidatura.update({
+      return {
+        id_candidatura: c.id_candidatura,
+        data_inscricao: c.data_candidatura,
+        status: c.status_atual,
+
+        // Agrupamos os dados da vaga para ficar organizado no Front-end
+        vaga: {
+          titulo: c.vaga.titulo,
+          modelo_trabalho: c.vaga.modelo_trabalho,
+          tipo_contrato: c.vaga.tipo_contrato,
+
+          // Lógica de localização limpa
+          localizacao:
+            c.vaga.modelo_trabalho === "REMOTO"
+              ? "Remoto"
+              : endereco
+                ? `${endereco.cidade} - ${endereco.uf}`
+                : "Não informada",
+
+          // Blindagem da empresa
+          empresa_nome: isConfidencial
+            ? "Empresa Confidencial"
+            : c.vaga.empresa.nome_fantasia,
+          empresa_logo: isConfidencial ? null : c.vaga.empresa.logotipo_url,
+        },
+
+        // Só manda agendamento se estiver na fase de entrevista
+        agendamento:
+          c.status_atual === "ENTREVISTA" && c.agendamento
+            ? {
+                data_hora: c.agendamento.data_hora,
+                local_link: c.agendamento.local_link,
+                observacoes: c.agendamento.observacoes,
+              }
+            : null,
+
+        feedback_reprovacao:
+          c.status_atual === "REPROVADO" && c.movimentacoes.length > 0
+            ? c.movimentacoes[0]?.motivo
+            : null,
+      };
+    });
+  }
+
+  async desistirCandidatura(id_candidatura: number, id_usuario: number) {
+    // 1. Busca a candidatura para garantir que existe e é da pessoa certa
+    const candidatura = await prisma.candidatura.findUnique({
       where: { id_candidatura },
-      data: { status_atual: "DESISTENCIA" },
+      select: {
+        id_candidato: true,
+        status_atual: true,
+        id_etapa_atual: true,
+      },
+    });
+
+    if (!candidatura) {
+      throw new Error("Candidatura não encontrada.");
+    }
+
+    // 🔒 TRAVA DE SEGURANÇA: O cara está tentando cancelar a candidatura do amiguinho?
+    if (candidatura.id_candidato !== id_usuario) {
+      throw new Error("Você não tem permissão para alterar esta candidatura.");
+    }
+
+    // 2. Verifica se a candidatura já está num status final
+    if (
+      ["REPROVADO", "DESISTENCIA", "APROVADO"].includes(
+        candidatura.status_atual,
+      )
+    ) {
+      throw new Error(
+        `Não é possível cancelar uma candidatura que já está com status: ${candidatura.status_atual}`,
+      );
+    }
+
+    // 3. A Transação (Tudo ou nada)
+    return await prisma.$transaction(async (tx) => {
+      // Atualiza o status principal para DESISTENCIA
+      const atualizada = await tx.candidatura.update({
+        where: { id_candidatura },
+        data: {
+          status_atual: "DESISTENCIA",
+        },
+      });
+
+      // Registra o movimento para a empresa ter o histórico de que foi o candidato quem saiu
+      await tx.movimentoCandidatura.create({
+        data: {
+          id_candidatura: id_candidatura,
+          etapa_origem: candidatura.id_etapa_atual,
+          etapa_destino: candidatura.id_etapa_atual, // Fica na mesma etapa, só muda o status
+          status_destino: "DESISTENCIA",
+          motivo: "Desistência informada pelo candidato através do painel.",
+        },
+      });
+
+      return atualizada;
+    });
+  }
+
+  async listarMeusAgendamentos(id_usuario: number) {
+    const agendamentos = await prisma.agendamentoEntrevista.findMany({
+      where: {
+        // Busca os agendamentos que pertencem às candidaturas deste usuário
+        candidatura: {
+          id_candidato: id_usuario,
+          // Filtro de Limpeza: Ignora se o processo já acabou para ele
+          status_atual: {
+            notIn: ["DESISTENCIA", "REPROVADO"],
+          },
+        },
+      },
+      // Ordena pela data: As entrevistas mais próximas do dia de hoje aparecem primeiro no array
+      orderBy: {
+        data_hora: "asc",
+      },
+      // Trazemos os dados da vaga e da empresa para montar o "Card de Entrevista"
+      include: {
+        candidatura: {
+          select: {
+            id_candidatura: true,
+            status_atual: true,
+            vaga: {
+              select: {
+                titulo: true,
+                empresa_confidencial: true,
+                empresa: {
+                  select: { nome_fantasia: true, logotipo_url: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Mapeamento e blindagem da empresa confidencial
+    return agendamentos.map((ag) => {
+      const isConfidencial = ag.candidatura.vaga.empresa_confidencial;
+
+      return {
+        id_agendamento: ag.id_agendamento,
+        id_candidatura: ag.candidatura.id_candidatura,
+
+        // 📅 Os dados de Ouro:
+        data_hora: ag.data_hora,
+        local_link: ag.local_link,
+        observacoes: ag.observacoes,
+
+        // Contexto para o candidato não esquecer qual é a vaga
+        vaga_titulo: ag.candidatura.vaga.titulo,
+        empresa_nome: isConfidencial
+          ? "Empresa Confidencial"
+          : ag.candidatura.vaga.empresa.nome_fantasia,
+        empresa_logo: isConfidencial
+          ? null
+          : ag.candidatura.vaga.empresa.logotipo_url,
+        status_candidatura: ag.candidatura.status_atual,
+      };
     });
   }
 }
