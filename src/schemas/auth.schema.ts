@@ -397,16 +397,11 @@ export const updateCandidatoSchema = z.object({
 
   disponibilidade_viagem: z.boolean().optional(),
   disponibilidade_mudanca: z.boolean().optional(),
-  turno_preferido: z
-    .enum([
-      "PRIMEIRO_TURNO",
-      "SEGUNDO_TURNO",
-      "TERCEIRO_TURNO",
-      "HORARIO_COMERCIAL",
-      "QUALQUER_TURNO",
-    ])
+turno_preferido: z
+    .array(z.enum(["PRIMEIRO_TURNO", "SEGUNDO_TURNO", "TERCEIRO_TURNO", "HORARIO_COMERCIAL", "QUALQUER_TURNO"]))
+    .max(3, "Você pode selecionar no máximo 3 turnos")
     .optional()
-    .nullable(),
+    .default([]),
   tipo_contato: z
     .enum(["WHATSAPP", "EMAIL", "LIGACAO", "QUALQUER_UM"])
     .optional()

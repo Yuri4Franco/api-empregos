@@ -14,6 +14,7 @@ import { FormacaoController } from "../controllers/FormacaoController.js";
 import { CompetenciaController } from "../controllers/CompetenciaController.js";
 import { AreaAtuacaoController } from "../controllers/AreaAtuacaoController.js";
 import { BancoTalentosController } from "../controllers/BancoTalentosController.js";
+import { NotificacaoController } from "../controllers/NotificacaoController.js";
 import {
   uploadBanner,
   uploadLogo,
@@ -77,6 +78,7 @@ const competenciaController = new CompetenciaController();
 const areaController = new AreaAtuacaoController();
 const bancoController = new BancoTalentosController();
 const dashboardCandidatoController = new DashboardCandidatoController();
+const notificacaoController = new NotificacaoController();
 
 routes.post("/login", authController.login);
 
@@ -579,14 +581,11 @@ routes.post(
 
 // Trocar senha
 routes.patch(
-  "/usuarios/:id/trocar-senha",
+  "/user/trocar-senha",
   authMiddleware(["CANDIDATO", "EMPRESA", "ADM"]),
-  validate(IdParamSchema, "params"),
   validate(TrocarSenha, "body"),
-  usuarioController.trocarSenha,
+  usuarioController.alterarSenha,
 );
-
-
 
 routes.get(
   "/me",
@@ -811,6 +810,25 @@ routes.patch(
   authMiddleware(["CANDIDATO"]),
   candidaturaController.desistir
 );
+
+routes.get(
+  "/notificacoes",
+  authMiddleware(["CANDIDATO", "EMPRESA", "ADM"]),
+  notificacaoController.listar
+);
+
+routes.get(
+  "/notificacoes/nao-lidas",
+  authMiddleware(["CANDIDATO", "EMPRESA", "ADM"]), 
+  notificacaoController.contarNaoLidas
+);
+
+routes.patch(
+  "/notificacoes/marcar-lidas",
+  authMiddleware(["CANDIDATO", "EMPRESA", "ADM"]),
+  notificacaoController.marcarLidas
+);
+
 
 routes.get("/admin/vagas", authMiddleware(["ADM"]), vagaController.listarAdmin);
 

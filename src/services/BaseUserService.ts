@@ -22,24 +22,40 @@ export class BaseUserService {
     });
   }
 
-  async TrocarSenha(id_usuario: number, nova_senha: string, id_autor: number) {
-    const senha_hash = await argon2.hash(nova_senha);
-    return await prisma.$transaction(async (tx) => {
-      const usuario = await tx.usuario.update({
-        where: { id_usuario },
-        data: { senha_hash, exigir_troca_senha: false },
-      });
-
-      await this.registrarLog(
-        tx,
-        id_autor,
-        "TROCAR_SENHA",
-        "Usuario",
-        id_usuario,
-      );
-
-      return usuario;
+  async alterarSenha(id_usuario: number, senha_atual: string, nova_senha: string) {
+    // 1. Busca o usuário no banco
+    const usuario = await prisma.usuario.findUnique({
+      where: { id_usuario },
     });
+
+    if (!usuario) {
+      throw new Error("Usuário não encontrado.");
+    }
+
+    // 2. Verifica se a senha atual confere com o Hash salvo (Atenção à ordem dos parâmetros no argon2)
+    const senhaValida = await argon2.verify(usuario.senha_hash, senha_atual);
+    if (!senhaValida) {
+      throw new Error("A senha atual informada está incorreta.");
+    }
+
+    // 3. Regra de negócio: Não deixar colocar a mesma senha que já estava
+    const isMesmaSenha = await argon2.verify(usuario.senha_hash, nova_senha);
+    if (isMesmaSenha) {
+      throw new Error("A nova senha não pode ser igual à senha atual.");
+    }
+
+    // 4. Criptografa a nova senha e salva no banco
+    const novoHash = await argon2.hash(nova_senha);
+
+    await prisma.usuario.update({
+      where: { id_usuario },
+      data: { 
+        senha_hash: novoHash,
+        exigir_troca_senha: false // Limpa o alerta de troca obrigatória, se existir
+      },
+    });
+
+    return { message: "Senha alterada com sucesso!" };
   }
 
   // Função única de atualização para a tabela 'Usuario'

@@ -32,6 +32,11 @@ export class AuthService {
     const senhaValida = await argon2.verify(usuario.senha_hash, senha_pura);
     if (!senhaValida) throw new Error("Credenciais inválidas.");
 
+    await prisma.usuario.update({
+      where: { id_usuario: usuario.id_usuario },
+      data: { ultimo_login: new Date() }
+    });
+
     return this.gerarToken(
       usuario.id_usuario,
       usuario.tipo_usuario,
@@ -126,13 +131,17 @@ export class AuthService {
           email,
           senha_hash: senhaHash,
           tipo_usuario: "CANDIDATO",
-          status: "ATIVO",
+          status: "PENDENTE",
           token_ativacao: tokenAtivacao,
         },
       });
 
-      await tx.candidato.create({
-        data: { id_usuario: user.id_usuario },
+await tx.candidato.create({
+        data: { 
+          id_usuario: user.id_usuario,
+          turno_preferido: ["QUALQUER_TURNO"],
+          cnh:["NAO_POSSUO"],
+        },
       });
 
       return {

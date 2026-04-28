@@ -21,16 +21,21 @@ export class UserController {
     }
   }
 
-  async trocarSenha(req: Request, res: Response) {
+  async alterarSenha(req: Request, res: Response) {
     try {
-      const id = parseInt(req.params.id as string);
-      const { nova_senha } = req.body;
-      const id_autor = req.user.id;
+      const id_usuario = req.user.id; // Pegamos do token JWT
+      const { senha_atual, nova_senha } = req.body;
 
-      const usuario = await userService.TrocarSenha(id, nova_senha, id_autor);
-      return res.json({ message: "Senha alterada com sucesso", usuario });
+      if (!senha_atual || !nova_senha) {
+        return res.status(400).json({ success: false, error: "Preencha todos os campos obrigatórios." });
+      }
+
+      const resultado = await userService.alterarSenha(id_usuario, senha_atual, nova_senha);
+      
+      return res.json({ success: true, data: resultado });
     } catch (error: any) {
-      return res.status(400).json({ error: error.message });
+      // Retorna 400 (Bad Request) para cair no toast.error do Front-end
+      return res.status(400).json({ success: false, error: error.message });
     }
   }
 
