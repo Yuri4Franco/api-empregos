@@ -587,6 +587,12 @@ routes.patch(
   usuarioController.alterarSenha,
 );
 
+routes.patch(
+  "/user/definir-senha-inicial",
+  authMiddleware(["CANDIDATO", "EMPRESA", "ADM"]),
+  usuarioController.definirSenhaInicial,
+);
+
 routes.get(
   "/me",
   authMiddleware(["ADM", "EMPRESA", "CANDIDATO"]),
@@ -802,33 +808,38 @@ routes.get(
 routes.get(
   "/candidato/agendamentos",
   authMiddleware(["CANDIDATO"]),
-  candidaturaController.listarAgendamentos
+  candidaturaController.listarAgendamentos,
 );
 
 routes.patch(
   "/candidato/candidaturas/:id_candidatura/desistir",
   authMiddleware(["CANDIDATO"]),
-  candidaturaController.desistir
+  candidaturaController.desistir,
 );
 
 routes.get(
   "/notificacoes",
   authMiddleware(["CANDIDATO", "EMPRESA", "ADM"]),
-  notificacaoController.listar
+  notificacaoController.listar,
 );
 
 routes.get(
   "/notificacoes/nao-lidas",
-  authMiddleware(["CANDIDATO", "EMPRESA", "ADM"]), 
-  notificacaoController.contarNaoLidas
+  authMiddleware(["CANDIDATO", "EMPRESA", "ADM"]),
+  notificacaoController.contarNaoLidas,
 );
 
 routes.patch(
   "/notificacoes/marcar-lidas",
   authMiddleware(["CANDIDATO", "EMPRESA", "ADM"]),
-  notificacaoController.marcarLidas
+  notificacaoController.marcarLidas,
 );
 
+routes.delete(
+  "/usuario/conta",
+  authMiddleware(["CANDIDATO", "EMPRESA"]),
+  usuarioController.deletarConta,
+);
 
 routes.get("/admin/vagas", authMiddleware(["ADM"]), vagaController.listarAdmin);
 

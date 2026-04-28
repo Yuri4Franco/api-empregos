@@ -23,18 +23,45 @@ export class UserController {
 
   async alterarSenha(req: Request, res: Response) {
     try {
-      const id_usuario = req.user.id; // Pegamos do token JWT
+      const id_usuario = req.user.id;
       const { senha_atual, nova_senha } = req.body;
 
       if (!senha_atual || !nova_senha) {
-        return res.status(400).json({ success: false, error: "Preencha todos os campos obrigatórios." });
+        return res.status(400).json({
+          success: false,
+          error: "Preencha todos os campos obrigatórios.",
+        });
       }
 
-      const resultado = await userService.alterarSenha(id_usuario, senha_atual, nova_senha);
-      
+      const resultado = await userService.alterarSenha(
+        id_usuario,
+        senha_atual,
+        nova_senha,
+      );
+
       return res.json({ success: true, data: resultado });
     } catch (error: any) {
-      // Retorna 400 (Bad Request) para cair no toast.error do Front-end
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  async definirSenhaInicial(req: Request, res: Response) {
+    try {
+      const id_usuario = req.user.id;
+      const { nova_senha } = req.body;
+
+      if (!nova_senha) {
+        return res
+          .status(400)
+          .json({ success: false, error: "A nova senha é obrigatória." });
+      }
+
+      const resultado = await userService.definirSenhaInicial(
+        id_usuario,
+        nova_senha,
+      );
+      return res.json({ success: true, data: resultado });
+    } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
@@ -48,6 +75,35 @@ export class UserController {
       return res.status(200).json(perfil);
     } catch (error: any) {
       return res.status(404).json({ error: error.message });
+    }
+  }
+
+  async deletarConta(req: Request, res: Response) {
+    try {
+      const id_usuario = req.user.id;
+      const { senha_confirmacao } = req.body;
+
+      if (!id_usuario) {
+        return res.status(401).json({
+          success: false,
+          error: "Usuário não autenticado.",
+        });
+      }
+
+      const resultado = await userService.excluirConta(
+        id_usuario,
+        senha_confirmacao,
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: resultado.message,
+      });
+    } catch (error: any) {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
     }
   }
 }
