@@ -441,4 +441,23 @@ export class CandidaturaService {
       };
     });
   }
+
+  async verificarInscricao(id_candidato: number, id_vaga: number) {
+    // Busca se existe qualquer registro de candidatura desse usuário para esta vaga
+    const candidatura = await prisma.candidatura.findFirst({
+      where: {
+        id_candidato: id_candidato,
+        id_vaga: id_vaga,
+      },
+      select: {
+        status_atual: true, // Pega o status para o Front-end poder usar
+      },
+    });
+
+    // Se 'candidatura' existir, inscrito = true. Se for null, inscrito = false.
+    return {
+      inscrito: !!candidatura,
+      status: candidatura ? candidatura.status_atual : null,
+    };
+  }
 }

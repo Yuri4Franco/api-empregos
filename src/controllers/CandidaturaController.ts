@@ -236,4 +236,40 @@ export class CandidaturaController {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
+
+  async verificarStatus(req: Request, res: Response) {
+    try {
+
+      const id_candidato = (req.user as any).id;
+
+      const id_vaga_param = req.params.id_vaga as string;
+
+      if (!id_vaga_param) {
+        return res.status(400).json({
+          success: false,
+          error: "O ID da vaga é obrigatório.",
+        });
+      }
+
+      const id_vaga = parseInt(id_vaga_param);
+
+      if (isNaN(id_vaga)) {
+        return res.status(400).json({
+          success: false,
+          error: "O ID da vaga informado é inválido.",
+        });
+      }
+      const resultado = await candidaturaService.verificarInscricao(
+        id_candidato,
+        id_vaga,
+      );
+
+      return res.status(200).json({
+        success: true,
+        data: resultado,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
 }

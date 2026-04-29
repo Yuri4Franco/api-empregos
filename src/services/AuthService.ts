@@ -131,7 +131,7 @@ export class AuthService {
           email,
           senha_hash: senhaHash,
           tipo_usuario: "CANDIDATO",
-          status: "PENDENTE",
+          status: "ATIVO",
           token_ativacao: tokenAtivacao,
         },
       });

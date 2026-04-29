@@ -644,6 +644,12 @@ routes.get(
   candidatoController.meuCurriculo,
 );
 
+routes.get(
+  "/candidato/vaga/:id_vaga/status",  
+  authMiddleware(["CANDIDATO"]),
+  candidaturaController.verificarStatus
+);
+
 // Rota para o candidato atualizar seu próprio currículo completo
 routes.put(
   "/candidato/meu-curriculo",
@@ -840,6 +846,8 @@ routes.patch(
   authMiddleware(["CANDIDATO", "EMPRESA", "ADM"]),
   notificacaoController.marcarLidas,
 );
+
+
 
 routes.delete(
   "/usuario/conta",
