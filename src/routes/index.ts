@@ -15,6 +15,8 @@ import { CompetenciaController } from "../controllers/CompetenciaController.js";
 import { AreaAtuacaoController } from "../controllers/AreaAtuacaoController.js";
 import { BancoTalentosController } from "../controllers/BancoTalentosController.js";
 import { NotificacaoController } from "../controllers/NotificacaoController.js";
+import { EmpresaDashboardController } from "../controllers/EmpresaDashboardController.js";
+import { EmpresaPublicaController } from "../controllers/EmpresaPublicaController.js";
 import {
   uploadBanner,
   uploadLogo,
@@ -79,6 +81,8 @@ const areaController = new AreaAtuacaoController();
 const bancoController = new BancoTalentosController();
 const dashboardCandidatoController = new DashboardCandidatoController();
 const notificacaoController = new NotificacaoController();
+const empresaDashboardController = new EmpresaDashboardController();
+const empresaPublicaController = new EmpresaPublicaController();
 
 routes.post("/login", authController.login);
 
@@ -172,6 +176,8 @@ routes.delete(
   validate(IdParamSchema, "params"),
   adminController.excluirAdmin,
 );
+
+routes.get("/empresas/perfil/:slug", empresaPublicaController.buscarPorSlug);
 
 // --- CANDIDATOS ---
 
@@ -840,6 +846,27 @@ routes.delete(
   authMiddleware(["CANDIDATO", "EMPRESA"]),
   usuarioController.deletarConta,
 );
+
+routes.get(
+  "/empresa/dashboard/estatisticas",
+  authMiddleware(["EMPRESA", "ADM"]),
+  empresaDashboardController.estatisticas
+);
+
+// Lista as vagas ativas com o termômetro de candidatos
+routes.get(
+  "/empresa/dashboard/vagas-resumo",
+  authMiddleware(["EMPRESA", "ADM"]),
+  empresaDashboardController.resumoVagas
+);
+
+// Próximas entrevistas agendadas
+routes.get(
+  "/empresa/dashboard/proximas-entrevistas",
+  authMiddleware(["EMPRESA", "ADM"]),
+  empresaDashboardController.proximasEntrevistas
+);
+
 
 routes.get("/admin/vagas", authMiddleware(["ADM"]), vagaController.listarAdmin);
 

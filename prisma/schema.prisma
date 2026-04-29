@@ -229,6 +229,7 @@ enum TurnoPreferido {
 model Empresa {
   id_empresa          Int            @id @default(autoincrement())
   cnpj                String         @unique
+  slug                String  @unique
   razao_social        String
   nome_fantasia       String
   email               String?        @unique

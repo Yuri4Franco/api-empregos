@@ -1,6 +1,7 @@
 import { prisma } from "../config/prisma.js";
 import argon2 from "argon2";
 import { BaseUserService } from "./BaseUserService";
+import { generateSlug } from "../utils/slugify.js";
 
 const baseUser = new BaseUserService();
 
@@ -18,75 +19,90 @@ export class AdminService {
    */
 
   // Cadastrar nova empresa + primeiro usuário vinculado
-  async cadastrarEmpresa(dados: any, id_autor: number) {
-    const cnpjLimpo = dados.cnpj.replace(/\D/g, "");
+async cadastrarEmpresa(dados: any, id_autor: number) {
+  const cnpjLimpo = dados.cnpj.replace(/\D/g, "");
+  
+  // 1. Geração do Slug
+  const slugBase = generateSlug(dados.nome_fantasia);
 
-    // 1. Validações de unicidade fora da transaction principal para performance
-    const eExistente = await prisma.empresa.findUnique({
-      where: { cnpj: cnpjLimpo },
-    });
-    const uExistente = await prisma.usuario.findUnique({
-      where: { email: dados.email },
-    });
+  // 2. Verificações Prévias (Fail Fast)
+  const [eExistente, uExistente, slugExistente] = await Promise.all([
+    prisma.empresa.findUnique({ where: { cnpj: cnpjLimpo } }),
+    prisma.usuario.findUnique({ where: { email: dados.email } }),
+    prisma.empresa.findUnique({ where: { slug: slugBase } }) // Verifica se o link já existe
+  ]);
 
-    if (eExistente) throw new Error("CNPJ já cadastrado.");
-    if (uExistente) throw new Error("E-mail de usuário já cadastrado.");
-
-    const senha_hash = await argon2.hash(dados.senha);
-
-    return await prisma.$transaction(async (tx) => {
-
-      const endereco = await tx.endereco.create({
-        data: {
-          logradouro: dados.logradouro,
-          numero: dados.numero,
-          complemento: dados.complemento || null,
-          cep: dados.cep,
-          cidade: dados.cidade || "Panambi",
-          uf: dados.uf || "RS",
-          bairro: dados.bairro,
-        },
-      });
-
-      const empresa = await tx.empresa.create({
-        data: {
-          cnpj: cnpjLimpo,
-          razao_social: dados.razao_social,
-          nome_fantasia: dados.nome_fantasia,
-          email: dados.email_institucional || null,
-          tipo_vinculo_aci: dados.tipo_vinculo_aci || "NAO_ASSOCIADA",
-          id_endereco: endereco.id_endereco,
-        },
-      });
-
-      const usuario = await tx.usuario.create({
-        data: {
-          nome: dados.nome,
-          email: dados.email,
-          senha_hash,
-          tipo_usuario: "EMPRESA",
-          status: "ATIVO",
-          id_empresa: empresa.id_empresa,
-          exigir_troca_senha: true,
-        },
-      });
-
-      await baseUser.registrarLog(
-        tx,
-        id_autor,
-        "CADASTRAR_EMPRESA",
-        "Empresa",
-        empresa.id_empresa,
-        {
-          razao_social: empresa.razao_social,
-          vinculo: empresa.tipo_vinculo_aci,
-        },
-      );
-
-      return { usuario, empresa };
-    });
+  if (eExistente) throw new Error("CNPJ já cadastrado.");
+  if (uExistente) throw new Error("E-mail de usuário já cadastrado.");
+  
+  // Se o slug já existir, avisamos para o admin adicionar um diferencial (ex: nome da cidade ou bairro)
+  if (slugExistente) {
+    throw new Error(
+      `O nome fantasia "${dados.nome_fantasia}" gera um link (slug) que já está em uso. Por favor, adicione um diferencial ao nome fantasia (ex: ${dados.nome_fantasia} - Centro).`
+    );
   }
 
+  const senha_hash = await argon2.hash(dados.senha);
+
+  return await prisma.$transaction(async (tx) => {
+    // Cadastro do Endereço
+    const endereco = await tx.endereco.create({
+      data: {
+        logradouro: dados.logradouro,
+        numero: dados.numero,
+        complemento: dados.complemento || null,
+        cep: dados.cep,
+        cidade: dados.cidade || "Panambi",
+        uf: dados.uf || "RS",
+        bairro: dados.bairro,
+      },
+    });
+
+    // Cadastro da Empresa com o SLUG
+    const empresa = await tx.empresa.create({
+      data: {
+        cnpj: cnpjLimpo,
+        razao_social: dados.razao_social,
+        nome_fantasia: dados.nome_fantasia,
+        slug: slugBase, // ✨ O novo campo aqui
+        email: dados.email_institucional || null,
+        tipo_vinculo_aci: dados.tipo_vinculo_aci || "NAO_ASSOCIADA",
+        id_endereco: endereco.id_endereco,
+      },
+    });
+
+    // Cadastro do Usuário Master da Empresa
+    const usuario = await tx.usuario.create({
+      data: {
+        nome: dados.nome,
+        email: dados.email,
+        senha_hash,
+        tipo_usuario: "EMPRESA",
+        status: "ATIVO",
+        id_empresa: empresa.id_empresa,
+        exigir_troca_senha: true,
+        is_master: true, // Importante para as permissões que discutimos antes
+      },
+    });
+
+    // Log de Auditoria
+    await baseUser.registrarLog(
+      tx,
+      id_autor,
+      "CADASTRAR_EMPRESA",
+      "Empresa",
+      empresa.id_empresa,
+      {
+        razao_social: empresa.razao_social,
+        slug: empresa.slug,
+        vinculo: empresa.tipo_vinculo_aci,
+      },
+    );
+
+    return { usuario, empresa };
+  });
+}
+//89
   async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
     const empresaExistente = await prisma.empresa.findUnique({
       where: { id_empresa },
