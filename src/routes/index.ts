@@ -882,4 +882,6 @@ routes.get("/vagas", vagaController.listarPublicas);
 
 routes.get("/vagas/:id", vagaController.detalharPublica);
 
+routes.get("/vagas/filtros-disponiveis", vagaController.filtrosDisponiveis);
+
 export default routes;

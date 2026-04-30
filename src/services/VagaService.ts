@@ -92,9 +92,8 @@ export class VagaService {
       await tx.etapaProcesso.createMany({
         data: etapasParaCriar.map((e: any, idx: number) => {
           let tipoSeguro = "INTERMEDIARIA";
-          if (idx === 0)
-            tipoSeguro = "INICIAL";
-          else if (idx === totalEtapas - 1) tipoSeguro = "FINAL"; 
+          if (idx === 0) tipoSeguro = "INICIAL";
+          else if (idx === totalEtapas - 1) tipoSeguro = "FINAL";
 
           return {
             id_vaga: vaga.id_vaga,
@@ -940,7 +939,7 @@ export class VagaService {
       orderBy: {
         data_publicacao: "desc", // Vagas mais recentes primeiro
       },
-      // Trazemos apenas os dados públicos da empresa para não vazar informações sensíveis (como CNPJ, faturamento, etc)
+      // Trazemos apenas os dados públicos da empresa
       include: {
         empresa: {
           select: {
@@ -948,14 +947,33 @@ export class VagaService {
             logotipo_url: true, // Se você tiver um campo de logo
           },
         },
+        endereco: {
+          select: { cidade: true, uf: true },
+        },
         area_atuacao: {
           select: { nome: true },
         },
       },
     });
 
+    // 3. SANITIZAÇÃO DE DADOS: Oculta a empresa se a vaga for confidencial
+    const vagasSanitizadas = vagas.map((vaga) => {
+      if (vaga.empresa_confidencial) {
+        return {
+          ...vaga,
+          // Substituímos os dados reais por dados genéricos para não quebrar a tipagem do frontend
+          empresa: {
+            nome_fantasia: "Empresa Confidencial",
+            logotipo_url: null,
+            tipo_vinculo_aci: "NAO_ASSOCIADA",
+          },
+        };
+      }
+      return vaga;
+    });
+
     return {
-      dados: vagas,
+      dados: vagasSanitizadas,
       paginacao: {
         total: totalVagas,
         pagina_atual: pagina,
@@ -1002,5 +1020,70 @@ export class VagaService {
     }
 
     return vaga;
+  }
+
+  async obterFiltrosDisponiveis() {
+    // Regra de Ouro: Só queremos filtros de vagas que as pessoas possam se candidatar AGORA
+    const baseWhere = { status: "ATIVA" as const };
+
+    const [enderecosBrutos, modelosTrabalho, tiposContrato, tiposDiversidade] =
+      await Promise.all([
+        // 1. Pega combinações únicas de UF e Cidade que possuem vagas ativas
+        prisma.endereco.findMany({
+          where: {
+            vaga: baseWhere, // CORREÇÃO 1: 'vaga' no singular, conforme seu schema
+          },
+          select: { uf: true, cidade: true },
+          distinct: ["uf", "cidade"],
+        }),
+
+        // 2. Pega os Modelos de Trabalho únicos que estão em uso agora
+        prisma.vaga.groupBy({
+          by: ["modelo_trabalho"],
+          where: baseWhere,
+        }),
+
+        // 3. Pega os Tipos de Contrato únicos em uso
+        prisma.vaga.groupBy({
+          by: ["tipo_contrato"],
+          where: baseWhere,
+        }),
+
+        // 4. Pega os Tipos de Diversidade únicos em uso
+        prisma.vaga.groupBy({
+          by: ["tipo_diversidade"],
+          where: baseWhere, // CORREÇÃO 2: Tiramos o { not: null } daqui
+        }),
+      ]);
+
+    // --- FORMATAÇÃO DOS LOCAIS ---
+    const locaisMap = new Map<string, Set<string>>();
+
+    for (const end of enderecosBrutos) {
+      if (!end.uf || !end.cidade) continue;
+
+      if (!locaisMap.has(end.uf)) {
+        locaisMap.set(end.uf, new Set());
+      }
+      locaisMap.get(end.uf)!.add(end.cidade);
+    }
+
+    const locaisFormatados = Array.from(locaisMap.entries())
+      .map(([uf, cidadesSet]) => ({
+        uf,
+        cidades: Array.from(cidadesSet).sort(),
+      }))
+      .sort((a, b) => a.uf.localeCompare(b.uf));
+
+    // --- RETORNO FORMATADO ---
+    return {
+      locais: locaisFormatados,
+      modelos: modelosTrabalho.map((m) => m.modelo_trabalho),
+      contratos: tiposContrato.map((c) => c.tipo_contrato),
+      // CORREÇÃO 2: Filtramos o null direto no JavaScript usando o .filter()
+      diversidade: tiposDiversidade
+        .map((d) => d.tipo_diversidade)
+        .filter((d) => d !== null),
+    };
   }
 }

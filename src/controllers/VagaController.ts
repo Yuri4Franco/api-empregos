@@ -298,4 +298,20 @@ export class VagaController {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
+
+  async filtrosDisponiveis(req: Request, res: Response) {
+    try {
+      const filtros = await vagaService.obterFiltrosDisponiveis();
+
+      return res.status(200).json({
+        success: true,
+        data: filtros,
+      });
+    } catch (error: any) {
+      return res.status(500).json({
+        success: false,
+        error: "Erro ao buscar filtros disponíveis.",
+      });
+    }
+  }
 }
