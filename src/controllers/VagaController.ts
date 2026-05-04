@@ -232,14 +232,26 @@ export class VagaController {
 
   async listarPublicas(req: Request, res: Response) {
     try {
-      // Extrai os filtros da Query String (a interrogação na URL)
-      const { busca, cidade, pagina, limite } = req.query;
+      // Extrai TODOS os filtros da Query String
+      const { 
+        busca, cidade, pagina, limite,
+        modelo_trabalho, tipo_contrato, somente_pcd,
+        nivel_hierarquico, salario_min, salario_max, tipo_pcd 
+      } = req.query;
 
       const resultado = await vagaService.listarVagasPublicas({
         busca: busca as string,
         cidade: cidade as string,
         pagina: pagina ? Number(pagina) : undefined,
         limite: limite ? Number(limite) : undefined,
+        // Novos filtros sendo repassados:
+        modelo_trabalho: modelo_trabalho as string,
+        tipo_contrato: tipo_contrato as string,
+        somente_pcd: somente_pcd === 'true', // Converte string 'true' para boolean
+        nivel_hierarquico: nivel_hierarquico as string,
+        salario_min: salario_min ? Number(salario_min) : undefined,
+        salario_max: salario_max ? Number(salario_max) : undefined,
+        tipo_pcd: tipo_pcd as string,
       });
 
       return res.status(200).json({
@@ -250,6 +262,7 @@ export class VagaController {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
+
 
   async detalharPublica(req: Request, res: Response) {
     try {

@@ -880,8 +880,10 @@ routes.get("/admin/vagas", authMiddleware(["ADM"]), vagaController.listarAdmin);
 
 routes.get("/vagas", vagaController.listarPublicas);
 
+routes.get("/vagas/filtros-disponiveis", vagaController.filtrosDisponiveis);
+
 routes.get("/vagas/:id", vagaController.detalharPublica);
 
-routes.get("/vagas/filtros-disponiveis", vagaController.filtrosDisponiveis);
+
 
 export default routes;
