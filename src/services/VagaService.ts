@@ -897,7 +897,7 @@ export class VagaService {
     });
   }
 
-async listarVagasPublicas(filtros: {
+  async listarVagasPublicas(filtros: {
     busca?: string | undefined;
     cidade?: string | undefined;
     pagina?: number | undefined;
@@ -916,7 +916,7 @@ async listarVagasPublicas(filtros: {
     const pular = (pagina - 1) * limite;
 
     const whereClause: any = {
-      status: "ATIVA", 
+      status: "ATIVA",
     };
 
     // --- 1. BUSCA POR TEXTO ---
@@ -930,8 +930,8 @@ async listarVagasPublicas(filtros: {
     // --- 2. CORREÇÃO DA CIDADE ---
     if (filtros.cidade) {
       // O Prisma precisa entrar na relação 'endereco' primeiro!
-      whereClause.endereco = { 
-        cidade: { equals: filtros.cidade, mode: "insensitive" } 
+      whereClause.endereco = {
+        cidade: { equals: filtros.cidade, mode: "insensitive" },
       };
     }
 
@@ -946,7 +946,9 @@ async listarVagasPublicas(filtros: {
     }
 
     if (filtros.nivel_hierarquico) {
-      whereClause.nivel_hierarquico = { in: filtros.nivel_hierarquico.split(",") };
+      whereClause.nivel_hierarquico = {
+        in: filtros.nivel_hierarquico.split(","),
+      };
     }
 
     // --- 4. LÓGICA DE PCD (Mesclando botão rápido com a gaveta) ---
@@ -958,7 +960,9 @@ async listarVagasPublicas(filtros: {
       }
     } else if (filtros.somente_pcd) {
       // Se clicou no botão rápido, aceita ambas as modalidades PCD
-      whereClause.tipo_diversidade = { in: ["VAGA_INCLUSIVA", "EXCLUSIVA_PCD"] };
+      whereClause.tipo_diversidade = {
+        in: ["VAGA_INCLUSIVA", "EXCLUSIVA_PCD"],
+      };
     }
 
     // --- 5. FAIXA SALARIAL ---
@@ -970,9 +974,11 @@ async listarVagasPublicas(filtros: {
     }
 
     if (filtros.id_area_atuacao) {
-      whereClause.id_area_atuacao = Number(filtros.id_area_atuacao);
+      const areaId = Number(filtros.id_area_atuacao);
+      if (!isNaN(areaId)) {
+        whereClause.id_area_atuacao = areaId;
+      }
     }
-
     // Executa as consultas com a nova whereClause
     const totalVagas = await prisma.vaga.count({
       where: whereClause,
@@ -983,13 +989,13 @@ async listarVagasPublicas(filtros: {
       skip: pular,
       take: limite,
       orderBy: {
-        data_publicacao: "desc", 
+        data_publicacao: "desc",
       },
       include: {
         empresa: {
           select: {
             nome_fantasia: true,
-            logotipo_url: true, 
+            logotipo_url: true,
           },
         },
         endereco: {
@@ -1066,49 +1072,49 @@ async listarVagasPublicas(filtros: {
     return vaga;
   }
 
-async obterFiltrosDisponiveis() {
+  async obterFiltrosDisponiveis() {
     const baseWhere = { status: "ATIVA" as const };
 
     const [
-      enderecosBrutos, 
-      modelosTrabalho, 
-      tiposContrato, 
-      tiposDiversidade, 
+      enderecosBrutos,
+      modelosTrabalho,
+      tiposContrato,
+      tiposDiversidade,
       areasComVagas,
-      niveisHierarquicos 
+      niveisHierarquicos,
     ] = await Promise.all([
-        prisma.endereco.findMany({
-          where: {
-            vaga: baseWhere,
-          },
-          select: { uf: true, cidade: true },
-          distinct: ["uf", "cidade"],
-        }), 
-        prisma.vaga.groupBy({
-          by: ["modelo_trabalho"],
-          where: baseWhere,
-        }),
-        prisma.vaga.groupBy({
-          by: ["tipo_contrato"],
-          where: baseWhere,
-        }),
-        prisma.vaga.groupBy({
-          by: ["tipo_diversidade"],
-          where: baseWhere,
-        }),
-        prisma.areaAtuacao.findMany({
-          where: {
-            vagas: { some: baseWhere } 
-          },
-          // CORREÇÃO: Alterado de 'id_area_atuacao' para 'id_area'
-          select: { id_area: true, nome: true }, 
-          orderBy: { nome: 'asc' }
-        }),
-        prisma.vaga.groupBy({
-          by: ["nivel_hierarquico"],
-          where: baseWhere,
-        })
-      ]);
+      prisma.endereco.findMany({
+        where: {
+          vaga: baseWhere,
+        },
+        select: { uf: true, cidade: true },
+        distinct: ["uf", "cidade"],
+      }),
+      prisma.vaga.groupBy({
+        by: ["modelo_trabalho"],
+        where: baseWhere,
+      }),
+      prisma.vaga.groupBy({
+        by: ["tipo_contrato"],
+        where: baseWhere,
+      }),
+      prisma.vaga.groupBy({
+        by: ["tipo_diversidade"],
+        where: baseWhere,
+      }),
+      prisma.areaAtuacao.findMany({
+        where: {
+          vagas: { some: baseWhere },
+        },
+        // CORREÇÃO: Alterado de 'id_area_atuacao' para 'id_area'
+        select: { id_area: true, nome: true },
+        orderBy: { nome: "asc" },
+      }),
+      prisma.vaga.groupBy({
+        by: ["nivel_hierarquico"],
+        where: baseWhere,
+      }),
+    ]);
 
     // --- FORMATAÇÃO DOS LOCAIS ---
     const locaisMap = new Map<string, Set<string>>();
