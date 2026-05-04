@@ -236,7 +236,7 @@ export class VagaController {
       const { 
         busca, cidade, pagina, limite,
         modelo_trabalho, tipo_contrato, somente_pcd,
-        nivel_hierarquico, salario_min, salario_max, tipo_pcd 
+        nivel_hierarquico, salario_min, salario_max, tipo_pcd, id_area_atuacao 
       } = req.query;
 
       const resultado = await vagaService.listarVagasPublicas({
@@ -244,7 +244,6 @@ export class VagaController {
         cidade: cidade as string,
         pagina: pagina ? Number(pagina) : undefined,
         limite: limite ? Number(limite) : undefined,
-        // Novos filtros sendo repassados:
         modelo_trabalho: modelo_trabalho as string,
         tipo_contrato: tipo_contrato as string,
         somente_pcd: somente_pcd === 'true', // Converte string 'true' para boolean
@@ -252,6 +251,7 @@ export class VagaController {
         salario_min: salario_min ? Number(salario_min) : undefined,
         salario_max: salario_max ? Number(salario_max) : undefined,
         tipo_pcd: tipo_pcd as string,
+        id_area_atuacao: id_area_atuacao as string
       });
 
       return res.status(200).json({
