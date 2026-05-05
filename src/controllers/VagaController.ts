@@ -12,7 +12,7 @@ export class VagaController {
    * Usado pelo Portal da Empresa.
    * Pode salvar como RASCUNHO ou enviar para análise da ACI.
    */
-async cadastrar(req: Request, res: Response) {
+  async cadastrar(req: Request, res: Response) {
     try {
       // 1. Descobrimos se é para mandar pra ACI ou se é só Rascunho
       const isSubmissao = req.body.enviar_para_aprovacao === true;
@@ -20,13 +20,15 @@ async cadastrar(req: Request, res: Response) {
       let dadosValidados;
 
       if (isSubmissao) {
-        // Validação de Ferro: Exige todos os campos min(5), min(10), área de atuação, etc.
-        dadosValidados = vagaSchema.parse(req.body);
+        // PASSTHROUGH VITAL: Deixa passar as chaves de etapas que o Front manda
+        dadosValidados = vagaSchema.passthrough().parse(req.body);
       } else {
-        const rascunhoSchema = vagaSchema.partial().extend({
+        // Validação de Rascunho: Transforma TUDO em opcional, EXCETO o título
+        const rascunhoSchema = vagaSchema.partial().passthrough().extend({
           titulo: vagaSchema.shape.titulo,
         });
 
+        // Parse flexível
         dadosValidados = rascunhoSchema.parse(req.body);
       }
 
@@ -53,7 +55,7 @@ async cadastrar(req: Request, res: Response) {
       const vaga = await vagaService.criarVaga(
         dadosValidados,
         id_empresa_real,
-        false // is_admin
+        false, // is_admin
       );
 
       const mensagem =
@@ -67,14 +69,29 @@ async cadastrar(req: Request, res: Response) {
         data: vaga,
       });
     } catch (error: any) {
-      // Se o erro vier do Zod, podemos enviar uma mensagem mais clara
-      if (error.name === "ZodError") {
-        return res.status(400).json({ 
-          success: false, 
-          error: "Erro de validação.",
-          detalhes: error.errors // Envia a lista de campos que falharam
+      // 🚀 AQUI ESTÁ A CORREÇÃO DE OURO 🚀
+      // Verifica se é erro do Zod checando se tem a propriedade "issues" ou "errors"
+      const isZodError =
+        error.name === "ZodError" || error.issues || error.errors;
+
+      if (isZodError) {
+        const listaErros = error.issues || error.errors || [];
+
+        const mensagens = listaErros
+          .map((err: any) => {
+            const caminho = err.path ? err.path.join(".") : "Campo";
+            return `${caminho}: ${err.message}`;
+          })
+          .join(" | ");
+
+        return res.status(400).json({
+          success: false,
+          error: `O Zod bloqueou: ${mensagens}`,
+          detalhes: listaErros,
         });
       }
+
+      // Se não for erro do Zod (Prisma, Service, etc), cai aqui normal
       return res.status(400).json({ success: false, error: error.message });
     }
   }
@@ -100,7 +117,7 @@ async cadastrar(req: Request, res: Response) {
     }
   }
 
-async atualizar(req: Request, res: Response) {
+  async atualizar(req: Request, res: Response) {
     try {
       const parametroId = req.params.id || req.params.id_vaga;
       const id_vaga = parseInt(parametroId as string);
@@ -154,10 +171,10 @@ async atualizar(req: Request, res: Response) {
       });
     } catch (error: any) {
       if (error.name === "ZodError") {
-        return res.status(400).json({ 
-          success: false, 
+        return res.status(400).json({
+          success: false,
           error: "Erro de validação.",
-          detalhes: error.errors 
+          detalhes: error.errors,
         });
       }
       return res.status(400).json({ success: false, error: error.message });
@@ -267,10 +284,19 @@ async atualizar(req: Request, res: Response) {
   async listarPublicas(req: Request, res: Response) {
     try {
       // Extrai TODOS os filtros da Query String
-      const { 
-        busca, cidade, pagina, limite,
-        modelo_trabalho, tipo_contrato, somente_pcd,
-        nivel_hierarquico, salario_min, salario_max, tipo_pcd, id_area_atuacao 
+      const {
+        busca,
+        cidade,
+        pagina,
+        limite,
+        modelo_trabalho,
+        tipo_contrato,
+        somente_pcd,
+        nivel_hierarquico,
+        salario_min,
+        salario_max,
+        tipo_pcd,
+        id_area_atuacao,
       } = req.query;
 
       const resultado = await vagaService.listarVagasPublicas({
@@ -280,12 +306,12 @@ async atualizar(req: Request, res: Response) {
         limite: limite ? Number(limite) : undefined,
         modelo_trabalho: modelo_trabalho as string,
         tipo_contrato: tipo_contrato as string,
-        somente_pcd: somente_pcd === 'true', // Converte string 'true' para boolean
+        somente_pcd: somente_pcd === "true", // Converte string 'true' para boolean
         nivel_hierarquico: nivel_hierarquico as string,
         salario_min: salario_min ? Number(salario_min) : undefined,
         salario_max: salario_max ? Number(salario_max) : undefined,
         tipo_pcd: tipo_pcd as string,
-        id_area_atuacao: id_area_atuacao as string
+        id_area_atuacao: id_area_atuacao as string,
       });
 
       return res.status(200).json({
@@ -296,7 +322,6 @@ async atualizar(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
-
 
   async detalharPublica(req: Request, res: Response) {
     try {

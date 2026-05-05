@@ -27,7 +27,7 @@ export class VagaService {
         data: {
           logradouro: dados.logradouro || "",
           numero: dados.numero || "",
-          cidade: dados.cidade || "Panambi", 
+          cidade: dados.cidade || "Panambi",
           uf: dados.uf || "RS",
           bairro: dados.bairro || "",
         },
@@ -35,17 +35,26 @@ export class VagaService {
 
       const vaga = await tx.vaga.create({
         data: {
-          id_empresa,
-          id_endereco: endereco.id_endereco,
-          // Se for rascunho e não tiver área, colocamos null (se o banco permitir) ou um ID genérico
-          id_area_atuacao: dados.id_area_atuacao || null, 
+          // --- RELACIONAMENTOS VIA CONNECT (O jeito à prova de balas do Prisma) ---
+          empresa: { connect: { id_empresa: id_empresa } },
+          endereco: { connect: { id_endereco: endereco.id_endereco } },
+
+          // A Área de Atuação entra condicionalmente: se tiver ID, conecta. Se não, ignora.
+          ...(dados.id_area_atuacao
+            ? { area_atuacao: { connect: { id_area: dados.id_area_atuacao } } }
+            : {}),
+
+          // --- CAMPOS NORMAIS ---
           titulo: dados.titulo,
-          nivel_hierarquico: dados.nivel_hierarquico || "NAO_INFORMADO", // Ajuste conforme seu Enum
+          nivel_hierarquico: dados.nivel_hierarquico || "NAO_INFORMADO",
           tipo_diversidade: dados.tipo_diversidade || "AMPLA_CONCORRENCIA",
           modelo_trabalho: dados.modelo_trabalho || "PRESENCIAL",
           tipo_contrato: dados.tipo_contrato || "CLT",
+
+          // Para campos de banco que aceitam nulo (Int?), o 'null' é a aposta mais segura
           faixa_salarial_de: dados.salario_de || null,
           faixa_salarial_ate: dados.salario_ate || null,
+
           salario_a_combinar: dados.salario_a_combinar || false,
           ocultar_salario: dados.ocultar_salario || false,
           descricao: dados.descricao || "",
@@ -86,7 +95,8 @@ export class VagaService {
         { nome_etapa: "Finalistas", requer_agendamento: false },
       ];
 
-      const etapasParaCriar = dados.etapas?.length > 0 ? dados.etapas : etapasPadrao;
+      const etapasParaCriar =
+        dados.etapas?.length > 0 ? dados.etapas : etapasPadrao;
       const totalEtapas = etapasParaCriar.length;
 
       await tx.etapaProcesso.createMany({
@@ -109,12 +119,20 @@ export class VagaService {
         data: {
           id_vaga: vaga.id_vaga,
           campos_destaque: [
-            "foto", "nome", "idade", "experiencia_recente", "cidade"
+            "foto",
+            "nome",
+            "idade",
+            "experiencia_recente",
+            "cidade",
           ],
         },
       });
 
-      if (statusFinal === "EM_ANALISE" && empresa.tipo_vinculo_aci === "NAO_ASSOCIADA" && !is_admin) {
+      if (
+        statusFinal === "EM_ANALISE" &&
+        empresa.tipo_vinculo_aci === "NAO_ASSOCIADA" &&
+        !is_admin
+      ) {
         await tx.empresa.update({
           where: { id_empresa },
           data: { creditos_vagas: { decrement: 1 } },
@@ -324,22 +342,27 @@ export class VagaService {
 
   async atualizarVaga(
     id_vaga: number,
-    id_empresa: number | null, 
+    id_empresa: number | null,
     dados: any,
-    is_admin: boolean = false, 
-    id_autor?: number, 
+    is_admin: boolean = false,
+    id_autor?: number,
   ) {
     // 1. Buscar a vaga e o endereço atual
     const vagaExistente = await prisma.vaga.findUnique({
       where: { id_vaga },
-      include: { endereco: true, empresa: { select: { tipo_vinculo_aci: true, creditos_vagas: true } } },
+      include: {
+        endereco: true,
+        empresa: { select: { tipo_vinculo_aci: true, creditos_vagas: true } },
+      },
     });
 
     if (!vagaExistente) throw new Error("Vaga não encontrada.");
 
     // 2. Trava de Segurança: Se NÃO for admin, obriga ser o dono da empresa
     if (!is_admin && vagaExistente.id_empresa !== id_empresa) {
-      throw new Error("Acesso negado: Você não tem permissão para editar esta vaga.");
+      throw new Error(
+        "Acesso negado: Você não tem permissão para editar esta vaga.",
+      );
     }
 
     // 3. REGRA DE NEGÓCIO: Verificação de Créditos ao Submeter Rascunho
@@ -348,7 +371,10 @@ export class VagaService {
 
     if (is_admin && dados.status) {
       novoStatus = dados.status;
-    } else if (dados.enviar_para_aprovacao && vagaExistente.status === "RASCUNHO") {
+    } else if (
+      dados.enviar_para_aprovacao &&
+      vagaExistente.status === "RASCUNHO"
+    ) {
       // Se era rascunho e agora quer enviar pra aprovação, aplicamos a regra da ACI
       if (vagaExistente.empresa.tipo_vinculo_aci === "NAO_ASSOCIADA") {
         if (vagaExistente.empresa.creditos_vagas <= 0) {
@@ -367,14 +393,15 @@ export class VagaService {
       if (cobrarCredito) {
         await tx.empresa.update({
           where: { id_empresa: vagaExistente.id_empresa },
-          data: { creditos_vagas: { decrement: 1 } }
+          data: { creditos_vagas: { decrement: 1 } },
         });
       }
 
       // 5. Atualizar Endereço
       if (vagaExistente.id_endereco) {
         const dadosEndereco: any = {};
-        if (dados.logradouro !== undefined) dadosEndereco.logradouro = dados.logradouro;
+        if (dados.logradouro !== undefined)
+          dadosEndereco.logradouro = dados.logradouro;
         if (dados.numero !== undefined) dadosEndereco.numero = dados.numero;
         if (dados.cidade !== undefined) dadosEndereco.cidade = dados.cidade;
         if (dados.uf !== undefined) dadosEndereco.uf = dados.uf;
@@ -398,7 +425,10 @@ export class VagaService {
         });
       }
 
-      if (dados.perguntas_eliminatorias && Array.isArray(dados.perguntas_eliminatorias)) {
+      if (
+        dados.perguntas_eliminatorias &&
+        Array.isArray(dados.perguntas_eliminatorias)
+      ) {
         await tx.vagaPerguntaEliminatoria.deleteMany({ where: { id_vaga } });
         await tx.vagaPerguntaEliminatoria.createMany({
           data: dados.perguntas_eliminatorias.map((p: any) => ({
@@ -411,9 +441,18 @@ export class VagaService {
 
       // Strings e Booleans
       const camposTextuais = [
-        "titulo", "nivel_hierarquico", "modelo_trabalho", "tipo_contrato", "tipo_diversidade",
-        "salario_a_combinar", "ocultar_salario", "descricao", "responsabilidades",
-        "requisitos_obrigatorios", "diferenciais", "empresa_confidencial",
+        "titulo",
+        "nivel_hierarquico",
+        "modelo_trabalho",
+        "tipo_contrato",
+        "tipo_diversidade",
+        "salario_a_combinar",
+        "ocultar_salario",
+        "descricao",
+        "responsabilidades",
+        "requisitos_obrigatorios",
+        "diferenciais",
+        "empresa_confidencial",
       ];
 
       camposTextuais.forEach((campo) => {
@@ -421,10 +460,19 @@ export class VagaService {
       });
 
       // Conversão Segura de Números (Se vier "" do Frontend, vira null)
-      if (dados.id_area_atuacao !== undefined) dadosVaga.id_area_atuacao = dados.id_area_atuacao ? Number(dados.id_area_atuacao) : null;
-      if (dados.salario_de !== undefined) dadosVaga.faixa_salarial_de = dados.salario_de ? Number(dados.salario_de) : null;
-      if (dados.salario_ate !== undefined) dadosVaga.faixa_salarial_ate = dados.salario_ate ? Number(dados.salario_ate) : null;
-      
+      if (dados.id_area_atuacao !== undefined)
+        dadosVaga.id_area_atuacao = dados.id_area_atuacao
+          ? Number(dados.id_area_atuacao)
+          : null;
+      if (dados.salario_de !== undefined)
+        dadosVaga.faixa_salarial_de = dados.salario_de
+          ? Number(dados.salario_de)
+          : null;
+      if (dados.salario_ate !== undefined)
+        dadosVaga.faixa_salarial_ate = dados.salario_ate
+          ? Number(dados.salario_ate)
+          : null;
+
       // Status e Data de Publicação
       dadosVaga.status = novoStatus;
       if (novoStatus === "ATIVA" && !vagaExistente.data_publicacao) {
@@ -441,21 +489,31 @@ export class VagaService {
         const etapasAtuais = await tx.etapaProcesso.findMany({
           where: { id_vaga },
         });
-        
-        const idsNovasEtapas = dados.etapas.map((e: any) => e.id_etapa).filter(Boolean);
-        const etapasParaRemover = etapasAtuais.filter((ea) => !idsNovasEtapas.includes(ea.id_etapa));
+
+        const idsNovasEtapas = dados.etapas
+          .map((e: any) => e.id_etapa)
+          .filter(Boolean);
+        const etapasParaRemover = etapasAtuais.filter(
+          (ea) => !idsNovasEtapas.includes(ea.id_etapa),
+        );
 
         if (etapasParaRemover.length > 0) {
           const temCandidatos = await tx.candidatura.findFirst({
-            where: { id_etapa_atual: { in: etapasParaRemover.map((e) => e.id_etapa) } },
+            where: {
+              id_etapa_atual: { in: etapasParaRemover.map((e) => e.id_etapa) },
+            },
           });
 
           if (temCandidatos) {
-            throw new Error("Não é possível remover etapas que possuem candidatos vinculados. Mova os candidatos primeiro.");
+            throw new Error(
+              "Não é possível remover etapas que possuem candidatos vinculados. Mova os candidatos primeiro.",
+            );
           }
 
           await tx.etapaProcesso.deleteMany({
-            where: { id_etapa: { in: etapasParaRemover.map((e) => e.id_etapa) } },
+            where: {
+              id_etapa: { in: etapasParaRemover.map((e) => e.id_etapa) },
+            },
           });
         }
 
