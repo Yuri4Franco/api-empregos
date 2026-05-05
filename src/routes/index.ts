@@ -309,9 +309,9 @@ routes.patch(
 routes.post(
   "/vagas",
   authMiddleware(["EMPRESA"]),
-  validate(vagaSchema),
-  vagaController.cadastrar,
+  vagaController.cadastrar
 );
+
 
 // Atualizar Etapas do Wizard -ok
 routes.put(

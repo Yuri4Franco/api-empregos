@@ -12,21 +12,34 @@ export class VagaController {
    * Usado pelo Portal da Empresa.
    * Pode salvar como RASCUNHO ou enviar para análise da ACI.
    */
-  async cadastrar(req: Request, res: Response) {
+async cadastrar(req: Request, res: Response) {
     try {
-      // 1. Usamos os dados que o Zod já validou e transformou
-      const dadosValidados = vagaSchema.parse(req.body);
+      // 1. Descobrimos se é para mandar pra ACI ou se é só Rascunho
+      const isSubmissao = req.body.enviar_para_aprovacao === true;
 
-      // 2. Pegamos o id_empresa do usuário logado (token)
+      let dadosValidados;
+
+      if (isSubmissao) {
+        // Validação de Ferro: Exige todos os campos min(5), min(10), área de atuação, etc.
+        dadosValidados = vagaSchema.parse(req.body);
+      } else {
+        const rascunhoSchema = vagaSchema.partial().extend({
+          titulo: vagaSchema.shape.titulo,
+        });
+
+        dadosValidados = rascunhoSchema.parse(req.body);
+      }
+
+      // 2. Pegamos o ID do usuário logado (token)
       const id_usuario = (req.user as any).id;
 
-      // 2. Buscamos no banco a qual empresa esse usuário pertence
+      // 3. Buscamos no banco a qual empresa esse usuário pertence
       const vinculo = await prisma.usuario.findUnique({
         where: { id_usuario },
         select: { id_empresa: true },
       });
 
-      // 3. Verificação de segurança
+      // 4. Verificação de segurança
       if (!vinculo || !vinculo.id_empresa) {
         return res.status(403).json({
           success: false,
@@ -34,26 +47,18 @@ export class VagaController {
         });
       }
 
-      // 4. Agora sim, temos o ID real da empresa
       const id_empresa_real = vinculo.id_empresa;
 
-      if (!id_empresa_real) {
-        return res.status(403).json({
-          success: false,
-          error: "Usuário não está vinculado a uma conta de empresa.",
-        });
-      }
-
-      // 3. Passamos 'dadosValidados' para o Service
+      // 5. Passamos 'dadosValidados' para o Service
       const vaga = await vagaService.criarVaga(
         dadosValidados,
         id_empresa_real,
-        false,
+        false // is_admin
       );
 
       const mensagem =
         vaga.status === "EM_ANALISE"
-          ? "Vaga enviada para aprovação da ACI com sucesso! "
+          ? "Vaga enviada para aprovação da ACI com sucesso!"
           : "Rascunho da vaga salvo com sucesso.";
 
       return res.status(201).json({
@@ -62,6 +67,14 @@ export class VagaController {
         data: vaga,
       });
     } catch (error: any) {
+      // Se o erro vier do Zod, podemos enviar uma mensagem mais clara
+      if (error.name === "ZodError") {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Erro de validação.",
+          detalhes: error.errors // Envia a lista de campos que falharam
+        });
+      }
       return res.status(400).json({ success: false, error: error.message });
     }
   }
@@ -87,20 +100,27 @@ export class VagaController {
     }
   }
 
-  async atualizar(req: Request, res: Response) {
+async atualizar(req: Request, res: Response) {
     try {
-      const { id_vaga } = req.params;
-      const id_empresa = (req.user as any).id_empresa;
-      const id_usuario = (req.user as any).id_usuario;
+      const parametroId = req.params.id || req.params.id_vaga;
+      const id_vaga = parseInt(parametroId as string);
+
+      // Trava de segurança: Se não for um número válido, a gente já barra aqui!
+      if (isNaN(id_vaga)) {
+        return res.status(400).json({
+          success: false,
+          error: "ID da vaga fornecido na URL é inválido.",
+        });
+      }
+      const id_usuario = (req.user as any).id;
       const is_admin = (req.user as any).tipo_usuario === "ADM";
 
-      // 2. Buscamos no banco a qual empresa esse usuário pertence
       const vinculo = await prisma.usuario.findUnique({
         where: { id_usuario },
         select: { id_empresa: true },
       });
 
-      // 3. Verificação de segurança
+      // 2. Verificação de segurança
       if (!vinculo || !vinculo.id_empresa) {
         return res.status(403).json({
           success: false,
@@ -108,14 +128,21 @@ export class VagaController {
         });
       }
 
-      // 4. Agora sim, temos o ID real da empresa
       const id_empresa_real = vinculo.id_empresa;
+      const isSubmissao = req.body.enviar_para_aprovacao === true;
+      let dadosValidados;
 
-      // Passamos id_empresa para a trava de dono, ou null se for Admin
+      if (isSubmissao) {
+        dadosValidados = vagaSchema.passthrough().parse(req.body);
+      } else {
+        const rascunhoSchema = vagaSchema.partial().passthrough();
+        dadosValidados = rascunhoSchema.parse(req.body);
+      }
+
       const vaga = await vagaService.atualizarVaga(
         Number(id_vaga),
         is_admin ? null : id_empresa_real,
-        req.body,
+        dadosValidados,
         is_admin,
         id_usuario,
       );
@@ -126,6 +153,13 @@ export class VagaController {
         data: vaga,
       });
     } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Erro de validação.",
+          detalhes: error.errors 
+        });
+      }
       return res.status(400).json({ success: false, error: error.message });
     }
   }
