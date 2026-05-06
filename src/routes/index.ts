@@ -558,7 +558,6 @@ routes.post(
 routes.post(
   "/empresa/vagas/:id_vaga/duplicar",
   authMiddleware(["EMPRESA"]),
-  validate(IdParamSchema, "params"),
   vagaController.duplicar,
 );
 

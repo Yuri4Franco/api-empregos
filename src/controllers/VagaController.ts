@@ -99,11 +99,23 @@ export class VagaController {
   async duplicar(req: Request, res: Response) {
     try {
       const { id_vaga } = req.params;
-      const id_empresa = (req.user as any).id_empresa;
+      const id_usuario = (req.user as any).id;
+
+      const usuario = await prisma.usuario.findUnique({
+        where: { id_usuario },
+        select: { id_empresa: true }
+      });
+
+      if (!usuario || !usuario.id_empresa) {
+        return res.status(403).json({ 
+          success: false, 
+          error: "Acesso negado. Nenhuma empresa vinculada a este usuário." 
+        });
+      }
 
       const novaVaga = await vagaService.duplicarVaga(
         Number(id_vaga),
-        id_empresa,
+        usuario.id_empresa,
       );
 
       return res.status(201).json({

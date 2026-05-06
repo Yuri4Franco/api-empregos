@@ -270,11 +270,11 @@ export class VagaService {
 
       // 3. Criar a Nova Vaga (Resolvendo erro 2375 com ?? null)
       const novaVaga = await tx.vaga.create({
-        data: {
+       data: {
           id_empresa: original.id_empresa,
           titulo: `${original.titulo} (Cópia)`,
           nivel_hierarquico: original.nivel_hierarquico,
-          id_endereco: novoEndereco?.id_endereco ?? null, // Garante null se não houver endereço
+          id_endereco: novoEndereco?.id_endereco ?? null,
           modelo_trabalho: original.modelo_trabalho,
           tipo_contrato: original.tipo_contrato,
           faixa_salarial_de: original.faixa_salarial_de,
@@ -287,7 +287,11 @@ export class VagaService {
           diferenciais: original.diferenciais,
           empresa_confidencial: original.empresa_confidencial,
           id_area_atuacao: original.id_area_atuacao,
-          status: "RASCUNHO", // Sempre rascunho para segurança
+          
+          // ---> ADICIONE ESTA LINHA: <---
+          tipo_diversidade: original.tipo_diversidade, 
+          
+          status: "RASCUNHO", 
         },
       });
 
@@ -347,7 +351,6 @@ export class VagaService {
     is_admin: boolean = false,
     id_autor?: number,
   ) {
-    // 1. Buscar a vaga e o endereço atual
     const vagaExistente = await prisma.vaga.findUnique({
       where: { id_vaga },
       include: {
