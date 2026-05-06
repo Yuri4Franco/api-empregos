@@ -1,3 +1,4 @@
+import { vi } from "zod/v4/locales";
 import { prisma } from "../config/prisma.js";
 import { StatusCandidatura } from "@prisma/client";
 
@@ -41,6 +42,7 @@ export class CandidatoService {
             fora_do_perfil: c.respostas.some((r) => r.fora_do_perfil),
             data_inscricao: c.data_candidatura,
             possui_agendamento: !!c.agendamento,
+            visualizada: c.visualizada || false,
             data_entrevista: c.agendamento?.data_hora || null,
             avaliacao_nota: c.avaliacao?.pontuacao || null,
             whatsapp: c.candidato.whatsapp || null,
@@ -226,6 +228,25 @@ export class CandidatoService {
 
     if (!candidatura || candidatura.vaga.id_empresa !== id_empresa) {
       throw new Error("Acesso negado.");
+    }
+
+    // --- GATILHO DE VISUALIZAÇÃO ---
+    // Se a candidatura ainda não foi visualizada, nós registramos agora!
+    if (!candidatura.visualizada) {
+      const agora = new Date();
+
+      await prisma.candidatura.update({
+        where: { id_candidatura },
+        data: {
+          visualizada: true,
+          data_visualizacao: agora,
+        },
+      });
+
+      // Atualizamos o objeto em memória para que o Front-end
+      // já receba o status de 'visualizada: true' no JSON de resposta
+      candidatura.visualizada = true;
+      candidatura.data_visualizacao = agora;
     }
 
     // --- LÓGICA DO RESUMO ESTRATÉGICO ---
@@ -509,28 +530,24 @@ export class CandidatoService {
   }
 
   async atualizarFotoPerfil(id_usuario: number, foto_url: string) {
-  return await prisma.candidato.update({
-    where: { 
-      id_usuario: id_usuario 
-    },
-    data: {
-      foto_url: foto_url,
-    },
-    // No select, podemos inclusive trazer o nome que está na tabela Usuario 
-    // para que o Front-end receba o objeto completo do perfil
-    select: {
-      id_usuario: true,
-      foto_url: true,
-      usuario: {
-        select: {
-          nome: true
-        }
-      }
-    },
-  });
+    return await prisma.candidato.update({
+      where: {
+        id_usuario: id_usuario,
+      },
+      data: {
+        foto_url: foto_url,
+      },
+      // No select, podemos inclusive trazer o nome que está na tabela Usuario
+      // para que o Front-end receba o objeto completo do perfil
+      select: {
+        id_usuario: true,
+        foto_url: true,
+        usuario: {
+          select: {
+            nome: true,
+          },
+        },
+      },
+    });
   }
-
-  
-
-
 }

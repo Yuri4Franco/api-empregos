@@ -177,7 +177,6 @@ export const vagaSchema = z.object({
   modelo_trabalho: z.string(),
   tipo_contrato: z.string(),
 
-  //diversidade
   tipo_diversidade: z.string().default("AMPLA_CONCORRENCIA"),
 
   salario_de: z.coerce.number().optional().nullable(),

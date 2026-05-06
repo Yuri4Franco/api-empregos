@@ -198,6 +198,7 @@ model Candidato {
   relatos_ouvidoria       OuvidoriaRelato[]
   desbloqueado_por CurriculoDesbloqueado[]
   salvo_por CurriculoSalvo[]
+  visualizacoes_perfil VisualizacaoCurriculo[]
 
   @@map("candidatos")
 }
@@ -254,6 +255,7 @@ model Empresa {
   solicitacoes_midia SolicitacaoMidia[]
   curriculos_desbloqueados CurriculoDesbloqueado[]
   curriculos_salvos CurriculoSalvo[]
+  curriculos_visualizados VisualizacaoCurriculo[]
   
 
   @@map("empresas")
@@ -360,6 +362,20 @@ model EtapaProcesso {
   @@map("etapas_processo")
 }
 
+model VisualizacaoCurriculo {
+  id_visualizacao   Int      @id @default(autoincrement())
+  id_candidato      Int
+  id_empresa        Int
+  data_visualizacao DateTime @default(now())
+
+  candidato Candidato @relation(fields: [id_candidato], references: [id_usuario], onDelete: Cascade)
+  
+  empresa   Empresa   @relation(fields: [id_empresa], references: [id_empresa], onDelete: Cascade)
+
+  @@index([id_candidato, data_visualizacao])
+  @@map("visualizacoes_curriculo")
+}
+
 model AgendamentoEntrevista {
   id_agendamento Int         @id @default(autoincrement())
   id_candidatura Int         @unique
@@ -390,6 +406,9 @@ model Candidatura {
   respostas        RespostaPergunta[]
   agendamento AgendamentoEntrevista?
   avaliacao AvaliacaoCandidatura?
+
+  visualizada       Boolean   @default(false)
+  data_visualizacao DateTime?
 
   @@map("candidaturas")
 }
