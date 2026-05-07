@@ -246,6 +246,7 @@ export const FiltroVagasEmpresaSchema = z.object({
       "REPROVADA",
       "PAUSADA",
       "ENCERRADA",
+      "AGUARDANDO_PAGAMENTO"
     ])
     .optional(),
 });

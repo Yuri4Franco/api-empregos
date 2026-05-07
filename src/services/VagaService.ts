@@ -563,7 +563,7 @@ export class VagaService {
     });
   }
 
-  async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
+async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
     // 1. Forçamos a conversão para número e definimos valores padrão caso venham nulos
     const page = Number(filtros.page) || 1;
     const limit = Number(filtros.limit) || 10;
@@ -581,7 +581,10 @@ export class VagaService {
               OR: [
                 { titulo: { contains: search, mode: "insensitive" } },
                 {
-                  area_profissional: { contains: search, mode: "insensitive" },
+                  // 🚀 CORREÇÃO AQUI: Entramos na relação "area_atuacao" e buscamos no "nome"
+                  area_atuacao: { 
+                    nome: { contains: search, mode: "insensitive" } 
+                  },
                 },
               ],
             }
@@ -594,10 +597,12 @@ export class VagaService {
         prisma.vaga.count({ where: onde }),
         prisma.vaga.findMany({
           where: onde,
-          skip: skip, // Agora é garantidamente um number
-          take: limit, // Agora é garantidamente um number
+          skip: skip,
+          take: limit,
           include: {
             _count: { select: { candidaturas: true } },
+            // É bom incluir a área de atuação no retorno para o Front-end mostrar no card!
+            area_atuacao: { select: { nome: true } } 
           },
           orderBy: { data_publicacao: "desc" },
         }),
@@ -613,7 +618,6 @@ export class VagaService {
         data: vagas,
       };
     } catch (error) {
-      // Log detalhado no terminal para você ver se o banco reclamar de algum campo
       console.error("Erro no Prisma ao listar vagas:", error);
       throw new Error("Erro ao buscar vagas no banco de dados.");
     }

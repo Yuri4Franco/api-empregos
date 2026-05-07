@@ -477,14 +477,14 @@ routes.put(
 routes.get(
   "/empresa/vagas/:id_vaga/kanban",
   authMiddleware(["EMPRESA"]),
-  candidatoController.index,
+  candidaturaController.index,
 );
 
 // Mover Card individual
 routes.patch(
   "/empresa/candidaturas/:id_candidatura/mover",
   authMiddleware(["EMPRESA"]),
-  candidatoController.mover,
+  candidaturaController.mover,
 );
 
 // Avançar candidato para a próxima etapa
@@ -505,28 +505,28 @@ routes.patch(
 routes.post(
   "/empresa/candidaturas/reprovar-lote",
   authMiddleware(["EMPRESA"]),
-  candidatoController.reprovarEmLote,
+  candidaturaController.reprovarEmLote,
 );
 
 // Safe Send (Botão Publicar)
 routes.post(
   "/empresa/vagas/:id_vaga/notificar-candidatos",
   authMiddleware(["EMPRESA"]),
-  candidatoController.publicarNotificacoes,
+  candidaturaController.publicarNotificacoes,
 );
 
 // Perfil completo do candidato (Dados + Currículo + Agendamento + Avaliação)
 routes.get(
   "/empresa/candidaturas/:id_candidatura/perfil",
   authMiddleware(["EMPRESA"]),
-  candidatoController.verPerfil,
+  candidaturaController.verPerfil,
 );
 
 // Salvar avaliação interna
 routes.post(
   "/empresa/candidaturas/:id_candidatura/avaliar",
   authMiddleware(["EMPRESA"]),
-  candidatoController.avaliar,
+  candidaturaController.avaliar,
 );
 
 // Agendar Entrevista
@@ -534,7 +534,7 @@ routes.post(
   "/empresa/candidaturas/:id_candidatura/agendar",
   authMiddleware(["EMPRESA"]),
   validate(AgendarEntrevistaSchema, "body"),
-  candidatoController.agendar,
+  candidaturaController.agendar,
 );
 
 // Configurar quais campos aparecem no resumo estratégico do candidato
@@ -543,7 +543,7 @@ routes.patch(
   authMiddleware(["EMPRESA"]),
 
   validate(ConfigurarDestaquesSchema, "body"),
-  candidatoController.salvarConfiguracaoDestaques,
+  candidaturaController.salvarConfiguracaoDestaques,
 );
 
 // Encerrar vaga
@@ -566,7 +566,7 @@ routes.get(
   "/empresa/candidaturas/:id_candidatura/historico",
   authMiddleware(["EMPRESA"]),
   validate(IdParamSchema, "params"),
-  candidatoController.verHistorico,
+  candidaturaController.verHistorico,
 );
 
 // Resumo operacional para a tela inicial da empresa
