@@ -473,11 +473,11 @@ routes.put(
   empresaController.atualizarPerfil,
 );
 
-// Visualizar Kanban da Vaga
+// Visualizar Painel de Gestão da Vaga
 routes.get(
-  "/empresa/vagas/:id_vaga/kanban",
+  "/empresa/vagas/:id_vaga/painel-gestao",
   authMiddleware(["EMPRESA"]),
-  candidaturaController.index,
+  candidaturaController.obterPainelGestao,
 );
 
 // Mover Card individual
@@ -565,7 +565,6 @@ routes.post(
 routes.get(
   "/empresa/candidaturas/:id_candidatura/historico",
   authMiddleware(["EMPRESA"]),
-  validate(IdParamSchema, "params"),
   candidaturaController.verHistorico,
 );
 

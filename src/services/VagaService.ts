@@ -94,6 +94,7 @@ export class VagaService {
         { nome_etapa: "Entrevista", requer_agendamento: true },
         { nome_etapa: "Finalistas", requer_agendamento: false },
       ];
+      
 
       const etapasParaCriar =
         dados.etapas?.length > 0 ? dados.etapas : etapasPadrao;

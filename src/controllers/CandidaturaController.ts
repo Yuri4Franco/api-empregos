@@ -6,7 +6,8 @@ import { prisma } from "../config/prisma.js";
 const candidaturaService = new CandidaturaService();
 
 export class CandidaturaController {
-  async index(req: Request, res: Response) {
+
+  async obterPainelGestao(req: Request, res: Response) {
     try {
       const { id_vaga } = req.params;
       const id_usuario = (req.user as any).id;
@@ -28,14 +29,14 @@ export class CandidaturaController {
       // 4. Agora sim, temos o ID real da empresa
       const id_empresa_real = vinculo.id_empresa;
 
-      const dadosKanban = await candidaturaService.kanban(
+      const dadosPainel = await candidaturaService.obterPainelGestao(
         Number(id_vaga),
         id_empresa_real,
       );
 
       return res.status(200).json({
         success: true,
-        data: dadosKanban,
+        data: dadosPainel,
       });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });

@@ -2,7 +2,7 @@ import { prisma } from "../config/prisma.js";
 import { StatusCandidatura } from "@prisma/client";
 
 export class CandidaturaService {
-  async kanban(id_vaga: number, id_empresa: number) {
+  async obterPainelGestao(id_vaga: number, id_empresa: number) {
     const vaga = await prisma.vaga.findFirst({
       where: { id_vaga, id_empresa },
       include: {
@@ -27,18 +27,27 @@ export class CandidaturaService {
       },
     });
 
-    const notificacoesPendentes = await prisma.candidatura.count({
-    where: {
-    id_vaga: Number(id_vaga),
-    notificacao_pendente: true,
+    // ✨ ATUALIZAÇÃO: Agora buscamos na tabela de movimentos
+    // Usamos o groupBy para saber quantos candidatos únicos têm pendências
+    const pendentesPorCandidato = await prisma.movimentoCandidatura.groupBy({
+      by: ["id_candidatura"],
+      where: {
+        notificacao_pendente: true,
+        candidatura: {
+          id_vaga: Number(id_vaga),
+          vaga: { id_empresa }, // Segurança extra: garante que a vaga é da empresa
+        },
       },
     });
+
+    const totalNotificacoesPendentes = pendentesPorCandidato.length;
 
     return {
       vaga: { titulo: vaga.titulo, status: vaga.status },
       colunas: vaga.etapas.map((etapa) => ({
         ...etapa,
-        notificacoes_pendentes: notificacoesPendentes,
+        // Mantemos aqui para o seu frontend continuar lendo corretamente
+        notificacoes_pendentes: totalNotificacoesPendentes,
         candidatos: candidaturas
           .filter((c) => c.id_etapa_atual === etapa.id_etapa)
           .map((c) => ({
@@ -113,6 +122,7 @@ export class CandidaturaService {
     id_empresa: number,
   ) {
     return await prisma.$transaction(async (tx) => {
+      // 1. Validações iniciais
       const candidatura = await tx.candidatura.findUnique({
         where: { id_candidatura },
         include: { vaga: { select: { id_empresa: true } } },
@@ -122,57 +132,76 @@ export class CandidaturaService {
         throw new Error("Candidatura não encontrada ou acesso negado.");
       }
 
-      // Buscamos a etapa de origem e a de destino para comparar a ORDEM
-      const etapaOrigem = await tx.etapaProcesso.findUnique({
-        where: { id_etapa: candidatura.id_etapa_atual }
+      // 2. Busca TODAS as etapas dessa vaga para termos o "mapa" completo
+      const etapasVaga = await tx.etapaProcesso.findMany({
+        where: { id_vaga: candidatura.id_vaga },
       });
 
-      const etapaDestino = await tx.etapaProcesso.findUnique({
-        where: { id_etapa: id_etapa_destino },
-      });
+      const etapaOrigem = etapasVaga.find(
+        (e) => e.id_etapa === candidatura.id_etapa_atual,
+      );
+      const etapaDestino = etapasVaga.find(
+        (e) => e.id_etapa === id_etapa_destino,
+      );
 
-      if (!etapaDestino || etapaDestino.id_vaga !== candidatura.id_vaga) {
-        throw new Error("Etapa de destino inválida para esta vaga.");
+      if (!etapaOrigem || !etapaDestino) {
+        throw new Error("Etapa inválida para esta vaga.");
       }
 
-      let novoStatus: StatusCandidatura = "TRIAGEM"; 
+      let novoStatus: StatusCandidatura = "TRIAGEM";
       if (etapaDestino.tipo === "FINAL") novoStatus = "APROVADO";
       if (etapaDestino.nome_etapa.toLowerCase().includes("entrevista")) {
         novoStatus = "ENTREVISTA";
       }
 
-      // 🛡️ A BLINDAGEM MÁXIMA ANTI-IOIÔ 🛡️
-      // Verifica no histórico se o candidato já esteve nesta etapa de destino alguma vez
-      const jaPassouPorAqui = await tx.movimentoCandidatura.findFirst({
-        where: {
-          id_candidatura,
-          etapa_destino: id_etapa_destino
-        }
+      // ====================================================================
+      // 🧠 A LÓGICA DA "MARCA D'ÁGUA MÁXIMA" (High Water Mark)
+      // Precisamos saber qual foi o ponto mais longe que o candidato já chegou.
+      // ====================================================================
+      const historico = await tx.movimentoCandidatura.findMany({
+        where: { id_candidatura },
+        select: { etapa_destino: true },
       });
 
-      // 1. Está indo para a direita? (ordem maior)
-      const isAvanco = etapaOrigem ? (etapaDestino.ordem > etapaOrigem.ordem) : true;
-      
-      // 2. Só notifica se for um avanço E a etapa não exigir agendamento E NUNCA TIVER PASSADO POR LÁ
-      const podeNotificarStatus = isAvanco && !etapaDestino.requer_agendamento && !jaPassouPorAqui;
+      let maiorOrdemAlcancada = etapaOrigem.ordem; // No mínimo, ele chegou onde está agora
 
+      // Varremos o histórico para descobrir o recorde
+      for (const mov of historico) {
+        const etapaDoHistorico = etapasVaga.find(
+          (e) => e.id_etapa === mov.etapa_destino,
+        );
+        if (etapaDoHistorico && etapaDoHistorico.ordem > maiorOrdemAlcancada) {
+          maiorOrdemAlcancada = etapaDoHistorico.ordem;
+        }
+      }
+
+      // 4. O VEREDITO: É um avanço inédito?
+      // Só é avanço real se ele está indo para uma ordem MAIOR do que o seu próprio recorde.
+      const isAvancoInedito = etapaDestino.ordem > maiorOrdemAlcancada;
+
+      // E só entra na fila se for inédito E não exigir agendamento manual
+      const deveNotificar = isAvancoInedito && !etapaDestino.requer_agendamento;
+
+      // 5. Registra o evento com a decisão final
       await tx.movimentoCandidatura.create({
         data: {
           id_candidatura,
           etapa_origem: candidatura.id_etapa_atual,
           etapa_destino: id_etapa_destino,
           status_destino: novoStatus,
-          motivo: `Movido para etapa: ${etapaDestino.nome_etapa}`,
+          motivo: isAvancoInedito
+            ? `Avançou para a etapa: ${etapaDestino.nome_etapa}`
+            : `Movido para a etapa: ${etapaDestino.nome_etapa} (Revisão/Correção)`,
+          notificacao_pendente: deveNotificar,
         },
       });
 
+      // 6. Atualiza o candidato fisicamente
       return await tx.candidatura.update({
         where: { id_candidatura },
         data: {
           id_etapa_atual: id_etapa_destino,
           status_atual: novoStatus,
-          // Se for avanço genuíno e inédito, notifica. Senão, preserva o estado anterior de pendência.
-          notificacao_pendente: podeNotificarStatus ? true : candidatura.notificacao_pendente,
         },
       });
     });
@@ -219,11 +248,11 @@ export class CandidaturaService {
     return await this.moverCandidato(
       id_candidatura,
       proximaEtapa.id_etapa,
-      id_empresa
+      id_empresa,
     );
   }
 
-    async agendarEntrevista(
+  async agendarEntrevista(
     id_candidatura: number,
     id_empresa: number,
     dados: { data_hora: Date; local_link: string; observacoes?: string },
@@ -239,61 +268,96 @@ export class CandidaturaService {
         throw new Error("Candidatura não encontrada ou acesso negado.");
       }
 
-      // 2. Criar ou atualizar o agendamento (Resolvendo erro de undefined/null)
+      // 2. Criar ou atualizar o agendamento
       const agendamento = await tx.agendamentoEntrevista.upsert({
         where: { id_candidatura },
         create: {
           id_candidatura,
           data_hora: dados.data_hora,
           local_link: dados.local_link,
-          // CORREÇÃO: Forçamos null se for undefined para agradar o Prisma
           observacoes: dados.observacoes ?? null,
         },
         update: {
           data_hora: dados.data_hora,
           local_link: dados.local_link,
-          // CORREÇÃO: Forçamos null se for undefined
           observacoes: dados.observacoes ?? null,
         },
       });
 
-      // 3. Após agendar, liberamos a notificação para o Safe Send [cite: 262, 265]
-      await tx.candidatura.update({
-        where: { id_candidatura },
-        data: { notificacao_pendente: true },
+      // Formata a data para ficar bonita no histórico
+      const dataFormatada = new Date(dados.data_hora).toLocaleString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+      });
+
+      // 3. Após agendar, criamos um EVENTO na linha do tempo com a pendência
+      // Assim o candidato continua na mesma etapa, mas a notificação entra na fila!
+      await tx.movimentoCandidatura.create({
+        data: {
+          id_candidatura: id_candidatura,
+          etapa_origem: candidatura.id_etapa_atual,
+          etapa_destino: candidatura.id_etapa_atual, // Permanece onde está
+          status_destino: candidatura.status_atual, // Mantém o status
+          motivo: `Entrevista agendada para: ${dataFormatada}`,
+          notificacao_pendente: true, // 🚀 Libera para o recrutador disparar o alerta!
+        },
       });
 
       return agendamento;
     });
   }
 
-
-async processarNotificacoesPendentes(id_vaga: number, id_empresa: number) {
-    // 1. Busca os pendentes trazendo os dados necessários para o disparo
-    const pendentes = await prisma.candidatura.findMany({
+  async processarNotificacoesPendentes(id_vaga: number, id_empresa: number) {
+    const movimentosPendentes = await prisma.movimentoCandidatura.findMany({
       where: {
-        id_vaga,
         notificacao_pendente: true,
-        vaga: { id_empresa },
-      },
-      include: {
-        candidato: {
-          include: { usuario: { select: { nome: true, email: true } } }
+        candidatura: {
+          id_vaga,
+          vaga: { id_empresa },
         },
-        agendamento: true, // Importante caso a notificação seja de entrevista
-      }
+      },
+      orderBy: { criado_em: "asc" },
+      include: {
+        candidatura: {
+          include: {
+            candidato: { include: { usuario: true } },
+            agendamento: true,
+            // 🚀 CORREÇÃO: Trazemos as etapas da vaga para descobrir o nome depois!
+            vaga: {
+              select: { etapas: true },
+            },
+          },
+        },
+      },
     });
 
-    if (pendentes.length === 0) return []; // Retorna array vazio se não tiver nada
+    if (movimentosPendentes.length === 0) return [];
 
-    // 2. Marca no banco que as pendências foram resolvidas
-    await prisma.candidatura.updateMany({
-      where: { id_candidatura: { in: pendentes.map((p) => p.id_candidatura) } },
+    const movimentosFinais = new Map();
+
+    for (const mov of movimentosPendentes) {
+      // Cruzamos os dados em memória para achar o nome da etapa de destino
+      const etapa = mov.candidatura.vaga.etapas.find(
+        (e) => e.id_etapa === mov.etapa_destino,
+      );
+
+      // Injetamos um campo novo no objeto para o seu Controller usar fácil no disparo de email
+      const movimentoComNomeDaEtapa = {
+        ...mov,
+        nome_etapa_destino: etapa ? etapa.nome_etapa : "Nova Etapa",
+      };
+
+      movimentosFinais.set(mov.id_candidatura, movimentoComNomeDaEtapa);
+    }
+
+    const listaParaNotificar = Array.from(movimentosFinais.values());
+    const idsMovimentos = movimentosPendentes.map((m) => m.id_movimento);
+
+    await prisma.movimentoCandidatura.updateMany({
+      where: { id_movimento: { in: idsMovimentos } },
       data: { notificacao_pendente: false },
     });
 
-    // 3. 🛡️ CORREÇÃO: Retorna o array CHEIO de dados para o Controller disparar os e-mails!
-    return pendentes; 
+    return listaParaNotificar;
   }
 
   async reprovarEmMassa(
@@ -307,8 +371,8 @@ async processarNotificacoesPendentes(id_vaga: number, id_empresa: number) {
           id_candidatura: { in: id_candidaturas },
           vaga: { id_empresa },
           status_atual: {
-            notIn: ["REPROVADO", "DESISTENCIA"]
-          }
+            notIn: ["REPROVADO", "DESISTENCIA"],
+          },
         },
         select: { id_candidatura: true, id_etapa_atual: true },
       });
@@ -317,7 +381,7 @@ async processarNotificacoesPendentes(id_vaga: number, id_empresa: number) {
         throw new Error("Candidaturas inválidas.");
       }
 
-     await tx.movimentoCandidatura.createMany({
+      await tx.movimentoCandidatura.createMany({
         data: candidaturas.map((c) => ({
           id_candidatura: c.id_candidatura,
           etapa_origem: c.id_etapa_atual,
@@ -478,19 +542,152 @@ async processarNotificacoesPendentes(id_vaga: number, id_empresa: number) {
   }
 
   async obterHistoricoCandidatura(id_candidatura: number, id_empresa: number) {
+    // 1. Buscamos a candidatura TUDO o que está atrelado a ela
     const candidatura = await prisma.candidatura.findFirst({
       where: {
         id_candidatura,
         vaga: { id_empresa },
+      },
+      include: {
+        movimentacoes: true, // Traz os movimentos do Kanban/Lista
+        agendamento: true, // Traz a entrevista (se houver)
+        avaliacao: true, // Traz as estrelinhas e notas (se houver)
       },
     });
 
     if (!candidatura)
       throw new Error("Candidatura não encontrada ou acesso negado.");
 
-    return await prisma.movimentoCandidatura.findMany({
-      where: { id_candidatura },
+    // 2. Criamos um Array vazio para empilhar os eventos
+    const eventos = [];
+
+    // --- EVENTO A: A INSCRIÇÃO ---
+    eventos.push({
+      id_evento: `insc_${candidatura.id_candidatura}`,
+      tipo: "INSCRICAO",
+      titulo: "Candidatura Recebida",
+      descricao: "O candidato enviou o currículo para esta vaga.",
+      data_hora: candidatura.data_candidatura,
+    });
+
+    // --- EVENTO B: A VISUALIZAÇÃO ---
+    if (candidatura.visualizada && candidatura.data_visualizacao) {
+      eventos.push({
+        id_evento: `view_${candidatura.id_candidatura}`,
+        tipo: "VISUALIZACAO",
+        titulo: "Currículo Visualizado",
+        descricao: "Você abriu o perfil do candidato pela primeira vez.",
+        data_hora: candidatura.data_visualizacao,
+      });
+    }
+
+    // --- EVENTO C: AS MOVIMENTAÇÕES DE ETAPA ---
+    candidatura.movimentacoes.forEach((mov) => {
+      eventos.push({
+        id_evento: `mov_${mov.id_movimento}`,
+        tipo: "MOVIMENTACAO",
+        titulo: "Avanço de Etapa",
+        descricao: `Candidato foi movido para o status: ${mov.status_destino}.`,
+        data_hora: mov.criado_em,
+      });
+    });
+
+    // --- EVENTO D: A AVALIAÇÃO ---
+    if (candidatura.avaliacao) {
+      eventos.push({
+        id_evento: `aval_${candidatura.avaliacao.id_avaliacao}`,
+        tipo: "AVALIACAO",
+        titulo: "Candidato Avaliado",
+        descricao: `Recebeu ${candidatura.avaliacao.pontuacao || "nota"} estrelas.`,
+        data_hora: candidatura.avaliacao.criado_em,
+      });
+    }
+
+    // --- EVENTO E: A ENTREVISTA ---
+    if (candidatura.agendamento) {
+      eventos.push({
+        id_evento: `agen_${candidatura.agendamento.id_agendamento}`,
+        tipo: "AGENDAMENTO",
+        titulo: "Entrevista Agendada",
+        descricao: `Marcada para ${new Date(candidatura.agendamento.data_hora).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}.`,
+        data_hora: candidatura.agendamento.criado_em, // Usamos a data que o RH CRIOU o agendamento para a timeline
+      });
+    }
+
+    // 3. Ordenamos TUDO do mais recente para o mais antigo (Decrescente)
+    eventos.sort(
+      (a, b) =>
+        new Date(b.data_hora).getTime() - new Date(a.data_hora).getTime(),
+    );
+
+    return eventos;
+  }
+
+  async obterHistoricoVaga(id_vaga: number, id_empresa: number) {
+    // 1. Validação de segurança: a vaga pertence a essa empresa?
+    const vaga = await prisma.vaga.findFirst({
+      where: { id_vaga, id_empresa },
+    });
+
+    if (!vaga) throw new Error("Vaga não encontrada ou acesso negado.");
+
+    // 2. Busca os logs relacionados a esta vaga
+    const logs = await prisma.logAuditoria.findMany({
+      where: {
+        entidade: "VAGA",
+        id_entidade: id_vaga,
+      },
+      include: {
+        usuario: { select: { nome: true } },
+      },
       orderBy: { criado_em: "desc" },
+    });
+
+    // 3. Mapeamento para formato de Timeline
+    return logs.map((log) => {
+      const detalhes = log.detalhes as any;
+      let titulo = "Atividade na Vaga";
+      let descricao = log.acao;
+      let tipo = "INFO";
+
+      // Lógica para deixar as mensagens "humanas"
+      switch (log.acao) {
+        case "CREATE":
+          tipo = "CRIACAO";
+          titulo = "Vaga Criada";
+          descricao = `Vaga iniciada como ${detalhes?.status || "Rascunho"} por ${log.usuario.nome}.`;
+          break;
+
+        case "UPDATE_STATUS":
+          tipo = "STATUS";
+          titulo = "Status Alterado";
+          descricao = `Status alterado de ${detalhes?.antigo} para ${detalhes?.novo}.`;
+          break;
+
+        case "UPDATE":
+          tipo = "EDICAO";
+          titulo = "Vaga Atualizada";
+          // Se você salvar nos detalhes quais campos mudaram, pode listar aqui
+          descricao = detalhes?.campos
+            ? `Campos editados: ${detalhes.campos.join(", ")}.`
+            : `Informações da vaga foram atualizadas por ${log.usuario.nome}.`;
+          break;
+
+        case "CLOSE":
+          tipo = "ENCERRAMENTO";
+          titulo = "Vaga Encerrada";
+          descricao = "A vaga foi finalizada e não aceita mais candidaturas.";
+          break;
+      }
+
+      return {
+        id_log: log.id_log,
+        tipo,
+        titulo,
+        descricao,
+        usuario: log.usuario.nome,
+        data_hora: log.criado_em,
+      };
     });
   }
 
@@ -501,8 +698,8 @@ async processarNotificacoesPendentes(id_vaga: number, id_empresa: number) {
           id_candidatura: { in: id_candidaturas },
           vaga: { id_empresa },
           status_atual: {
-            notIn: ["REPROVADO", "DESISTENCIA"]
-          }
+            notIn: ["REPROVADO", "DESISTENCIA"],
+          },
         },
         select: { id_candidatura: true, id_etapa_atual: true, id_vaga: true },
       });

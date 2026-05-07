@@ -398,7 +398,6 @@ model Candidatura {
   id_etapa_atual   Int
   status_atual     StatusCandidatura @default(INSCRITO)
   data_candidatura DateTime          @default(now())
-  notificacao_pendente Boolean       @default(false)
 
   vaga             Vaga              @relation(fields: [id_vaga], references: [id_vaga])
   candidato        Candidato         @relation(fields: [id_candidato], references: [id_usuario])
@@ -438,6 +437,7 @@ model MovimentoCandidatura {
   etapa_destino  Int
   status_destino StatusCandidatura
   motivo         String?
+  notificacao_pendente Boolean @default(true)
   criado_em      DateTime     @default(now())
 
   @@map("movimentos_candidatura")
