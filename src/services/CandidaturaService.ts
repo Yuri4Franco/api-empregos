@@ -361,14 +361,18 @@ export class CandidaturaService {
   }
 
   async reprovarEmMassa(
-    id_candidaturas: number[],
+    id_candidaturas: any[], // Aceita 'any' temporariamente para forçar a conversão segura
     motivo: string,
     id_empresa: number,
   ) {
+    // 1. Garantir que os IDs sejam numéricos (o Express as vezes envia como string)
+    const idsNumericos = id_candidaturas.map((id) => Number(id));
+
     return await prisma.$transaction(async (tx) => {
-      const candidaturas = await tx.candidatura.findMany({
+      // 2. Busca apenas as candidaturas que REALMENTE podem ser reprovadas
+      const candidaturasValidas = await tx.candidatura.findMany({
         where: {
-          id_candidatura: { in: id_candidaturas },
+          id_candidatura: { in: idsNumericos },
           vaga: { id_empresa },
           status_atual: {
             notIn: ["REPROVADO", "DESISTENCIA"],
@@ -377,25 +381,32 @@ export class CandidaturaService {
         select: { id_candidatura: true, id_etapa_atual: true },
       });
 
-      if (candidaturas.length !== id_candidaturas.length) {
-        throw new Error("Candidaturas inválidas.");
+      // 3. Se o RH selecionou uma lista, mas TODOS já estavam reprovados, avisamos:
+      if (candidaturasValidas.length === 0) {
+        throw new Error("Nenhuma candidatura selecionada é válida para reprovação (talvez já tenham sido reprovadas).");
       }
 
+      // Separamos apenas os IDs que passaram na peneira
+      const idsFiltrados = candidaturasValidas.map((c) => c.id_candidatura);
+
+      // 4. Salva a movimentação do histórico
       await tx.movimentoCandidatura.createMany({
-        data: candidaturas.map((c) => ({
+        data: candidaturasValidas.map((c) => ({
           id_candidatura: c.id_candidatura,
           etapa_origem: c.id_etapa_atual,
-          etapa_destino: c.id_etapa_atual, // <-- Correção: Ele "estaciona" na etapa atual
-          status_destino: "REPROVADO",
+          etapa_destino: c.id_etapa_atual, // Estaciona na etapa atual
+          status_destino: "REPROVADO", // O enum correto pode ser passado direto
           motivo: motivo || "Reprovação em lote",
+          // notificacao_pendente: true // O Prisma já aplica @default(true) neste model automaticamente!
         })),
       });
 
+      // 5. Atualiza o status das candidaturas validadas
       return await tx.candidatura.updateMany({
-        where: { id_candidatura: { in: id_candidaturas } },
+        where: { id_candidatura: { in: idsFiltrados } },
         data: {
-          status_atual: StatusCandidatura.REPROVADO,
-          notificacao_pendente: true,
+          status_atual: "REPROVADO", 
+          // 🚨 IMPORTANTE: Removi o "notificacao_pendente: true" daqui pois ele não existe no model Candidatura!
         },
       });
     });
@@ -783,7 +794,7 @@ export class CandidaturaService {
     });
   }
 
-  async listarHistoricoCompleto(id_usuario: number) {
+async listarHistoricoCompleto(id_usuario: number) {
     const candidaturas = await prisma.candidatura.findMany({
       where: { id_candidato: id_usuario },
       orderBy: { data_candidatura: "desc" }, // Da mais nova para a mais antiga
@@ -799,14 +810,15 @@ export class CandidaturaService {
           },
         },
         agendamento: true,
-
-        // ✨ O Pulo do Gato para o Feedback:
-        // Trazemos apenas a movimentação onde o cara foi Reprovado para pegar o "motivo"
+        // ✨ O NOVO Pulo do Gato: Trazemos TODO o histórico de movimentações da candidatura
         movimentacoes: {
-          where: { status_destino: "REPROVADO" },
-          orderBy: { criado_em: "desc" },
-          take: 1,
-          select: { motivo: true },
+          orderBy: { criado_em: "asc" }, // Crescente para montar a linha do tempo (timeline)
+          select: {
+            id_movimento: true,
+            status_destino: true,
+            motivo: true,
+            criado_em: true,
+          }
         },
       },
     });
@@ -815,6 +827,11 @@ export class CandidaturaService {
     return candidaturas.map((c) => {
       const isConfidencial = c.vaga.empresa_confidencial;
       const endereco = c.vaga.endereco;
+
+      // Pegamos a última movimentação para extrair o feedback caso ele tenha sido reprovado
+      const ultimaMovimentacao = c.movimentacoes.length > 0 
+        ? c.movimentacoes[c.movimentacoes.length - 1] 
+        : null;
 
       return {
         id_candidatura: c.id_candidatura,
@@ -842,6 +859,9 @@ export class CandidaturaService {
           empresa_logo: isConfidencial ? null : c.vaga.empresa.logotipo_url,
         },
 
+        // Mandamos o array de movimentações para a Timeline do Frontend
+        movimentacoes: c.movimentacoes,
+
         // Só manda agendamento se estiver na fase de entrevista
         agendamento:
           c.status_atual === "ENTREVISTA" && c.agendamento
@@ -853,13 +873,14 @@ export class CandidaturaService {
             : null,
 
         feedback_reprovacao:
-          c.status_atual === "REPROVADO" && c.movimentacoes.length > 0
-            ? c.movimentacoes[0]?.motivo
+          c.status_atual === "REPROVADO" && ultimaMovimentacao?.status_destino === "REPROVADO"
+            ? ultimaMovimentacao.motivo
             : null,
       };
     });
   }
 
+  
   async desistirCandidatura(id_candidatura: number, id_usuario: number) {
     // 1. Busca a candidatura para garantir que existe e é da pessoa certa
     const candidatura = await prisma.candidatura.findUnique({
@@ -917,8 +938,17 @@ export class CandidaturaService {
   }
 
   async listarMeusAgendamentos(id_usuario: number) {
+    // 🕒 Lógica para pegar o início do dia atual (00:00:00)
+    const inicioDoDia = new Date();
+    inicioDoDia.setHours(0, 0, 0, 0);
+
     const agendamentos = await prisma.agendamentoEntrevista.findMany({
       where: {
+        // 🔥 FILTRO: Mostra agendamentos de HOJE (desde as 00:00) em diante
+        data_hora: {
+          gte: inicioDoDia,
+        },
+        
         // Busca os agendamentos que pertencem às candidaturas deste usuário
         candidatura: {
           id_candidato: id_usuario,
@@ -928,11 +958,10 @@ export class CandidaturaService {
           },
         },
       },
-      // Ordena pela data: As entrevistas mais próximas do dia de hoje aparecem primeiro no array
+      // Ordena pela data: As entrevistas mais próximas do dia de hoje aparecem primeiro
       orderBy: {
         data_hora: "asc",
       },
-      // Trazemos os dados da vaga e da empresa para montar o "Card de Entrevista"
       include: {
         candidatura: {
           select: {
@@ -952,20 +981,15 @@ export class CandidaturaService {
       },
     });
 
-    // Mapeamento e blindagem da empresa confidencial
     return agendamentos.map((ag) => {
       const isConfidencial = ag.candidatura.vaga.empresa_confidencial;
 
       return {
         id_agendamento: ag.id_agendamento,
         id_candidatura: ag.candidatura.id_candidatura,
-
-        // 📅 Os dados de Ouro:
         data_hora: ag.data_hora,
         local_link: ag.local_link,
         observacoes: ag.observacoes,
-
-        // Contexto para o candidato não esquecer qual é a vaga
         vaga_titulo: ag.candidatura.vaga.titulo,
         empresa_nome: isConfidencial
           ? "Empresa Confidencial"

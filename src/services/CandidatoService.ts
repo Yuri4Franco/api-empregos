@@ -148,6 +148,7 @@ export class CandidatoService {
             },
           }),
         },
+
         include: {
           endereco: true,
           areas_atuacao: {
@@ -159,6 +160,26 @@ export class CandidatoService {
   }
 
   async atualizarVisibilidade(id_usuario: number, visivel: boolean) {
+    // 1. TRAVA DE SEGURANÇA: Se ele quer ficar visível, precisamos checar o CPF
+    if (visivel) {
+      const candidato = await prisma.candidato.findUnique({
+        where: { id_usuario },
+        select: { cpf: true },
+      });
+
+      if (!candidato) {
+        throw new Error("Candidato não encontrado.");
+      }
+
+      // Se o CPF for null ou string vazia, barra a ação!
+      if (!candidato.cpf) {
+        throw new Error(
+          "Para deixar seu currículo visível no banco de talentos, é obrigatório cadastrar seu CPF na aba em Dados Básicos.",
+        );
+      }
+    }
+
+    // 2. Se passou na validação (ou se ele só quer ocultar), atualiza no banco
     return await prisma.candidato.update({
       where: { id_usuario },
       data: {

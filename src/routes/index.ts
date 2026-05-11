@@ -473,6 +473,24 @@ routes.put(
   empresaController.atualizarPerfil,
 );
 
+routes.patch(
+  "/empresa/vagas/:id_vaga/pausar",
+  authMiddleware(["EMPRESA"]), // Garante que é uma empresa
+  vagaController.pausar
+);
+
+routes.patch(
+  "/empresa/vagas/:id_vaga/ativar",
+  authMiddleware(["EMPRESA"]),
+  vagaController.ativar
+);
+
+routes.patch(
+  "/empresa/vagas/:id_vaga/encerrar",
+  authMiddleware(["EMPRESA"]),
+  vagaController.encerrar
+);
+
 // Visualizar Painel de Gestão da Vaga
 routes.get(
   "/empresa/vagas/:id_vaga/painel-gestao",
@@ -544,14 +562,6 @@ routes.patch(
 
   validate(ConfigurarDestaquesSchema, "body"),
   candidaturaController.salvarConfiguracaoDestaques,
-);
-
-// Encerrar vaga
-routes.post(
-  "/empresa/vagas/:id_vaga/encerrar",
-  authMiddleware(["EMPRESA"]),
-  validate(IdParamSchema, "params"),
-  vagaController.encerrar,
 );
 
 // Duplicar vaga

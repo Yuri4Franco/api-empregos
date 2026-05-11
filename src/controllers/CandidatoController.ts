@@ -56,8 +56,9 @@ export class CandidatoController {
   async toggleVisibilidade(req: Request, res: Response) {
     try {
       const id_usuario = (req.user as any).id;
-
-      const { perfil_visivel_empresas } = req.body;
+      
+      // Converte explicitamente para booleano caso venha como string do front
+      const perfil_visivel_empresas = Boolean(req.body.perfil_visivel_empresas);
 
       const resultado = await candidatoService.atualizarVisibilidade(
         id_usuario,

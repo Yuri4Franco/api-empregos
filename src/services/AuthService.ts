@@ -136,7 +136,7 @@ export class AuthService {
         },
       });
 
-await tx.candidato.create({
+    await tx.candidato.create({
         data: { 
           id_usuario: user.id_usuario,
           turno_preferido: ["QUALQUER_TURNO"],

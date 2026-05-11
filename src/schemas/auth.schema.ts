@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validarCPF } from "../types/validarCpf";
 
 // --- ÁTOMOS  ---
 const UsuarioBaseSchema = z.object({
@@ -119,7 +120,6 @@ export const AtualizarUsuarioSchema = z
   })
   .refine((data) => Object.keys(data).length > 0, "Informe ao menos um campo");
 
-// 4. Para o Perfil do Candidato (O JSON gigante com experiências/formações)
 export const AtualizarPerfilCompletoSchema = z.object({
   nome: z.string().optional(),
   email: z.string().optional(),
@@ -230,7 +230,7 @@ export const vagaSchema = z.object({
 export const sincronizarAreasSchema = z.object({
   areas_ids: z
     .array(z.number("Os IDs das áreas devem ser números."))
-    .max(3, "Você pode selecionar no máximo 3 áreas de atuação.")
+    .max(10, "Você pode selecionar no máximo 10 áreas de atuação.")
     .min(1, "Selecione pelo menos uma área."),
 });
 
@@ -361,8 +361,14 @@ export const RegisterCandidatoSchema = z
   });
 
 export const updateCandidatoSchema = z.object({
-  // Dados Pessoais
-  cpf: z.string().length(11, "CPF deve ter 11 dígitos").optional().nullable(),
+  cpf: z
+    .string()
+    .length(11, "CPF deve ter 11 dígitos")
+    .refine((val) => validarCPF(val), {
+      message: "CPF inválido. Verifique os números digitados.",
+    })
+    .optional()
+    .nullable(),
   telefone: z.string().min(10).optional().nullable(),
   whatsapp: z.string().min(10).optional().nullable(),
   data_nascimento: z.string().pipe(z.coerce.date()).optional().nullable(),
@@ -397,6 +403,7 @@ export const updateCandidatoSchema = z.object({
 
   disponibilidade_viagem: z.boolean().optional(),
   disponibilidade_mudanca: z.boolean().optional(),
+  disponibilidade_sabados: z.boolean().optional(),
 turno_preferido: z
     .array(z.enum(["PRIMEIRO_TURNO", "SEGUNDO_TURNO", "TERCEIRO_TURNO", "HORARIO_COMERCIAL", "QUALQUER_TURNO"]))
     .max(3, "Você pode selecionar no máximo 3 turnos")
@@ -452,16 +459,18 @@ export const experienciaSchema = z
 
 export const formacaoSchema = z
   .object({
-    instituicao: z.string().min(2, "Nome da instituição é obrigatório"),
-    nivel: z.string().min(2, "Nível de escolaridade é obrigatório"), // Ex: Ensino Médio, Superior, Técnico
-    curso: z.string().min(2, "Nome do curso é obrigatório"),
-    status: z.string().min(2, "Status é obrigatório"), // Ex: Concluído, Cursando, Trancado
+    instituicao: z.string().optional().nullable(), // Agora é opcional, pois ensino básico não envia
+    nivel: z.string().min(2, "Nível de escolaridade é obrigatório"),
+    curso: z.string().min(2, "Nome do curso é obrigatório"), // O front sempre vai enviar (seja o curso ou o nome do nível)
+    status: z.string().min(2, "Status é obrigatório"),
     data_conclusao: z.string().pipe(z.coerce.date()).optional().nullable(),
   })
   .refine(
     (data) => {
-      // Regra inteligente: Se marcou como concluído, tem que ter a data.
-      if (data.status.toUpperCase() === "CONCLUÍDO" && !data.data_conclusao) {
+      const isBasico = data.nivel === "Ensino Fundamental" || data.nivel === "Ensino Médio";
+      const isConcluido = data.status.toUpperCase() === "CONCLUÍDO";
+
+      if (!isBasico && isConcluido && !data.data_conclusao) {
         return false;
       }
       return true;

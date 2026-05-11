@@ -8,7 +8,6 @@ export const validate =
       const validatedData = await schema.parseAsync(req[source]);
 
       if (source === "query" || source === "params") {
-
         Object.keys(req[source]).forEach(
           (key) => delete (req[source] as any)[key],
         );
@@ -20,8 +19,12 @@ export const validate =
       return next();
     } catch (error) {
       if (error instanceof ZodError) {
+        // ✨ A MÁGICA AQUI: Pega a primeira mensagem customizada do Zod
+        const mensagemPrincipal = error.issues[0]?.message || "Erro de validação nos dados.";
+
         return res.status(400).json({
-          error: "Erro de validação",
+          success: false, // <-- Mantém o padrão de resposta da sua API
+          error: mensagemPrincipal, // <-- Agora o front-end vai ler a mensagem certa!
           origem: source,
           detalhes: error.issues.map((e: z.ZodIssue) => ({
             campo: e.path.join("."),
@@ -33,6 +36,7 @@ export const validate =
       console.error("ERRO NO MIDDLEWARE DE VALIDAÇÃO:", error);
 
       return res.status(500).json({
+        success: false,
         error: "Erro interno no servidor de validação.",
         message: error instanceof Error ? error.message : "Erro desconhecido",
       });

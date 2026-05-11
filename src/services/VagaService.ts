@@ -876,64 +876,6 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
     };
   }
 
-  async encerrarVaga(
-    id_vaga: number,
-    id_empresa: number,
-    motivo: string = "Vaga encerrada pela empresa",
-  ) {
-    return await prisma.$transaction(async (tx) => {
-      // 1. Validar se a vaga pertence à empresa e se está ativa
-      const vaga = await tx.vaga.findFirst({
-        where: { id_vaga, id_empresa },
-      });
-
-      if (!vaga) throw new Error("Vaga não encontrada ou acesso negado.");
-
-      // 2. Buscar todos os candidatos que NÃO estão em status final (APROVADO, REPROVADO, DESISTENCIA)
-      const candidatosPendentes = await tx.candidatura.findMany({
-        where: {
-          id_vaga,
-          status_atual: {
-            notIn: ["APROVADO", "REPROVADO", "DESISTENCIA"],
-          },
-        },
-        select: { id_candidatura: true, id_etapa_atual: true },
-      });
-
-      if (candidatosPendentes.length > 0) {
-        const ids = candidatosPendentes.map((c) => c.id_candidatura);
-
-        await tx.movimentoCandidatura.createMany({
-          data: candidatosPendentes.map((c) => ({
-            id_candidatura: c.id_candidatura,
-            etapa_origem: c.id_etapa_atual,
-            etapa_destino: 0,
-            status_destino: "REPROVADO",
-            motivo: motivo,
-          })),
-        });
-
-        // Atualizar as candidaturas
-        await tx.candidatura.updateMany({
-          where: { id_candidatura: { in: ids } },
-          data: {
-            status_atual: "REPROVADO",
-            notificacao_pendente: true,
-          },
-        });
-      }
-
-      // 4. Atualizar o status da Vaga
-      return await tx.vaga.update({
-        where: { id_vaga },
-        data: {
-          status: "ENCERRADA",
-          data_encerramento: new Date(),
-        },
-      });
-    });
-  }
-
   async listarVagasPublicas(filtros: {
     busca?: string | undefined;
     cidade?: string | undefined;
@@ -1185,5 +1127,156 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
         .map((n) => n.nivel_hierarquico)
         .filter((n) => n !== null),
     };
+  }
+
+
+  // =========================================================
+  // 1. PAUSAR VAGA
+  // =========================================================
+  async pausarVaga(id_vaga: number, id_empresa: number, id_autor: number) {
+    const vaga = await prisma.vaga.findFirst({
+      where: { id_vaga, id_empresa },
+      select: { status: true }
+    });
+
+    if (!vaga) throw new Error("Vaga não encontrada ou acesso negado.");
+    if (vaga.status !== "ATIVA") {
+      throw new Error("Apenas vagas ativas podem ser pausadas.");
+    }
+
+    return await prisma.$transaction(async (tx) => {
+      const atualizada = await tx.vaga.update({
+        where: { id_vaga },
+        data: { status: "PAUSADA" },
+      });
+
+      await tx.logAuditoria.create({
+        data: {
+          id_usuario: id_autor,
+          acao: "PAUSAR_VAGA",
+          entidade: "Vaga",
+          id_entidade: id_vaga,
+          detalhes: { status_anterior: "ATIVA", novo_status: "PAUSADA" }
+        }
+      });
+
+      return atualizada;
+    });
+  }
+
+  // =========================================================
+  // 2. ATIVAR VAGA (RETORNAR DA PAUSA)
+  // =========================================================
+  async ativarVaga(id_vaga: number, id_empresa: number, id_autor: number) {
+    const vaga = await prisma.vaga.findFirst({
+      where: { id_vaga, id_empresa },
+      select: { status: true }
+    });
+
+    if (!vaga) throw new Error("Vaga não encontrada ou acesso negado.");
+    if (vaga.status !== "PAUSADA") {
+      throw new Error("Apenas vagas pausadas podem ser reativadas.");
+    }
+
+    return await prisma.$transaction(async (tx) => {
+      const atualizada = await tx.vaga.update({
+        where: { id_vaga },
+        data: { status: "ATIVA" },
+      });
+
+      await tx.logAuditoria.create({
+        data: {
+          id_usuario: id_autor,
+          acao: "ATIVAR_VAGA",
+          entidade: "Vaga",
+          id_entidade: id_vaga,
+          detalhes: { status_anterior: "PAUSADA", novo_status: "ATIVA" }
+        }
+      });
+
+      return atualizada;
+    });
+  }
+
+  // =========================================================
+  // 3. ENCERRAR VAGA (COM REPROVAÇÃO EM MASSA)
+  // =========================================================
+  async encerrarVaga(
+    id_vaga: number,
+    id_empresa: number,
+    id_autor: number,
+    motivo: string = "A vaga foi encerrada e o processo seletivo finalizado."
+  ) {
+    return await prisma.$transaction(async (tx) => {
+      // 1. Validar a vaga
+      const vaga = await tx.vaga.findFirst({
+        where: { id_vaga, id_empresa },
+        select: { status: true }
+      });
+
+      if (!vaga) throw new Error("Vaga não encontrada ou acesso negado.");
+      if (vaga.status === "ENCERRADA") throw new Error("Esta vaga já está encerrada.");
+
+      // 2. Buscar candidatos ativos (que não estão Aprovados, Reprovados ou Desistentes)
+      const candidatosPendentes = await tx.candidatura.findMany({
+        where: {
+          id_vaga,
+          status_atual: {
+            notIn: ["APROVADO", "REPROVADO", "DESISTENCIA"],
+          },
+        },
+        select: { id_candidatura: true, id_etapa_atual: true },
+      });
+
+      // 3. Se houver candidatos sobrando, faz a reprovação em massa
+      if (candidatosPendentes.length > 0) {
+        const ids = candidatosPendentes.map((c) => c.id_candidatura);
+
+        // Cria os eventos de reprovação (Com notificação PENDENTE = true na nova tabela!)
+        await tx.movimentoCandidatura.createMany({
+          data: candidatosPendentes.map((c) => ({
+            id_candidatura: c.id_candidatura,
+            etapa_origem: c.id_etapa_atual,
+            etapa_destino: c.id_etapa_atual, // Ele estaciona na etapa onde parou
+            status_destino: "REPROVADO",
+            motivo: motivo,
+            notificacao_pendente: true, // 🚀 Libera para envio de e-mail de feedback!
+          })),
+        });
+
+        // Atualiza o status físico das candidaturas
+        await tx.candidatura.updateMany({
+          where: { id_candidatura: { in: ids } },
+          data: {
+            status_atual: "REPROVADO",
+          },
+        });
+      }
+
+      // 4. Atualizar o status da Vaga
+      const vagaEncerrada = await tx.vaga.update({
+        where: { id_vaga },
+        data: {
+          status: "ENCERRADA",
+          data_encerramento: new Date(),
+        },
+      });
+
+      // 5. Criar Log de Auditoria
+      await tx.logAuditoria.create({
+        data: {
+          id_usuario: id_autor,
+          acao: "ENCERRAR_VAGA",
+          entidade: "Vaga",
+          id_entidade: id_vaga,
+          detalhes: { 
+            candidatos_reprovados_automaticamente: candidatosPendentes.length, 
+            motivo 
+          }
+        }
+      });
+
+      return vagaEncerrada;
+    });
   }
 }

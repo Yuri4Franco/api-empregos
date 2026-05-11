@@ -276,6 +276,7 @@ export class BaseUserService {
             pcd: false,
             disponibilidade_viagem: false,
             disponibilidade_mudanca: false,
+            disponibilidade_sabados: false,
             primeiro_emprego: false,
             turno_preferido: { set: [] }, // O Prisma exige o { set: [] } para limpar Arrays
             cnh: { set: [] },

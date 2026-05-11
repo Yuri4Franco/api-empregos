@@ -275,24 +275,6 @@ export class VagaController {
     }
   }
 
-  async encerrar(req: Request, res: Response) {
-    try {
-      const { id_vaga } = req.params;
-      const { motivo } = req.body;
-      const id_empresa = (req.user as any).id_empresa;
-
-      await vagaService.encerrarVaga(Number(id_vaga), id_empresa, motivo);
-
-      return res.status(200).json({
-        success: true,
-        message:
-          "Vaga encerrada com sucesso. Candidatos pendentes foram movidos para reprovação e aguardam publicação de feedback.",
-      });
-    } catch (error: any) {
-      return res.status(400).json({ success: false, error: error.message });
-    }
-  }
-
   async listarPublicas(req: Request, res: Response) {
     try {
       // Extrai TODOS os filtros da Query String
@@ -398,4 +380,80 @@ export class VagaController {
       });
     }
   }
+
+  // =========================================================
+  // PAUSAR VAGA
+  // =========================================================
+  async pausar(req: Request, res: Response) {
+    try {
+      const id_vaga = Number(req.params.id_vaga);
+      const user = req.user as any;
+      const id_empresa = user.id_empresa;
+      const id_autor = (req.user as any).id;
+
+      if (!id_vaga) throw new Error("ID da vaga não fornecido.");
+
+      const vagaPausada = await vagaService.pausarVaga(id_vaga, id_empresa, id_autor);
+
+      return res.status(200).json({
+        success: true,
+        message: "Vaga pausada com sucesso. Ela não receberá mais candidaturas até ser reativada.",
+        data: vagaPausada,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  // =========================================================
+  // ATIVAR VAGA (RETORNAR DA PAUSA)
+  // =========================================================
+  async ativar(req: Request, res: Response) {
+    try {
+      const id_vaga = Number(req.params.id_vaga);
+      const user = req.user as any;
+      const id_empresa = user.id_empresa;
+      const id_autor = (req.user as any).id;
+
+      if (!id_vaga) throw new Error("ID da vaga não fornecido.");
+
+      const vagaAtivada = await vagaService.ativarVaga(id_vaga, id_empresa, id_autor);
+
+      return res.status(200).json({
+        success: true,
+        message: "Vaga reativada! Ela já está visível novamente no painel de vagas.",
+        data: vagaAtivada,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  // =========================================================
+  // ENCERRAR VAGA
+  // =========================================================
+  async encerrar(req: Request, res: Response) {
+    try {
+      const id_vaga = Number(req.params.id_vaga);
+      const user = req.user as any;
+      const id_empresa = user.id_empresa;
+      const id_autor = (req.user as any).id;
+      
+      // O motivo vem do schema validado (opcional)
+      const { motivo } = req.body;
+
+      if (!id_vaga) throw new Error("ID da vaga não fornecido.");
+
+      const vagaEncerrada = await vagaService.encerrarVaga(id_vaga, id_empresa, id_autor, motivo);
+
+      return res.status(200).json({
+        success: true,
+        message: "Vaga encerrada com sucesso. Os candidatos não aprovados foram reprovados e serão notificados.",
+        data: vagaEncerrada,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+  
 }

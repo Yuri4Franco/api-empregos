@@ -158,12 +158,31 @@ export class CandidaturaController {
   async reprovarEmLote(req: Request, res: Response) {
     try {
       const { id_candidaturas, motivo } = req.body;
-      const id_empresa = (req.user as any).id_empresa;
+      const id_usuario = (req.user as any).id;
+
+      console.log ("CANDIDATURAS SELECIONADAS:", id_candidaturas)
+
+      // 2. Buscamos no banco a qual empresa esse usuário pertence
+      const vinculo = await prisma.usuario.findUnique({
+        where: { id_usuario },
+        select: { id_empresa: true },
+      });
+
+      // 3. Verificação de segurança
+      if (!vinculo || !vinculo.id_empresa) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado. Usuário não vinculado a uma empresa.",
+        });
+      }
+
+      // 4. Agora sim, temos o ID real da empresa
+      const id_empresa_real = vinculo.id_empresa;
 
       await candidaturaService.reprovarEmMassa(
         id_candidaturas,
         motivo,
-        id_empresa,
+        id_empresa_real,
       );
 
       return res.status(200).json({

@@ -181,7 +181,7 @@ model Candidato {
   necessidade             String?
 
   tipo_contato            TipoContato? @default(WHATSAPP)
-  perfil_visivel_empresas Boolean   @default(true)
+  perfil_visivel_empresas Boolean   @default(false)
   objetivo_profissional   String?
   pretensao_salarial      Decimal?  @db.Decimal(10, 2)
   resumo_profissional     String?   @db.Text
@@ -189,6 +189,7 @@ model Candidato {
   disponibilidade_mudanca Boolean   @default(false)
   turno_preferido         TurnoPreferido[]
   areas_atuacao           CandidatoAreaAtuacao[]
+  disponibilidade_sabados  Boolean   @default(false)
 
   experiencias            ExperienciaProfissional[]
   formacoes               FormacaoAcademica[]
@@ -546,10 +547,11 @@ model FormacaoAcademica {
   id_formacao    Int       @id @default(autoincrement())
   id_candidato   Int
   candidato      Candidato @relation(fields: [id_candidato], references: [id_usuario])
-  instituicao    String
+  instituicao    String?
   nivel          String
   curso          String
   status         String
+  serie          String?
   data_conclusao DateTime?
   @@map("formacoes_academicas")
 }
