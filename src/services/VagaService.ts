@@ -205,19 +205,18 @@ export class VagaService {
         orderBy: {
           data_publicacao: "desc", // Vagas mais recentes no topo
         },
-        // O Admin precisa ver detalhes de quem criou
         include: {
           empresa: {
             select: {
               id_empresa: true,
               nome_fantasia: true,
-              cnpj: true, // Admin pode ver CNPJ
+              cnpj: true,
             },
           },
           area_atuacao: {
             select: { nome: true },
           },
-          // Opcional: Contar quantos candidatos já se aplicaram pra essa vaga
+
           _count: {
             select: { candidaturas: true },
           },
@@ -237,7 +236,6 @@ export class VagaService {
 
   async duplicarVaga(id_vaga: number, id_empresa: number) {
     return await prisma.$transaction(async (tx) => {
-      // 1. Busca a vaga original com todas as relações que precisam ser copiadas
       const original = await tx.vaga.findFirst({
         where: { id_vaga, id_empresa },
         include: {
@@ -252,9 +250,7 @@ export class VagaService {
 
       if (!original)
         throw new Error("Vaga original não encontrada ou acesso negado.");
-
-      // 2. Criar um NOVO registro de Endereço (Deep Copy)
-      // Se a original não tiver endereço, o novoEndereco será null
+      
       const novoEndereco = original.endereco
         ? await tx.endereco.create({
             data: {
@@ -269,11 +265,10 @@ export class VagaService {
           })
         : null;
 
-      // 3. Criar a Nova Vaga (Resolvendo erro 2375 com ?? null)
       const novaVaga = await tx.vaga.create({
        data: {
           id_empresa: original.id_empresa,
-          titulo: `${original.titulo} (Cópia)`,
+          titulo: original.titulo,
           nivel_hierarquico: original.nivel_hierarquico,
           id_endereco: novoEndereco?.id_endereco ?? null,
           modelo_trabalho: original.modelo_trabalho,
@@ -288,15 +283,10 @@ export class VagaService {
           diferenciais: original.diferenciais,
           empresa_confidencial: original.empresa_confidencial,
           id_area_atuacao: original.id_area_atuacao,
-          
-          // ---> ADICIONE ESTA LINHA: <---
           tipo_diversidade: original.tipo_diversidade, 
-          
           status: "RASCUNHO", 
         },
       });
-
-      // 4. Replicar Benefícios
       if (original.beneficios.length > 0) {
         await tx.vagaBeneficio.createMany({
           data: original.beneficios.map((b) => ({
@@ -305,8 +295,6 @@ export class VagaService {
           })),
         });
       }
-
-      // 5. Replicar Perguntas Eliminatórias
       if (original.perguntas_eliminatorias.length > 0) {
         await tx.vagaPerguntaEliminatoria.createMany({
           data: original.perguntas_eliminatorias.map((p) => ({
@@ -316,8 +304,6 @@ export class VagaService {
           })),
         });
       }
-
-      // 6. Replicar Etapas do Kanban
       if (original.etapas.length > 0) {
         await tx.etapaProcesso.createMany({
           data: original.etapas.map((e) => ({
@@ -329,13 +315,10 @@ export class VagaService {
           })),
         });
       }
-
-      // 7. Replicar Configurações Estratégicas (Resolvendo erro 2322 de JSON)
       if (original.configuracao) {
         await tx.configuracaoVaga.create({
           data: {
             id_vaga: novaVaga.id_vaga,
-            // Cast ou fallback para evitar o erro de JsonValue incompatível
             campos_destaque: original.configuracao.campos_destaque ?? [],
           },
         });

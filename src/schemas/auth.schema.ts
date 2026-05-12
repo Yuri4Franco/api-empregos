@@ -417,8 +417,10 @@ turno_preferido: z
   pcd: z.boolean().optional(),
   tipo_pcd: z.string().optional().nullable(),
   necessidade: z.string().max(300, "Texto muito longo").optional().nullable(),
-  
-
+   cnh: z
+    .array(z.enum(["NAO_POSSUO", "A", "B", "C", "D", "E"]))
+    .optional()
+    .default(["NAO_POSSUO"]),
   // Endereço (Nested)
   endereco: z
     .object({

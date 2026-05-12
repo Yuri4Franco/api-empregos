@@ -38,6 +38,8 @@ export class CandidatoController {
     try {
       const id_usuario = (req.user as any).id;
 
+      console.log("Dados que chegaram no controller", req.body)
+
       const candidatoActualizado = await candidatoService.actualizarDadosGerais(
         id_usuario,
         req.body,

@@ -3,10 +3,15 @@ import { prisma } from "../config/prisma.js";
 
 export class BancoTalentosService {
   async listarVitrine(filtros: {
+    competencia?: number[] | undefined;
     id_area?: number | undefined;
-    turno?: string | undefined;
+    turno?: string[] | undefined;
     primeiro_emprego?: boolean | undefined;
     pcd?: boolean | undefined;
+    disponibilidade_sabados?: boolean | undefined;
+    disponibilidade_viagem?: boolean | undefined;
+    cnh?: string[] | undefined;
+    escolaridade?: string[] | undefined;
     pagina?: number | undefined;
     limite?: number | undefined;
   }) {
@@ -14,21 +19,23 @@ export class BancoTalentosService {
     const limite = filtros.limite || 10;
     const skip = (pagina - 1) * limite;
 
-    // 1. Regra de Ouro: SÓ busca quem quer ser visto
+    // 1. Regra de Ouro: SÓ busca quem quer ser visto e está ativo
     const whereClause: any = {
       perfil_visivel_empresas: true,
-      usuario: { status: "ATIVO" }, // Só listar candidatos com conta ativa
+      usuario: { status: "ATIVO" },
     };
 
-    // 2. Filtros Dinâmicos
+    // 2. Filtros Básicos e Logísticos
     if (filtros.id_area) {
       whereClause.areas_atuacao = {
         some: { id_area: filtros.id_area },
       };
     }
 
-    if (filtros.turno) {
-      whereClause.turno_preferido = filtros.turno as TurnoPreferido;
+    if (filtros.turno && filtros.turno.length > 0) {
+      whereClause.turno_preferido = {
+        hasSome: filtros.turno, // Verifica se o candidato tem ALGUM dos turnos selecionados
+      };
     }
 
     if (filtros.primeiro_emprego !== undefined) {
@@ -39,7 +46,69 @@ export class BancoTalentosService {
       whereClause.pcd = filtros.pcd;
     }
 
-    // 3. Executa a busca paralela (Contagem + Dados)
+    if (filtros.disponibilidade_sabados !== undefined) {
+      whereClause.disponibilidade_sabados = filtros.disponibilidade_sabados;
+    }
+
+    if (filtros.disponibilidade_viagem !== undefined) {
+      whereClause.disponibilidade_viagem = filtros.disponibilidade_viagem;
+    }
+
+    if (filtros.cnh && filtros.cnh.length > 0) {
+      whereClause.cnh = {
+        hasSome: filtros.cnh, // Verifica se o candidato tem ALGUMA das CNHs exigidas
+      };
+    }
+
+    if (filtros.competencia && filtros.competencia.length > 0) {
+      whereClause.competencias = {
+        some: {
+          id_competencia: { in: filtros.competencia }, // Pega candidatos que tenham pelo menos UMA das habilidades
+        },
+      };
+    }
+
+    // 3. Filtro Avançado de Escolaridade (Multi-select)
+    if (filtros.escolaridade && filtros.escolaridade.length > 0) {
+      const niveisPermitidos: string[] = [];
+      const statusPermitidos: string[] = [];
+
+      if (filtros.escolaridade.includes("MEDIO_COMPLETO")) {
+        niveisPermitidos.push("Ensino Médio");
+        statusPermitidos.push("CONCLUÍDO");
+      }
+      if (filtros.escolaridade.includes("TECNICO")) {
+        niveisPermitidos.push("Curso Técnico");
+      }
+      if (filtros.escolaridade.includes("SUPERIOR_CURSANDO")) {
+        niveisPermitidos.push("Graduação", "Superior (Tecnólogo)");
+        statusPermitidos.push("CURSANDO");
+      }
+      if (filtros.escolaridade.includes("SUPERIOR_COMPLETO")) {
+        niveisPermitidos.push(
+          "Graduação",
+          "Superior (Tecnólogo)",
+          "Pós-Graduação / Especialização",
+          "Mestrado / Doutorado"
+        );
+        statusPermitidos.push("CONCLUÍDO");
+      }
+
+      const formacaoQuery: any = {
+        nivel: { in: niveisPermitidos },
+      };
+
+      // Só aplica filtro de status se ele for relevante para as opções selecionadas
+      if (statusPermitidos.length > 0) {
+        formacaoQuery.status = { in: statusPermitidos };
+      }
+
+      whereClause.formacoes = {
+        some: formacaoQuery,
+      };
+    }
+
+    // 4. Executa a busca paralela
     const [total, candidatos] = await Promise.all([
       prisma.candidato.count({ where: whereClause }),
 
@@ -47,11 +116,10 @@ export class BancoTalentosService {
         where: whereClause,
         skip,
         take: limite,
-        orderBy: { usuario: { atualizado_em: "desc" } }, // Os perfis mais atualizados primeiro
+        orderBy: { usuario: { atualizado_em: "desc" } },
 
-        // 🚨 BLINDAGEM: Trazemos APENAS o que é público
         select: {
-          id_usuario: true, // Precisamos para gerar o "Candidato #ID"
+          id_usuario: true,
           objetivo_profissional: true,
           resumo_profissional: true,
           pretensao_salarial: true,
@@ -59,17 +127,12 @@ export class BancoTalentosService {
           primeiro_emprego: true,
           pcd: true,
 
-          // Cidade e Estado (É público, não identifica a rua da pessoa)
-          endereco: {
-            select: { cidade: true, uf: true },
-          },
+          endereco: { select: { cidade: true, uf: true } },
 
-          // Áreas de atuação (para montar o título principal)
           areas_atuacao: {
             include: { area: { select: { nome: true } } },
           },
 
-          // Experiências e Formações (Oculta contato das antigas empresas se tiver)
           experiencias: {
             select: {
               cargo: true,
@@ -78,6 +141,7 @@ export class BancoTalentosService {
               data_fim: true,
               atual: true,
             },
+            orderBy: { data_inicio: "desc" }, 
           },
           formacoes: {
             select: { curso: true, nivel: true, instituicao: true },
@@ -89,17 +153,14 @@ export class BancoTalentosService {
       }),
     ]);
 
-    // 4. Formatação Final (A Máscara)
+    // 5. Formatação Final
     const dadosMascarados = candidatos.map((c) => {
-      // Pega a principal área de atuação para colocar no título (ou um texto padrão)
       const areaPrincipal = c.areas_atuacao[0]?.area.nome || "Profissional";
 
       return {
-        id_candidato: c.id_usuario, // Importante para a empresa poder clicar e desbloquear depois
-        // ✨ A MÁGICA: "Candidato #1042 - Desenvolvedor Web"
+        id_candidato: c.id_usuario,
         identificacao_publica: `Candidato #${c.id_usuario} - ${areaPrincipal}`,
 
-        // Dados profissionais
         objetivo_profissional: c.objetivo_profissional,
         resumo_profissional: c.resumo_profissional,
         cidade: c.endereco?.cidade || "Não informada",
@@ -108,7 +169,6 @@ export class BancoTalentosService {
         primeiro_emprego: c.primeiro_emprego,
         pcd: c.pcd,
 
-        // Arrays
         areas: c.areas_atuacao.map((a) => a.area.nome),
         competencias: c.competencias.map((comp) => comp.competencia.nome),
         experiencias: c.experiencias,
@@ -125,7 +185,6 @@ export class BancoTalentosService {
       },
     };
   }
-
   async obterCurriculo(id_candidato: number, id_empresa: number) {
     const empresa = await prisma.empresa.findUnique({
       where: { id_empresa },

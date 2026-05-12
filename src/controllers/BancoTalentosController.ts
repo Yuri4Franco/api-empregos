@@ -5,14 +5,44 @@ import { prisma } from "../config/prisma.js";
 const bancoService = new BancoTalentosService();
 
 export class BancoTalentosController {
-  async listar(req: Request, res: Response) {
+async listar(req: Request, res: Response) {
     try {
-      const { area, turno, primeiro_emprego, pcd, pagina, limite } = req.query;
+      const {
+        area,
+        turno,
+        primeiro_emprego,
+        pcd,
+        disponibilidade_sabados,
+        disponibilidade_viagem,
+        cnh,
+        escolaridade,
+        competencia,
+        pagina,
+        limite,
+      } = req.query;
+
+      // 🔥 O Pulo do Gato: Força os parâmetros de texto a virarem Arrays
+      const parseArray = (param: any): string[] | undefined => {
+        if (!param) return undefined;
+        // Se vier "A,B", ele fatia e transforma em ["A", "B"]
+        return String(param).split(",");
+      };
 
       const resultado = await bancoService.listarVitrine({
+        // Numéricos
         id_area: area ? Number(area) : undefined,
-        turno: turno as string | undefined,
+        pagina: pagina ? Number(pagina) : undefined,
+        limite: limite ? Number(limite) : undefined,
 
+        // Arrays Multi-select (Aqui a mágica resolve o erro do Prisma)
+        turno: parseArray(turno),
+        cnh: parseArray(cnh),
+        escolaridade: parseArray(escolaridade),
+        
+        // Array de números para as competências
+        competencia: parseArray(competencia)?.map((num) => Number(num)),
+
+        // Booleanos seguros
         primeiro_emprego:
           primeiro_emprego === "true"
             ? true
@@ -20,9 +50,18 @@ export class BancoTalentosController {
               ? false
               : undefined,
         pcd: pcd === "true" ? true : pcd === "false" ? false : undefined,
-
-        pagina: pagina ? Number(pagina) : undefined,
-        limite: limite ? Number(limite) : undefined,
+        disponibilidade_sabados:
+          disponibilidade_sabados === "true"
+            ? true
+            : disponibilidade_sabados === "false"
+              ? false
+              : undefined,
+        disponibilidade_viagem:
+          disponibilidade_viagem === "true"
+            ? true
+            : disponibilidade_viagem === "false"
+              ? false
+              : undefined,
       });
 
       return res.status(200).json({
