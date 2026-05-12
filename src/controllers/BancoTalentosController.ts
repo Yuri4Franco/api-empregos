@@ -241,26 +241,19 @@ async listar(req: Request, res: Response) {
   async alternarFavorito(req: Request, res: Response) {
     try {
       const { id_candidato } = req.params;
-      const { observacoes } = req.body;
       const id_usuario = (req.user as any).id;
 
-      // 2. Buscamos no banco a qual empresa esse usuário pertence
       const vinculo = await prisma.usuario.findUnique({
         where: { id_usuario },
         select: { id_empresa: true },
       });
-
-      // 3. Verificação de segurança
       if (!vinculo || !vinculo.id_empresa) {
         return res.status(403).json({
           success: false,
           error: "Acesso negado. Usuário não vinculado a uma empresa.",
         });
       }
-
-      // 4. Agora sim, temos o ID real da empresa
       const id_empresa_real = vinculo.id_empresa;
-
 
       if (!id_empresa_real)
         return res
@@ -270,7 +263,6 @@ async listar(req: Request, res: Response) {
       const resultado = await bancoService.alternarCurriculoSalvo(
         Number(id_candidato),
         id_empresa_real,
-        observacoes,
       );
 
       return res.status(200).json({ success: true, data: resultado });

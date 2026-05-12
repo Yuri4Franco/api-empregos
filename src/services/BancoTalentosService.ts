@@ -89,7 +89,7 @@ export class BancoTalentosService {
           "Graduação",
           "Superior (Tecnólogo)",
           "Pós-Graduação / Especialização",
-          "Mestrado / Doutorado"
+          "Mestrado / Doutorado",
         );
         statusPermitidos.push("CONCLUÍDO");
       }
@@ -141,7 +141,7 @@ export class BancoTalentosService {
               data_fim: true,
               atual: true,
             },
-            orderBy: { data_inicio: "desc" }, 
+            orderBy: { data_inicio: "desc" },
           },
           formacoes: {
             select: { curso: true, nivel: true, instituicao: true },
@@ -215,6 +215,20 @@ export class BancoTalentosService {
       throw new Error("Este currículo não está disponível no momento.");
     }
 
+    // ✨ A MÁGICA DO "FAVORITO" AQUI
+    // Consulta super rápida para checar se essa empresa já favoritou esse candidato
+    const checkSalvo = await prisma.curriculoSalvo.findUnique({
+      where: {
+        id_empresa_id_candidato: {
+          id_empresa: id_empresa,
+          id_candidato: id_candidato,
+        },
+      },
+    });
+
+    // Transforma o resultado da query em um booleano (true ou false)
+    const isCandidatoSalvo = !!checkSalvo;
+
     // 4. A INTELIGÊNCIA DE ACESSO
     let acessoLiberado = false;
 
@@ -236,10 +250,7 @@ export class BancoTalentosService {
     }
 
     // --- 🚀 GATILHO DE VISUALIZAÇÃO (LOG) ---
-    // Só gravamos que o candidato foi "visto" se a empresa teve acesso total aos dados dele.
     if (acessoLiberado) {
-      // Usamos .create sem 'await' na frente, assim a Promise roda em paralelo
-      // no background e não segura o tempo de resposta da API para o Front-end!
       prisma.visualizacaoCurriculo
         .create({
           data: {
@@ -248,7 +259,6 @@ export class BancoTalentosService {
           },
         })
         .catch((err) => {
-          // Apenas logamos no console para não quebrar a requisição se falhar por algum motivo
           console.error(
             `Erro ao registrar view do candidato ${id_candidato}:`,
             err.message,
@@ -260,12 +270,17 @@ export class BancoTalentosService {
     // 5. Monta o payload base
     const areaPrincipal =
       candidato.areas_atuacao[0]?.area.nome || "Profissional";
+
     const dadosProfissionais = {
       id_candidato: candidato.id_usuario,
+      is_salvo: isCandidatoSalvo, // ✨ AQUI VAI A FLAG PARA O FRONTEND
       objetivo_profissional: candidato.objetivo_profissional,
       resumo_profissional: candidato.resumo_profissional,
       pretensao_salarial: candidato.pretensao_salarial,
       turno_preferido: candidato.turno_preferido,
+      disponibilidade_sabados: candidato.disponibilidade_sabados,
+      disponibilidade_viagem: candidato.disponibilidade_viagem,
+      cnh: candidato.cnh,
       primeiro_emprego: candidato.primeiro_emprego,
       pcd: candidato.pcd,
       tipo_pcd: candidato.tipo_pcd,
@@ -497,7 +512,6 @@ export class BancoTalentosService {
   async alternarCurriculoSalvo(
     id_candidato: number,
     id_empresa: number,
-    observacoes?: string,
   ) {
     const salvoExistente = await prisma.curriculoSalvo.findUnique({
       where: {
@@ -506,18 +520,16 @@ export class BancoTalentosService {
     });
 
     if (salvoExistente) {
-      // Se já estava salvo, removemos (Unfavorite)
+      
       await prisma.curriculoSalvo.delete({
         where: { id_salvo: salvoExistente.id_salvo },
       });
       return { favoritado: false, mensagem: "Currículo removido dos salvos." };
     } else {
-      // Se não estava, nós salvamos
       await prisma.curriculoSalvo.create({
         data: {
           id_empresa: id_empresa,
           id_candidato: id_candidato,
-          observacoes: observacoes ?? null,
         },
       });
       return { favoritado: true, mensagem: "Currículo salvo com sucesso!" };
