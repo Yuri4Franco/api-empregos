@@ -27,7 +27,7 @@ export class CandidaturaService {
       },
     });
 
-    // ✨ ATUALIZAÇÃO: Agora buscamos na tabela de movimentos
+    // ✨ Busca na tabela de movimentos
     // Usamos o groupBy para saber quantos candidatos únicos têm pendências
     const pendentesPorCandidato = await prisma.movimentoCandidatura.groupBy({
       by: ["id_candidatura"],
@@ -44,10 +44,16 @@ export class CandidaturaService {
 
     return {
       vaga: { titulo: vaga.titulo, status: vaga.status },
+      // ✨ MUDANÇA: Colocamos o total na RAIZ do objeto!
+      total_notificacoes_pendentes: totalNotificacoesPendentes,
+
+      // As colunas agora servem perfeitamente como as "Abas" da sua nova lista
       colunas: vaga.etapas.map((etapa) => ({
-        ...etapa,
-        // Mantemos aqui para o seu frontend continuar lendo corretamente
-        notificacoes_pendentes: totalNotificacoesPendentes,
+        id_etapa: etapa.id_etapa,
+        nome_etapa: etapa.nome_etapa,
+        ordem: etapa.ordem,
+        tipo: etapa.tipo,
+        requer_agendamento: etapa.requer_agendamento,
         candidatos: candidaturas
           .filter((c) => c.id_etapa_atual === etapa.id_etapa)
           .map((c) => ({
@@ -383,7 +389,9 @@ export class CandidaturaService {
 
       // 3. Se o RH selecionou uma lista, mas TODOS já estavam reprovados, avisamos:
       if (candidaturasValidas.length === 0) {
-        throw new Error("Nenhuma candidatura selecionada é válida para reprovação (talvez já tenham sido reprovadas).");
+        throw new Error(
+          "Nenhuma candidatura selecionada é válida para reprovação (talvez já tenham sido reprovadas).",
+        );
       }
 
       // Separamos apenas os IDs que passaram na peneira
@@ -405,7 +413,7 @@ export class CandidaturaService {
       return await tx.candidatura.updateMany({
         where: { id_candidatura: { in: idsFiltrados } },
         data: {
-          status_atual: "REPROVADO", 
+          status_atual: "REPROVADO",
           // 🚨 IMPORTANTE: Removi o "notificacao_pendente: true" daqui pois ele não existe no model Candidatura!
         },
       });
@@ -737,6 +745,27 @@ export class CandidaturaService {
         orderBy: { ordem: "asc" },
       });
 
+      // ✨ BUSCA DE ALTA PERFORMANCE DO HISTÓRICO (Para a regra do "Recorde")
+      // Pega todos os movimentos desses candidatos de uma vez só
+      const historicosGerais = await tx.movimentoCandidatura.findMany({
+        where: { id_candidatura: { in: id_candidaturas } },
+        select: { id_candidatura: true, etapa_destino: true },
+      });
+
+      // Mapeia o "Recorde" (maior ordem alcançada) de cada candidato
+      const recordes = new Map<number, number>();
+      for (const hist of historicosGerais) {
+        const etapaDoHistorico = etapasVaga.find(
+          (e) => e.id_etapa === hist.etapa_destino,
+        );
+        if (etapaDoHistorico) {
+          const recordeAtual = recordes.get(hist.id_candidatura) || 0;
+          if (etapaDoHistorico.ordem > recordeAtual) {
+            recordes.set(hist.id_candidatura, etapaDoHistorico.ordem);
+          }
+        }
+      }
+
       const movimentosParaCriar = [];
       const candidaturasParaAtualizar = []; // Usaremos Promise.all para as atualizações
 
@@ -757,24 +786,35 @@ export class CandidaturaService {
         if (proximaEtapa.nome_etapa.toLowerCase().includes("entrevista"))
           novoStatus = "ENTREVISTA";
 
-        // Prepara o histórico
+        // ✨ AVALIAÇÃO DA NOTIFICAÇÃO (High Water Mark)
+        // Garante que o recorde nunca seja menor que a etapa onde ele já estava fisicamente
+        const recordeHistorico = Math.max(
+          recordes.get(c.id_candidatura) || 0,
+          etapaAtual.ordem,
+        );
+        const isAvancoInedito = proximaEtapa.ordem > recordeHistorico;
+        const deveNotificar =
+          isAvancoInedito && !proximaEtapa.requer_agendamento;
+
+        // Prepara o histórico (✨ A NOTIFICAÇÃO PENDENTE VEM PRA CÁ!)
         movimentosParaCriar.push({
           id_candidatura: c.id_candidatura,
           etapa_origem: c.id_etapa_atual,
           etapa_destino: proximaEtapa.id_etapa,
           status_destino: novoStatus,
-          motivo: `Avançado em massa para a etapa: ${proximaEtapa.nome_etapa}`,
+          motivo: isAvancoInedito
+            ? `Avançado em massa para a etapa: ${proximaEtapa.nome_etapa}`
+            : `Movido em massa para a etapa: ${proximaEtapa.nome_etapa} (Revisão)`,
+          notificacao_pendente: deveNotificar,
         });
 
-        // Prepara o Update individual (pois cada um pode estar indo pra uma etapa diferente,
-        // caso o recrutador tenha selecionado de colunas misturadas)
+        // Prepara o Update individual
         candidaturasParaAtualizar.push(
           tx.candidatura.update({
             where: { id_candidatura: c.id_candidatura },
             data: {
               id_etapa_atual: proximaEtapa.id_etapa,
               status_atual: novoStatus,
-              notificacao_pendente: !proximaEtapa.requer_agendamento,
             },
           }),
         );
@@ -794,7 +834,7 @@ export class CandidaturaService {
     });
   }
 
-async listarHistoricoCompleto(id_usuario: number) {
+  async listarHistoricoCompleto(id_usuario: number) {
     const candidaturas = await prisma.candidatura.findMany({
       where: { id_candidato: id_usuario },
       orderBy: { data_candidatura: "desc" }, // Da mais nova para a mais antiga
@@ -818,7 +858,7 @@ async listarHistoricoCompleto(id_usuario: number) {
             status_destino: true,
             motivo: true,
             criado_em: true,
-          }
+          },
         },
       },
     });
@@ -829,9 +869,10 @@ async listarHistoricoCompleto(id_usuario: number) {
       const endereco = c.vaga.endereco;
 
       // Pegamos a última movimentação para extrair o feedback caso ele tenha sido reprovado
-      const ultimaMovimentacao = c.movimentacoes.length > 0 
-        ? c.movimentacoes[c.movimentacoes.length - 1] 
-        : null;
+      const ultimaMovimentacao =
+        c.movimentacoes.length > 0
+          ? c.movimentacoes[c.movimentacoes.length - 1]
+          : null;
 
       return {
         id_candidatura: c.id_candidatura,
@@ -873,14 +914,14 @@ async listarHistoricoCompleto(id_usuario: number) {
             : null,
 
         feedback_reprovacao:
-          c.status_atual === "REPROVADO" && ultimaMovimentacao?.status_destino === "REPROVADO"
+          c.status_atual === "REPROVADO" &&
+          ultimaMovimentacao?.status_destino === "REPROVADO"
             ? ultimaMovimentacao.motivo
             : null,
       };
     });
   }
 
-  
   async desistirCandidatura(id_candidatura: number, id_usuario: number) {
     // 1. Busca a candidatura para garantir que existe e é da pessoa certa
     const candidatura = await prisma.candidatura.findUnique({
@@ -948,7 +989,7 @@ async listarHistoricoCompleto(id_usuario: number) {
         data_hora: {
           gte: inicioDoDia,
         },
-        
+
         // Busca os agendamentos que pertencem às candidaturas deste usuário
         candidatura: {
           id_candidato: id_usuario,
