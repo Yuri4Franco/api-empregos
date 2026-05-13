@@ -343,6 +343,7 @@ export class BancoTalentosService {
   async desbloquearCurriculoTransacao(
     id_candidato: number,
     id_empresa: number,
+    id_usuario_logado: number
   ) {
     // 1. Validações Iniciais (Fora da transação para economizar processamento do banco)
     const empresa = await prisma.empresa.findUnique({
@@ -410,7 +411,7 @@ export class BancoTalentosService {
       // 3.4. Registrar no Log de Auditoria
       await tx.logAuditoria.create({
         data: {
-          id_usuario: id_empresa, // ID de quem fez a ação
+          id_usuario: id_usuario_logado, // ✨ CORRIGIDO AQUI!
           entidade: "CANDIDATO",
           id_entidade: id_candidato,
           acao: "DESBLOQUEIO_CURRICULO_CREDITO",
@@ -424,18 +425,26 @@ export class BancoTalentosService {
     return await this.obterCurriculo(id_candidato, id_empresa);
   }
 
-  async listarMeusDesbloqueados(id_empresa: number) {
-    // Busca todos os registros de desbloqueio dessa empresa
+async listarMeusDesbloqueados(id_empresa: number) {
+    // 1. Buscamos todos os currículos salvos por esta empresa para comparar
+    const salvos = await prisma.curriculoSalvo.findMany({
+      where: { id_empresa },
+      select: { id_candidato: true }
+    });
+
+    // Criamos um Set com os IDs para ter uma busca de alta performance O(1)
+    const idsSalvosSet = new Set(salvos.map(s => s.id_candidato));
+
+    // 2. Busca todos os registros de desbloqueio desta empresa (sua query original)
     const historico = await prisma.curriculoDesbloqueado.findMany({
       where: { id_empresa },
-      orderBy: { data_desbloqueio: "desc" }, // Os mais recentes no topo
+      orderBy: { data_desbloqueio: "desc" },
       include: {
         candidato: {
           include: {
             usuario: { select: { nome: true, email: true, status: true } },
             endereco: { select: { cidade: true, uf: true } },
             areas_atuacao: { include: { area: { select: { nome: true } } } },
-            // Traz a última experiência só para dar contexto no Card
             experiencias: {
               orderBy: { data_inicio: "desc" },
               take: 1,
@@ -446,7 +455,7 @@ export class BancoTalentosService {
       },
     });
 
-    // Formata para o Front-end não ter que lidar com aninhamento complexo
+    // 3. Formata para o Front-end
     const gaveta = historico.map((registro) => {
       const c = registro.candidato;
       const areaPrincipal = c.areas_atuacao[0]?.area.nome || "Profissional";
@@ -457,6 +466,10 @@ export class BancoTalentosService {
       return {
         id_candidato: c.id_usuario,
         data_desbloqueio: registro.data_desbloqueio,
+        
+        // ✨ A NOVA PROPRIEDADE AQUI:
+        // Verifica se o ID deste candidato está no nosso conjunto de salvos
+        is_salvo: idsSalvosSet.has(c.id_usuario),
 
         // Dados Liberados
         nome: c.usuario.nome,
@@ -537,7 +550,7 @@ export class BancoTalentosService {
   }
 
   // 2. Listar Favoritos (Com filtro de censura embutido)
-  async listarCurriculosSalvos(id_empresa: number) {
+async listarCurriculosSalvos(id_empresa: number) {
     // Busca os dados da empresa e a lista de quem ela já PAGOU para ver
     const [empresa, desbloqueios] = await Promise.all([
       prisma.empresa.findUnique({
@@ -552,8 +565,8 @@ export class BancoTalentosService {
 
     if (!empresa) throw new Error("Empresa não encontrada.");
 
-    // Array rápido só com os IDs de quem está liberado
-    const idsLiberados = desbloqueios.map((d) => d.id_candidato);
+    // ✨ Melhoria de Performance: Usando Set O(1) ao invés de Array.includes O(N)
+    const idsLiberadosSet = new Set(desbloqueios.map((d) => d.id_candidato));
     const isAssociada = empresa.tipo_vinculo_aci === "ASSOCIADA";
 
     // Busca a lista de favoritos
@@ -585,7 +598,10 @@ export class BancoTalentosService {
         : "Sem experiência registrada";
 
       // A MÁGICA DA SEGURANÇA: Tem acesso liberado?
-      const acessoLiberado = isAssociada || idsLiberados.includes(c.id_usuario);
+      const acessoLiberado = isAssociada || idsLiberadosSet.has(c.id_usuario);
+
+      // ✨ AQUI ESTÁ A NOVA FLAG DE STATUS DO PERFIL
+      const perfilAtivo = c.usuario.status === "ATIVO" && c.perfil_visivel_empresas;
 
       const payloadBase = {
         id_candidato: c.id_usuario,
@@ -594,6 +610,8 @@ export class BancoTalentosService {
         area_principal: areaPrincipal,
         ultima_experiencia: ultimaExp,
         acesso_liberado: acessoLiberado,
+        is_salvo: true, // Já que estamos na lista de favoritos, sempre será true
+        perfil_ativo: perfilAtivo, // Retorna se o perfil tá no ar ou foi ocultado
       };
 
       if (acessoLiberado) {
