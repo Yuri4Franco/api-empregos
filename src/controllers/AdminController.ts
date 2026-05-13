@@ -190,37 +190,6 @@ export class AdminController {
     }
   }
 
-  async cadastrarCandidatoManual(req: Request, res: Response) {
-    try {
-      const idAutor = req.user.id;
-      // O req.body já chega 100% validado e tipado
-      const resultado = await adminService.cadastrarCandidatoManual(
-        req.body,
-        idAutor,
-      );
-
-      return res.status(201).json({
-        message: "Candidato cadastrado com sucesso.",
-        data: resultado,
-      });
-    } catch (error: any) {
-      return res.status(400).json({ error: error.message });
-    }
-  }
-
-  // Listar todos os usuários candidato
-  async listarCandidatos(req: Request, res: Response) {
-    try {
-      const filtros = req.query;
-
-      const result = await adminService.listarTodosCandidatos(filtros);
-
-      return res.status(200).json(result);
-    } catch (error: any) {
-      return res.status(500).json({ error: error.message });
-    }
-  }
-
   // Ver currículo completo do candidato
   async obterCurriculo(req: Request, res: Response) {
     try {
@@ -232,29 +201,6 @@ export class AdminController {
       return res.status(200).json(curriculo);
     } catch (error: any) {
       return res.status(404).json({ error: error.message });
-    }
-  }
-
-  // Atualizar currículo/perfil pelo ADM
-  async atualizarPerfilCompleto(req: Request, res: Response) {
-    try {
-      // O id já vem como number pelo middleware validate(IdParamSchema, 'params')
-      const { id } = req.params as any;
-      const id_autor = req.user.id;
-
-      // req.body já está validado e com as datas convertidas
-      const resultado = await adminService.atualizarPerfilCompletoCandidato(
-        id,
-        req.body,
-        id_autor,
-      );
-
-      return res.status(200).json({
-        message: "Perfil atualizado com sucesso!",
-        data: resultado,
-      });
-    } catch (error: any) {
-      return res.status(400).json({ error: error.message });
     }
   }
 

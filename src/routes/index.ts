@@ -181,39 +181,6 @@ routes.get("/empresas/perfil/:slug", empresaPublicaController.buscarPorSlug);
 
 // --- CANDIDATOS ---
 
-// Listar todos os candidatos - fora do piloto
-routes.get(
-  "/admin/candidatos",
-  authMiddleware(["ADM"]),
-  validate(FiltroUsuarioSchema, "query"),
-  adminController.listarCandidatos,
-);
-
-// Cadastrar candidato manualmente - pode ser
-routes.post(
-  "/admin/candidatos/manual",
-  authMiddleware(["ADM"]),
-  validate(cadastroCandidatoManualSchema, "body"),
-  adminController.cadastrarCandidatoManual,
-);
-
-// Obter currículo completo de um candidat - fora do piloto
-routes.get(
-  "/admin/candidatos/:id/curriculo",
-  authMiddleware(["ADM"]),
-  validate(IdParamSchema, "params"),
-  adminController.obterCurriculo,
-);
-
-// Atualizar perfil completo do candidato (dados pessoais + perfil profissional)- fora do piloto
-routes.put(
-  "/admin/candidatos/:id/perfil-completo",
-  authMiddleware(["ADM"]),
-  validate(IdParamSchema, "params"),
-  validate(AtualizarPerfilCompletoSchema, "body"),
-  adminController.atualizarPerfilCompleto,
-);
-
 // Adicionar experiência profissional ao candidato - pode ser
 routes.post(
   "/admin/candidatos/:id_usuario/formacao",
