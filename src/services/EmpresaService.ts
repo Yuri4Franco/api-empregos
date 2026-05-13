@@ -2,68 +2,7 @@ import { prisma } from "../config/prisma.js";
 import { startOfDay, endOfDay, subDays } from "date-fns";
 
 export class EmpresaService {
-  async visualizarPerfilCandidato(id_empresa: number, id_candidato: number) {
-    // 1. Verificar se a empresa já desbloqueou este candidato antes
-    // Podemos usar a tabela LogAuditoria ou criar uma tabela de 'Desbloqueios'
-    // Aqui, vamos checar se a empresa já teve alguma interação de sucesso
-    const jaAcessou = await prisma.logAuditoria.findFirst({
-      where: {
-        id_usuario: id_empresa, // Adaptar conforme seu log
-        entidade: "CANDIDATO",
-        id_entidade: id_candidato,
-        acao: "DESBLOQUEIO_CURRICULO",
-      },
-    });
-
-    if (jaAcessou) {
-      return this.buscarPerfilCompleto(id_candidato);
-    }
-
-    // 2. Se não acessou, verificar créditos
-    const empresa = await prisma.empresa.findUnique({
-      where: { id_empresa },
-      select: { creditos_curriculos: true, tipo_vinculo_aci: true },
-    });
-
-    if (!empresa) throw new Error("Empresa não encontrada.");
-
-    // Associadas podem ter regras diferentes, mas aqui seguimos o padrão de crédito
-    if (empresa.creditos_curriculos <= 0) {
-      throw new Error("Saldo de créditos de currículo insuficiente.");
-    }
-
-    // 3. Deduzir crédito e registrar acesso em transação
-    return await prisma.$transaction(async (tx) => {
-      await tx.empresa.update({
-        where: { id_empresa },
-        data: { creditos_curriculos: { decrement: 1 } },
-      });
-
-      await tx.logAuditoria.create({
-        data: {
-          id_usuario: id_empresa,
-          entidade: "CANDIDATO",
-          id_entidade: id_candidato,
-          acao: "DESBLOQUEIO_CURRICULO",
-          detalhes: { data: new Date() },
-        },
-      });
-
-      return this.buscarPerfilCompleto(id_candidato, tx);
-    });
-  }
-
-  private async buscarPerfilCompleto(id_candidato: number, tx: any = prisma) {
-    return await tx.candidato.findUnique({
-      where: { id_usuario: id_candidato },
-      include: {
-        usuario: { select: { nome: true, email: true } },
-        experiencias: true,
-        formacoes: true,
-      },
-    });
-  }
-
+  
   async solicitarDivulgacao(id_empresa: number, dados: any) {
     // Verifica se a vaga pertence à empresa
     const vaga = await prisma.vaga.findFirst({
@@ -133,8 +72,9 @@ export class EmpresaService {
       inscritosUltimas24h,
       funilCandidaturas,
       proximasEntrevistas,
-      notificacoesPendentes,
-      foraDoPerfil,
+      notificacoesPendentes, // 6ª variável
+      inscritosNoPeriodo, // ✨ CORREÇÃO: Faltava essa variável (7ª)
+      foraDoPerfil, // 8ª variável
     ] = await Promise.all([
       // 1. Vagas por Status (para ver quantas estão Ativas, em Análise, etc)
       prisma.vaga.groupBy({
@@ -183,22 +123,23 @@ export class EmpresaService {
         take: 5,
       }),
 
-      // 6. Contador do Safe Send (Feedback pendente)
-      prisma.candidatura.count({
+      // 6. Contador do Safe Send (Feedback pendente) - ✨ CORRIGIDO PARA O NOVO SCHEMA
+      prisma.movimentoCandidatura.count({
         where: {
-          vaga: { id_empresa },
           notificacao_pendente: true,
+          candidatura: { vaga: { id_empresa } },
         },
       }),
 
+      // 7. Inscritos no período do Dashboard - ✨ AGORA TEM UMA VARIÁVEL PARA ELE
       prisma.candidatura.count({
         where: {
           vaga: { id_empresa },
-          data_candidatura: { gte: dataLimite }, // Agora filtra pelo período do dashboard
+          data_candidatura: { gte: dataLimite },
         },
       }),
 
-      // 7. Inteligência de Triagem (Quantos estão "Fora do Perfil")
+      // 8. Inteligência de Triagem (Quantos estão "Fora do Perfil")
       prisma.respostaPergunta.count({
         where: {
           fora_do_perfil: true,
@@ -214,7 +155,7 @@ export class EmpresaService {
           vagasStatus.find((v) => v.status === "ATIVA")?._count || 0,
         total_inscritos: totalCandidatos,
         novos_hoje: inscritosUltimas24h,
-        alertas_safe_send: notificacoesPendentes,
+        alertas_safe_send: notificacoesPendentes, // Agora reflete a tabela de movimentos!
         candidatos_fora_perfil: foraDoPerfil,
       },
       funil: funilCandidaturas.map((f) => ({
