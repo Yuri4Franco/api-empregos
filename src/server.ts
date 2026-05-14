@@ -3,28 +3,37 @@ import "dotenv/config";
 import { prisma } from "./config/prisma";
 import routes from "./routes/index.js";
 import cors from "cors";
+import helmet from "helmet";
 
 const app = express();
 
+app.use(helmet());
+
+const origensPermitidas = [
+  "https://acivagas.com.br",
+  "http://acivagas.com.br",
+  "https://www.acivagas.com.br",
+  "http://www.acivagas.com.br"
+];
+
+if (process.env.NODE_ENV !== 'production') {
+  origensPermitidas.push("http://localhost:3000");
+}
+
 app.use(
   cors({
-    origin: [
-      "http://acivagas.com.br",
-      "https://acivagas.com.br",
-      "http://www.acivagas.com.br",
-      "https://www.acivagas.com.br",
-      "http://localhost:3000" 
-    ],
+    origin: origensPermitidas,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
   })
 );
+
 app.use(express.json());
 
 app.use(routes);
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3333;
 
 app.get("/health", async (req, res) => {
   try {
