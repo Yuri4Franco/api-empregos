@@ -518,3 +518,11 @@ export const AtualizarDadosEmpresaSchema = z.object({
 export const candidatoAreaSchema = z.object({
   id_area: z.number().int().positive("Área de atuação inválida"),
 });
+
+
+export const contatoSiteSchema = z.object({
+  nome: z.string().min(2, "O nome da empresa/responsável é obrigatório."),
+  email: z.string().email("Informe um e-mail válido."),
+  assunto: z.string().min(2, "O assunto é obrigatório."),
+  mensagem: z.string().min(10, "Escreva uma mensagem de pelo menos 10 caracteres."),
+});

@@ -1,11 +1,16 @@
 import express from "express";
+import rateLimit from "express-rate-limit"
 import "dotenv/config";
 import { prisma } from "./config/prisma";
 import routes from "./routes/index.js";
 import cors from "cors";
 import helmet from "helmet";
+import { globalLimiter } from "./middlewares/rateLimiter";
 
 const app = express();
+
+app.set("trust proxy", 1); // Avisa sobre o Nginx
+app.use(globalLimiter);    // Aplica a regra leve para tudo
 
 app.use(helmet());
 

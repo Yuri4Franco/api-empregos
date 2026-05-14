@@ -17,6 +17,7 @@ import { BancoTalentosController } from "../controllers/BancoTalentosController.
 import { NotificacaoController } from "../controllers/NotificacaoController.js";
 import { EmpresaDashboardController } from "../controllers/EmpresaDashboardController.js";
 import { EmpresaPublicaController } from "../controllers/EmpresaPublicaController.js";
+import { ContatoController } from "../controllers/ContatoController.js";
 import {
   uploadBanner,
   uploadLogo,
@@ -35,6 +36,7 @@ import {
   CandidaturaSchema,
   ColaboradorSchema,
   ConfigurarDestaquesSchema,
+  contatoSiteSchema,
   CreditosSchema,
   DashboardFiltroSchema,
   EmpresaSchema,
@@ -63,6 +65,7 @@ import { validate } from "../middlewares/validate.js";
 import { TaxonomiaController } from "../controllers/TaxonomiaController.js";
 import { validatePhotoUpload } from "../middlewares/validatePhotoUpload.js";
 import { DashboardCandidatoController } from "../controllers/DashboardCandidatoController.js";
+import { authLimiter } from "../middlewares/rateLimiter.js";
 
 const routes = Router();
 const vagaController = new VagaController();
@@ -83,14 +86,19 @@ const dashboardCandidatoController = new DashboardCandidatoController();
 const notificacaoController = new NotificacaoController();
 const empresaDashboardController = new EmpresaDashboardController();
 const empresaPublicaController = new EmpresaPublicaController();
+const contatoController = new ContatoController();
 
-routes.post("/login", authController.login);
+routes.post("/login", authLimiter, authController.login);
 
-routes.post("/register", authController.register);
+routes.post("/register", authLimiter, authController.register);
 
-routes.post("/ativar", authController.ativar);
+routes.post("/ativar", authLimiter, authController.ativar);
 
-routes.post("/auth/reenviar-ativacao", authController.reenviarAtivacao);
+routes.post(
+  "/auth/reenviar-ativacao",
+  authLimiter,
+  authController.reenviarAtivacao,
+);
 
 // Rotas de Admin
 // Cadastrar nova empresa - OK
@@ -273,12 +281,7 @@ routes.patch(
 
 // Rota da Empresa (Cria como Rascunho ou Analise)
 // Criar Rascunho (Etapa 1) - ok
-routes.post(
-  "/vagas",
-  authMiddleware(["EMPRESA"]),
-  vagaController.cadastrar
-);
-
+routes.post("/vagas", authMiddleware(["EMPRESA"]), vagaController.cadastrar);
 
 // Atualizar Etapas do Wizard -ok
 routes.put(
@@ -443,19 +446,19 @@ routes.put(
 routes.patch(
   "/empresa/vagas/:id_vaga/pausar",
   authMiddleware(["EMPRESA"]), // Garante que é uma empresa
-  vagaController.pausar
+  vagaController.pausar,
 );
 
 routes.patch(
   "/empresa/vagas/:id_vaga/ativar",
   authMiddleware(["EMPRESA"]),
-  vagaController.ativar
+  vagaController.ativar,
 );
 
 routes.patch(
   "/empresa/vagas/:id_vaga/encerrar",
   authMiddleware(["EMPRESA"]),
-  vagaController.encerrar
+  vagaController.encerrar,
 );
 
 // Visualizar Painel de Gestão da Vaga
@@ -620,9 +623,9 @@ routes.get(
 );
 
 routes.get(
-  "/candidato/vaga/:id_vaga/status",  
+  "/candidato/vaga/:id_vaga/status",
   authMiddleware(["CANDIDATO"]),
-  candidaturaController.verificarStatus
+  candidaturaController.verificarStatus,
 );
 
 // Rota para o candidato atualizar seu próprio currículo completo
@@ -822,8 +825,6 @@ routes.patch(
   notificacaoController.marcarLidas,
 );
 
-
-
 routes.delete(
   "/usuario/conta",
   authMiddleware(["CANDIDATO", "EMPRESA"]),
@@ -833,23 +834,28 @@ routes.delete(
 routes.get(
   "/empresa/dashboard/estatisticas",
   authMiddleware(["EMPRESA", "ADM"]),
-  empresaDashboardController.estatisticas
+  empresaDashboardController.estatisticas,
 );
 
 // Lista as vagas ativas com o termômetro de candidatos
 routes.get(
   "/empresa/dashboard/vagas-resumo",
   authMiddleware(["EMPRESA", "ADM"]),
-  empresaDashboardController.resumoVagas
+  empresaDashboardController.resumoVagas,
 );
 
 // Próximas entrevistas agendadas
 routes.get(
   "/empresa/dashboard/proximas-entrevistas",
   authMiddleware(["EMPRESA", "ADM"]),
-  empresaDashboardController.proximasEntrevistas
+  empresaDashboardController.proximasEntrevistas,
 );
 
+routes.post(
+  "/site/contato",
+  validate(contatoSiteSchema),
+  contatoController.enviarContato,
+);
 
 routes.get("/admin/vagas", authMiddleware(["ADM"]), vagaController.listarAdmin);
 
