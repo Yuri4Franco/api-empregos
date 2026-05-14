@@ -8,13 +8,18 @@ const app = express();
 
 app.use(
   cors({
-    origin: "*" ,
+    origin: [
+      "http://acivagas.com.br",
+      "https://acivagas.com.br",
+      "http://www.acivagas.com.br",
+      "https://www.acivagas.com.br",
+      "http://localhost:3000" 
+    ],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
-  }),
+  })
 );
-
 app.use(express.json());
 
 app.use(routes);
