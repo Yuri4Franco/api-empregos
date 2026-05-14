@@ -198,6 +198,7 @@ export class BaseUserService {
             status: true,
             creditos_vagas: true,
             creditos_curriculos: true,
+            slug: true,
           },
         },
       },
