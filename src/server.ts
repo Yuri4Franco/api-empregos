@@ -14,8 +14,8 @@ const app = express();
 
 // (As linhas antigas requestHandler e tracingHandler foram removidas daqui)
 
-app.set("trust proxy", 1); // Avisa sobre o Nginx
-app.use(globalLimiter);    // Aplica a regra leve para tudo
+app.set("trust proxy", 1); 
+app.use(globalLimiter);
 
 app.use(helmet());
 

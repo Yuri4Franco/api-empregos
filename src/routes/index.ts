@@ -64,7 +64,7 @@ import { validate } from "../middlewares/validate.js";
 import { TaxonomiaController } from "../controllers/TaxonomiaController.js";
 import { validatePhotoUpload } from "../middlewares/validatePhotoUpload.js";
 import { DashboardCandidatoController } from "../controllers/DashboardCandidatoController.js";
-import { authLimiter } from "../middlewares/rateLimiter.js";
+import { authLimiter, emailLimiter } from "../middlewares/rateLimiter.js";
 
 const routes = Router();
 const vagaController = new VagaController();
@@ -864,6 +864,7 @@ routes.get(
 
 routes.post(
   "/site/contato",
+  emailLimiter,
   validate(contatoSiteSchema),
   contatoController.enviarContato,
 );
