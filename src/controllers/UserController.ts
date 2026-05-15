@@ -25,7 +25,9 @@ export class UserController {
     try {
       const id_usuario = req.user.id;
       const { senha_atual, nova_senha } = req.body;
-
+      console.log("ID do usuário:", id_usuario);
+      console.log("Senha atual:", senha_atual);
+      console.log("Nova senha:", nova_senha);
       if (!senha_atual || !nova_senha) {
         return res.status(400).json({
           success: false,
@@ -80,6 +82,7 @@ export class UserController {
 
   async deletarConta(req: Request, res: Response) {
     try {
+      
       const id_usuario = req.user.id;
       const { senha_confirmacao } = req.body;
 

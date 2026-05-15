@@ -9,14 +9,10 @@ const UsuarioBaseSchema = z.object({
 
 const SenhaForte = z
   .string()
-  .min(6, "A senha deve ter no mínimo 8 caracteres")
+  .min(8, "A senha deve ter no mínimo 8 caracteres")
   .regex(/[A-Z]/, "Deve conter ao menos uma letra maiúscula")
   .regex(/[0-9]/, "Deve conter ao menos um número")
   .regex(/[^a-zA-Z0-9]/, "Deve conter ao menos um caractere especial");
-
-const SenhaPadrao = z
-  .string()
-  .min(6, "A senha deve ter no mínimo 6 caracteres");
 
 const EnderecoSchema = z.object({
   uf: z.string().length(2, "UF deve ter 2 caracteres").optional(),
@@ -26,8 +22,18 @@ const EnderecoSchema = z.object({
   bairro: z.string().optional(),
 });
 
+export const esqueciSenhaSchema = z.object({
+  email: z.string().email("Por favor, insira um e-mail válido."),
+});
+
+export const redefinirSenhaSchema = z.object({
+  token: z.string().min(1, "O token de recuperação é obrigatório."),
+  nova_senha: SenhaForte,
+});
+
 export const TrocarSenha = z.object({
   nova_senha: SenhaForte,
+  senha_atual: z.string().min(1, "A senha atual é obrigatória para trocar a senha."),
 });
 
 const CandidatoBaseSchema = z.object({

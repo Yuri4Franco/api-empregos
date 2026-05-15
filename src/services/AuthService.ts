@@ -34,7 +34,7 @@ export class AuthService {
 
     await prisma.usuario.update({
       where: { id_usuario: usuario.id_usuario },
-      data: { ultimo_login: new Date() }
+      data: { ultimo_login: new Date() },
     });
 
     return this.gerarToken(
@@ -136,11 +136,11 @@ export class AuthService {
         },
       });
 
-    await tx.candidato.create({
-        data: { 
+      await tx.candidato.create({
+        data: {
           id_usuario: user.id_usuario,
           turno_preferido: ["QUALQUER_TURNO"],
-          cnh:["NAO_POSSUO"],
+          cnh: ["NAO_POSSUO"],
         },
       });
 
@@ -221,4 +221,61 @@ export class AuthService {
 
     return true;
   }
+
+  async solicitarRecuperacaoSenha(email: string) {
+    const usuario = await prisma.usuario.findUnique({
+      where: { email },
+    });
+
+    if (!usuario) return;
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiraToken = new Date(Date.now() + 60 * 60 * 1000);
+
+    await prisma.usuario.update({
+      where: { id_usuario: usuario.id_usuario },
+      data: {
+        token_recuperar: token,
+        expira_token: expiraToken,
+      },
+    });
+
+    await emailService.enviarEmailRecuperacao(
+      usuario.email,
+      usuario.nome,
+      token,
+    );
+  }
+
+  // 2º Passo: Executar a redefinição com Argon2
+  async redefinirSenha(token: string, novaSenha: string) {
+    const usuario = await prisma.usuario.findUnique({
+      where: { token_recuperar: token },
+    });
+
+    if (
+      !usuario ||
+      !usuario.expira_token ||
+      new Date() > usuario.expira_token
+    ) {
+      throw new Error(
+        "Token de recuperação inválido ou expirado. Solicite novamente.",
+      );
+    }
+
+    // ✨ AQUI ESTÁ A MÁGICA DO ARGON2
+    // O argon2.hash já gera o salt automaticamente e usa os parâmetros recomendados
+    const senhaHash = await argon2.hash(novaSenha);
+
+    await prisma.usuario.update({
+      where: { id_usuario: usuario.id_usuario },
+      data: {
+        senha_hash: senhaHash,
+        token_recuperar: null,
+        expira_token: null,
+      },
+    });
+
+    return true;
+  } 
 }

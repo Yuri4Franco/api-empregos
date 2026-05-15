@@ -6,12 +6,10 @@ const authService = new AuthService();
 export class AuthController {
   async login(req: Request, res: Response) {
     try {
-      
       const { email, senha, cnpj } = req.body;
 
       console.log("email:", email);
       console.log("senha:", senha);
-
 
       let result;
       if (cnpj) {
@@ -49,7 +47,7 @@ export class AuthController {
   async ativar(req: Request, res: Response) {
     try {
       console.log("BODY RECEBIDO NO BACKEND:", req.body);
-      
+
       const { token } = req.body;
 
       if (!token) {
@@ -72,9 +70,9 @@ export class AuthController {
       const { email } = req.body;
 
       if (!email) {
-        return res.status(400).json({ 
-          success: false, 
-          error: "O e-mail é obrigatório." 
+        return res.status(400).json({
+          success: false,
+          error: "O e-mail é obrigatório.",
         });
       }
 
@@ -85,10 +83,50 @@ export class AuthController {
         message: "Um novo link de ativação foi enviado para o seu e-mail.",
       });
     } catch (error: any) {
-      return res.status(400).json({ 
-        success: false, 
-        error: error.message 
+      return res.status(400).json({
+        success: false,
+        error: error.message,
       });
+    }
+  }
+
+  async esqueciSenha(req: Request, res: Response) {
+    try {
+      const { email } = req.body;
+
+      // Chama o service (ele roda assíncrono e já envia o e-mail)
+      await authService.solicitarRecuperacaoSenha(email);
+
+      // Sempre retorna sucesso, mesmo se o email for inválido (medida de segurança)
+      return res.status(200).json({
+        success: true,
+        message:
+          "Se o e-mail estiver cadastrado em nosso sistema, você receberá um link com as instruções para redefinir sua senha em instantes.",
+      });
+    } catch (error: any) {
+      return res
+        .status(500)
+        .json({
+          success: false,
+          error: "Erro interno ao processar a solicitação.",
+        });
+    }
+  }
+
+  async redefinirSenha(req: Request, res: Response) {
+    try {
+      const { token, nova_senha } = req.body;
+
+      await authService.redefinirSenha(token, nova_senha);
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Sua senha foi redefinida com sucesso! Você já pode fazer login.",
+      });
+    } catch (error: any) {
+      // Vai capturar o erro de "Token inválido ou expirado" lá do Service
+      return res.status(400).json({ success: false, error: error.message });
     }
   }
 }

@@ -1,5 +1,4 @@
 import express from "express";
-import rateLimit from "express-rate-limit"
 import "dotenv/config";
 import { prisma } from "./config/prisma";
 import routes from "./routes/index.js";
@@ -7,7 +6,13 @@ import cors from "cors";
 import helmet from "helmet";
 import { globalLimiter } from "./middlewares/rateLimiter";
 
+// Importações do Sentry
+import * as Sentry from "@sentry/node";
+import { nodeProfilingIntegration } from "@sentry/profiling-node";
+
 const app = express();
+
+// (As linhas antigas requestHandler e tracingHandler foram removidas daqui)
 
 app.set("trust proxy", 1); // Avisa sobre o Nginx
 app.use(globalLimiter);    // Aplica a regra leve para tudo
@@ -38,6 +43,13 @@ app.use(express.json());
 
 app.use(routes);
 
+Sentry.setupExpressErrorHandler(app);
+
+// Seu middleware customizado
+app.use((err: any, req: any, res: any, next: any) => {
+  res.status(500).json({ error: "Erro interno do servidor" });
+});
+
 const PORT = process.env.PORT || 3333;
 
 app.get("/health", async (req, res) => {
@@ -50,5 +62,5 @@ app.get("/health", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Servidor rodando em http://localhost:${PORT}`);
+  console.log(`Servidor rodando em http://localhost:${PORT} 🚀`);
 });

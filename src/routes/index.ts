@@ -26,20 +26,18 @@ import {
 import {
   AgendarEntrevistaSchema,
   AtualizarAdminSchema,
-  AtualizarPerfilCompletoSchema,
   AtualizarPerfilEmpresaSchema,
   AtualizarUsuarioSchema,
   CadastroAdminSchema,
-  cadastroCandidatoManualSchema,
   candidatoAreaSchema,
   candidatoCompetenciaSchema,
-  CandidaturaSchema,
   ColaboradorSchema,
   ConfigurarDestaquesSchema,
   contatoSiteSchema,
   CreditosSchema,
   DashboardFiltroSchema,
   EmpresaSchema,
+  esqueciSenhaSchema,
   experienciaSchema,
   ExperienciaSchema,
   FiltroUsuarioSchema,
@@ -50,6 +48,7 @@ import {
   IdParamSchema,
   ModeracaoVagaSchema,
   QueryListagemSchema,
+  redefinirSenhaSchema,
   ResetSenhaSchema,
   sincronizarAreasSchema,
   SolicitacaoMidiaSchema,
@@ -98,6 +97,18 @@ routes.post(
   "/auth/reenviar-ativacao",
   authLimiter,
   authController.reenviarAtivacao,
+);
+
+routes.post(
+  "/auth/esqueci-senha",
+  validate(esqueciSenhaSchema),
+  authController.esqueciSenha,
+);
+
+routes.post(
+  "/auth/redefinir-senha",
+  validate(redefinirSenhaSchema),
+  authController.redefinirSenha,
 );
 
 // Rotas de Admin
