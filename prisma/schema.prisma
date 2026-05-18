@@ -325,6 +325,10 @@ model Vaga {
   observacoes_admin       String?          @db.Text
   tipo_diversidade        TipoDiversidade @default(AMPLA_CONCORRENCIA)
 
+  vaga_externa            Boolean? @default(false)
+  link_externo            String?
+  instrucoes_candidatura  String?
+
   id_area_atuacao         Int?
   area_atuacao            AreaAtuacao?     @relation(fields: [id_area_atuacao], references: [id_area])
 

@@ -191,6 +191,32 @@ export const vagaSchema = z.object({
   ocultar_salario: z.boolean().default(false),
   empresa_confidencial: z.boolean().default(false),
 
+ata_encerramento: z.any().nullable().optional().refine((val) => {
+    if (!val) return true; // Se não tiver data, deixa passar
+    
+    // Se vier do HTML (YYYY-MM-DD), adiciona T12. Se vier do Front (ISO String), usa direto.
+    const dataString = typeof val === "string" && !val.includes("T") ? `${val}T12:00:00` : val;
+    
+    const dataEscolhida = new Date(dataString);
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    
+    return dataEscolhida >= hoje;
+  }, "A data de encerramento não pode estar no passado."),
+
+  vaga_externa: z.boolean().default(false).optional(),
+  
+  link_externo: z.string()
+    .url("Insira um link válido (com https://)")
+    .nullable()
+    .optional()
+    .or(z.literal("")),
+    
+  instrucoes_candidatura: z.string()
+    .nullable()
+    .optional()
+    .or(z.literal("")),
+
   // Textos
   descricao: z.string().min(10),
   responsabilidades: z.string().min(5),
@@ -401,9 +427,21 @@ export const updateCandidatoSchema = z.object({
     .nullable(),
 
   // Profissional
-  objetivo_profissional: z.string().max(200).optional().nullable(),
+    objetivo_profissional: z
+    .string()
+    .max(200, "Tente ser mais direto no objetivo (máx 200 caracteres)")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  resumo_profissional: z
+    .string()
+    .optional()
+    .nullable()
+    .or(z.literal(""))
+    .refine((val) => !val || val.trim().length >= 20, {
+      message: "Se for preencher, escreva pelo menos 20 caracteres para um bom resumo.",
+    }),
   pretensao_salarial: z.number().positive().optional().nullable(),
-  resumo_profissional: z.string().min(20).optional().nullable(),
   id_area_atuacao: z.number().int().optional().nullable(),
   primeiro_emprego: z.boolean().default(false),
 

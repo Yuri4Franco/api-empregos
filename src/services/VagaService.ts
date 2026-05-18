@@ -3,6 +3,7 @@ import { ModeloTrabalho, StatusVaga } from "@prisma/client";
 
 export class VagaService {
   async criarVaga(dados: any, id_empresa: number, is_admin: boolean = false) {
+
     const empresa = await prisma.empresa.findUnique({
       where: { id_empresa },
       select: { tipo_vinculo_aci: true, creditos_vagas: true },
@@ -22,7 +23,6 @@ export class VagaService {
     }
 
     return await prisma.$transaction(async (tx) => {
-      // ⚠️ ADICIONAMOS FALLBACKS AQUI para o rascunho não quebrar o banco
       const endereco = await tx.endereco.create({
         data: {
           logradouro: dados.logradouro || "",
@@ -35,23 +35,19 @@ export class VagaService {
 
       const vaga = await tx.vaga.create({
         data: {
-          // --- RELACIONAMENTOS VIA CONNECT (O jeito à prova de balas do Prisma) ---
           empresa: { connect: { id_empresa: id_empresa } },
           endereco: { connect: { id_endereco: endereco.id_endereco } },
 
-          // A Área de Atuação entra condicionalmente: se tiver ID, conecta. Se não, ignora.
           ...(dados.id_area_atuacao
             ? { area_atuacao: { connect: { id_area: dados.id_area_atuacao } } }
             : {}),
 
-          // --- CAMPOS NORMAIS ---
           titulo: dados.titulo,
           nivel_hierarquico: dados.nivel_hierarquico || "NAO_INFORMADO",
           tipo_diversidade: dados.tipo_diversidade || "AMPLA_CONCORRENCIA",
           modelo_trabalho: dados.modelo_trabalho || "PRESENCIAL",
           tipo_contrato: dados.tipo_contrato || "CLT",
 
-          // Para campos de banco que aceitam nulo (Int?), o 'null' é a aposta mais segura
           faixa_salarial_de: dados.salario_de || null,
           faixa_salarial_ate: dados.salario_ate || null,
 
@@ -63,6 +59,13 @@ export class VagaService {
           diferenciais: dados.diferenciais || "",
           empresa_confidencial: dados.empresa_confidencial || false,
           status: statusFinal,
+          data_encerramento: dados.data_encerramento ? new Date(dados.data_encerramento) : null,
+          
+          vaga_externa: dados.vaga_externa || false,    
+          link_externo: dados.link_externo || null,         
+          instrucoes_candidatura: dados.instrucoes_candidatura || null,
+
+
           data_publicacao: statusFinal === "ATIVA" ? new Date() : new Date(),
         },
       });
@@ -90,7 +93,6 @@ export class VagaService {
       // Se o usuário não enviou etapas no rascunho, não criamos as padrão ainda, ou criamos as básicas
       const etapasPadrao = [
         { nome_etapa: "Inscritos", requer_agendamento: false },
-        { nome_etapa: "Triagem", requer_agendamento: false },
         { nome_etapa: "Entrevista", requer_agendamento: true },
         { nome_etapa: "Finalistas", requer_agendamento: false },
       ];
