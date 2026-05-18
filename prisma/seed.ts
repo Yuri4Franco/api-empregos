@@ -5,14 +5,14 @@ import argon2 from "argon2";
 async function main() {
   console.log("🌱 Iniciando seeding...");
 
-  const emailAdmin = "admin@aciempregos.com.br";
+  const emailAdmin = "admin@acivagas.com.br";
 
   const adminExistente = await prisma.usuario.findUnique({
     where: { email: emailAdmin },
   });
 
   if (!adminExistente) {
-    const senhaHash = await argon2.hash("@ICA#19364$4dm4c13mpr3g05");
+    const senhaHash = await argon2.hash("@ICA#19364$#acivagas");
 
     await prisma.usuario.create({
       data: {
