@@ -180,7 +180,7 @@ model Candidato {
   tipo_pcd                String?
   necessidade             String?
 
-  tipo_contato            TipoContato? @default(WHATSAPP)
+  tipo_contato            TipoContato[]
   perfil_visivel_empresas Boolean   @default(false)
   objetivo_profissional   String?
   pretensao_salarial      Decimal?  @db.Decimal(10, 2)

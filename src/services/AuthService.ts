@@ -141,6 +141,7 @@ export class AuthService {
           id_usuario: user.id_usuario,
           turno_preferido: ["QUALQUER_TURNO"],
           cnh: ["NAO_POSSUO"],
+          tipo_contato: ["WHATSAPP"],
         },
       });
 

@@ -1,27 +1,95 @@
 import { transporter } from "../config/mailer";
 
 export class EmailService {
+  // ============================================================================
+  // TEMPLATE BASE DE E-MAIL (Header e Footer)
+  // ============================================================================
+  private gerarTemplateEmail(conteudoHtml: string): string {
+    // ⚠️ SUBSTITUA ESTES LINKS PELAS URLS REAIS DAS SUAS LOGOS APÓS HOSPEDÁ-LAS
+    const logoAciVagas = "https://seusite.com.br/logo-aci-vagas.png";
+    const logoAciPanambi = "https://seusite.com.br/logo-aci-panambi.png";
+    const linkWhatsApp = "https://wa.me/555533759350"; // Link direto pro WhatsApp
+
+    return `
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="margin: 0; padding: 0; background-color: #f4f7f6; font-family: Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f7f6; padding: 20px 10px;">
+          <tr>
+            <td align="center">
+              <table width="100%" max-width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                
+                <tr>
+                  <td align="center" style="background-color: #003366; padding: 30px 20px;">
+                    <img src="${logoAciVagas}" alt="ACI Vagas" style="max-height: 50px; width: auto; display: block;" />
+                  </td>
+                </tr>
+
+                <tr>
+                  <td style="padding: 40px 30px; color: #333333; font-size: 16px; line-height: 1.6;">
+                    ${conteudoHtml}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 40px 30px; text-align: center; color: #64748b; font-size: 14px; line-height: 1.5;">
+                    <img src="${logoAciPanambi}" alt="ACI Panambi" style="max-height: 40px; width: auto; margin-bottom: 20px; display: inline-block;" />
+                    
+                    <p style="margin: 0 0 10px 0; font-weight: bold; color: #334155;">Associação Comercial e Industrial de Panambi</p>
+                    <p style="margin: 0 0 5px 0;">R. Konrad Adenauer, 555 - Sala B - Centro</p>
+                    <p style="margin: 0 0 15px 0;">Panambi - RS, 98280-000</p>
+                    
+                    <p style="margin: 0 0 20px 0;">
+                      <a href="mailto:recepcao@aci.panambi.com.br" style="color: #0056b3; text-decoration: none;">recepcao@aci.panambi.com.br</a><br>
+                      (55) 3375-9350
+                    </p>
+
+                    <a href="${linkWhatsApp}" style="display: inline-block; background-color: #25D366; color: #ffffff; text-decoration: none; font-weight: bold; padding: 12px 24px; border-radius: 6px; font-size: 14px;">
+                      Falar no WhatsApp
+                    </a>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
+  }
+
+  // ============================================================================
+  // MÉTODOS DE ENVIO (Usando o template base)
+  // ============================================================================
+
   async enviarEmailAtivacao(email: string, nome: string, token: string) {
     const urlAtivacao = `${process.env.APP_URL}/ativar/${token}`;
+
+    const conteudo = `
+      <h2 style="color: #003366; margin-top: 0;">Olá, ${nome}!</h2>
+      <p>Seja bem-vindo à plataforma <strong>ACI Vagas</strong>.</p>
+      <p>Para concluir seu cadastro de forma segura e começar a se candidatar às vagas exclusivas da nossa região, clique no botão abaixo:</p>
+      
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="${urlAtivacao}" style="background-color: #0056b3; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px;">
+          Ativar Minha Conta
+        </a>
+      </div>
+
+      <p style="margin-bottom: 5px;">Se o botão não funcionar, copie e cole este link no seu navegador:</p>
+      <p style="font-size: 13px; color: #0056b3; word-break: break-all;">${urlAtivacao}</p>
+    `;
 
     const mailOptions = {
       from: `"ACI Vagas" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: "Ative sua conta - ACI Vagas",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px;">
-          <h2>Olá, ${nome}!</h2>
-          <p>Seja bem-vindo à plataforma <strong>ACI Vagas</strong>.</p>
-          <p>Para concluir seu cadastro e começar a se candidatar às vagas, clique no botão abaixo:</p>
-          <a href="${urlAtivacao}" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0;">
-            Ativar Minha Conta
-          </a>
-          <p>Se o botão não funcionar, copie e cole este link no seu navegador:</p>
-          <p>${urlAtivacao}</p>
-          <hr />
-          <p style="font-size: 12px; color: #666;">Este link é válido para ativação imediata. </p>
-        </div>
-      `,
+      html: this.gerarTemplateEmail(conteudo), // ✨ Aplicando o template
     };
 
     return await transporter.sendMail(mailOptions);
@@ -33,53 +101,56 @@ export class EmailService {
     assunto: string,
     mensagem: string,
   ) {
+    const conteudo = `
+      <h2 style="color: #003366; margin-top: 0; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Novo Contato Pelo Site</h2>
+      <p><strong>Empresa/Responsável:</strong> ${nome}</p>
+      <p><strong>E-mail de Retorno:</strong> <a href="mailto:${emailContato}" style="color: #0056b3;">${emailContato}</a></p>
+      <p><strong>Assunto:</strong> ${assunto}</p>
+      
+      <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 25px;">
+        <p style="margin-top: 0; font-weight: bold; color: #475569; font-size: 14px;">Mensagem:</p>
+        <p style="white-space: pre-wrap; margin-bottom: 0; color: #334155;">${mensagem}</p>
+      </div>
+    `;
+
     const mailOptions = {
       from: `"ACI Vagas" <${process.env.EMAIL_USER}>`,
       to: "comercial@acipanambi.com.br",
       replyTo: emailContato,
-      subject: `Novo Contato pelo Site: ${assunto}`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; color: #333; background-color: #f4f7f6; padding: 20px; border-radius: 8px;">
-          <div style="background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-            <h2 style="color: #0056b3; margin-top: 0;">Novo formulário de contato - ACI Vagas</h2>
-            <p style="font-size: 16px;"><strong>Empresa/Responsável:</strong> ${nome}</p>
-            <p style="font-size: 16px;"><strong>E-mail:</strong> ${emailContato}</p>
-            <p style="font-size: 16px;"><strong>Assunto:</strong> ${assunto}</p>
-            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-            <p style="font-size: 16px; font-weight: bold;">Mensagem:</p>
-            <p style="white-space: pre-wrap; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">${mensagem}</p>
-          </div>
-        </div>
-      `,
+      subject: `Nova Mensagem: ${assunto}`,
+      html: this.gerarTemplateEmail(conteudo), // ✨ Aplicando o template
     };
 
     return await transporter.sendMail(mailOptions);
   }
 
   async enviarEmailRecuperacao(email: string, nome: string, token: string) {
-    // O seu Front-end deve ter uma rota que receba este token na URL
     const urlRecuperacao = `${process.env.APP_URL}/recuperar-senha/${token}`;
+
+    const conteudo = `
+      <h2 style="color: #003366; margin-top: 0;">Olá, ${nome}!</h2>
+      <p>Recebemos um pedido para redefinir a senha da sua conta no ACI Vagas.</p>
+      <p>Se foi você que fez a solicitação, clique no botão abaixo para criar uma nova senha com segurança:</p>
+      
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="${urlRecuperacao}" style="background-color: #10b981; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px;">
+          Redefinir Minha Senha
+        </a>
+      </div>
+
+      <p style="margin-bottom: 5px;">Ou copie e cole o link abaixo no seu navegador:</p>
+      <p style="font-size: 13px; color: #0056b3; word-break: break-all;">${urlRecuperacao}</p>
+      
+      <p style="font-size: 13px; color: #64748b; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+        <strong>Importante:</strong> Este link tem validade de 1 hora. Se você não solicitou a troca de senha, pode ignorar este e-mail tranquilamente.
+      </p>
+    `;
 
     const mailOptions = {
       from: `"ACI Vagas" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: "Recuperação de Senha - ACI Vagas",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; color: #333;">
-          <h2>Olá, ${nome}!</h2>
-          <p>Recebemos um pedido para redefinir a senha da sua conta no ACI Vagas.</p>
-          <p>Se foi você que fez a solicitação, clique no botão abaixo para criar uma nova senha:</p>
-          <a href="${urlRecuperacao}" style="background: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; margin: 20px 0;">
-            Redefinir Minha Senha
-          </a>
-          <p>Ou copie e cole o link abaixo no seu navegador:</p>
-          <p style="word-break: break-all; color: #666;">${urlRecuperacao}</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="font-size: 12px; color: #999;">
-            Este link tem validade de 1 hora. Se você não solicitou a troca de senha, pode ignorar este e-mail. Sua conta continuará segura.
-          </p>
-        </div>
-      `,
+      html: this.gerarTemplateEmail(conteudo),
     };
 
     return await transporter.sendMail(mailOptions);

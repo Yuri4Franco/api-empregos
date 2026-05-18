@@ -33,7 +33,9 @@ export const redefinirSenhaSchema = z.object({
 
 export const TrocarSenha = z.object({
   nova_senha: SenhaForte,
-  senha_atual: z.string().min(1, "A senha atual é obrigatória para trocar a senha."),
+  senha_atual: z
+    .string()
+    .min(1, "A senha atual é obrigatória para trocar a senha."),
 });
 
 const CandidatoBaseSchema = z.object({
@@ -191,31 +193,34 @@ export const vagaSchema = z.object({
   ocultar_salario: z.boolean().default(false),
   empresa_confidencial: z.boolean().default(false),
 
-ata_encerramento: z.any().nullable().optional().refine((val) => {
-    if (!val) return true; // Se não tiver data, deixa passar
-    
-    // Se vier do HTML (YYYY-MM-DD), adiciona T12. Se vier do Front (ISO String), usa direto.
-    const dataString = typeof val === "string" && !val.includes("T") ? `${val}T12:00:00` : val;
-    
-    const dataEscolhida = new Date(dataString);
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    
-    return dataEscolhida >= hoje;
-  }, "A data de encerramento não pode estar no passado."),
+  ata_encerramento: z
+    .any()
+    .nullable()
+    .optional()
+    .refine((val) => {
+      if (!val) return true; // Se não tiver data, deixa passar
+
+      // Se vier do HTML (YYYY-MM-DD), adiciona T12. Se vier do Front (ISO String), usa direto.
+      const dataString =
+        typeof val === "string" && !val.includes("T") ? `${val}T12:00:00` : val;
+
+      const dataEscolhida = new Date(dataString);
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+
+      return dataEscolhida >= hoje;
+    }, "A data de encerramento não pode estar no passado."),
 
   vaga_externa: z.boolean().default(false).optional(),
-  
-  link_externo: z.string()
+
+  link_externo: z
+    .string()
     .url("Insira um link válido (com https://)")
     .nullable()
     .optional()
     .or(z.literal("")),
-    
-  instrucoes_candidatura: z.string()
-    .nullable()
-    .optional()
-    .or(z.literal("")),
+
+  instrucoes_candidatura: z.string().nullable().optional().or(z.literal("")),
 
   // Textos
   descricao: z.string().min(10),
@@ -278,7 +283,7 @@ export const FiltroVagasEmpresaSchema = z.object({
       "REPROVADA",
       "PAUSADA",
       "ENCERRADA",
-      "AGUARDANDO_PAGAMENTO"
+      "AGUARDANDO_PAGAMENTO",
     ])
     .optional(),
 });
@@ -419,7 +424,7 @@ export const updateCandidatoSchema = z.object({
     .optional()
     .nullable()
     .or(z.literal("")),
-    link_outro: z
+  link_outro: z
     .string()
     .url("URL inválida")
     .optional()
@@ -427,7 +432,7 @@ export const updateCandidatoSchema = z.object({
     .nullable(),
 
   // Profissional
-    objetivo_profissional: z
+  objetivo_profissional: z
     .string()
     .max(200, "Tente ser mais direto no objetivo (máx 200 caracteres)")
     .optional()
@@ -439,7 +444,8 @@ export const updateCandidatoSchema = z.object({
     .nullable()
     .or(z.literal(""))
     .refine((val) => !val || val.trim().length >= 20, {
-      message: "Se for preencher, escreva pelo menos 20 caracteres para um bom resumo.",
+      message:
+        "Se for preencher, escreva pelo menos 20 caracteres para um bom resumo.",
     }),
   pretensao_salarial: z.number().positive().optional().nullable(),
   id_area_atuacao: z.number().int().optional().nullable(),
@@ -448,20 +454,27 @@ export const updateCandidatoSchema = z.object({
   disponibilidade_viagem: z.boolean().optional(),
   disponibilidade_mudanca: z.boolean().optional(),
   disponibilidade_sabados: z.boolean().optional(),
-turno_preferido: z
-    .array(z.enum(["PRIMEIRO_TURNO", "SEGUNDO_TURNO", "TERCEIRO_TURNO", "HORARIO_COMERCIAL", "QUALQUER_TURNO"]))
+  turno_preferido: z
+    .array(
+      z.enum([
+        "PRIMEIRO_TURNO",
+        "SEGUNDO_TURNO",
+        "TERCEIRO_TURNO",
+        "HORARIO_COMERCIAL",
+        "QUALQUER_TURNO",
+      ]),
+    )
     .max(3, "Você pode selecionar no máximo 3 turnos")
     .optional()
     .default([]),
   tipo_contato: z
-    .enum(["WHATSAPP", "EMAIL", "LIGACAO", "QUALQUER_UM"])
-    .optional()
-    .nullable(),
+    .array(z.enum(["WHATSAPP", "EMAIL", "LIGACAO", "QUALQUER_UM"]))
+    .default(["QUALQUER_UM"]),
 
   pcd: z.boolean().optional(),
   tipo_pcd: z.string().optional().nullable(),
   necessidade: z.string().max(300, "Texto muito longo").optional().nullable(),
-   cnh: z
+  cnh: z
     .array(z.enum(["NAO_POSSUO", "A", "B", "C", "D", "E"]))
     .optional()
     .default(["NAO_POSSUO"]),
@@ -513,7 +526,8 @@ export const formacaoSchema = z
   })
   .refine(
     (data) => {
-      const isBasico = data.nivel === "Ensino Fundamental" || data.nivel === "Ensino Médio";
+      const isBasico =
+        data.nivel === "Ensino Fundamental" || data.nivel === "Ensino Médio";
       const isConcluido = data.status.toUpperCase() === "CONCLUÍDO";
 
       if (!isBasico && isConcluido && !data.data_conclusao) {
@@ -563,10 +577,11 @@ export const candidatoAreaSchema = z.object({
   id_area: z.number().int().positive("Área de atuação inválida"),
 });
 
-
 export const contatoSiteSchema = z.object({
   nome: z.string().min(2, "O nome da empresa/responsável é obrigatório."),
   email: z.string().email("Informe um e-mail válido."),
   assunto: z.string().min(2, "O assunto é obrigatório."),
-  mensagem: z.string().min(10, "Escreva uma mensagem de pelo menos 10 caracteres."),
+  mensagem: z
+    .string()
+    .min(10, "Escreva uma mensagem de pelo menos 10 caracteres."),
 });
