@@ -6,8 +6,8 @@ export class EmailService {
   // ============================================================================
   private gerarTemplateEmail(conteudoHtml: string): string {
     // ⚠️ SUBSTITUA ESTES LINKS PELAS URLS REAIS DAS SUAS LOGOS APÓS HOSPEDÁ-LAS
-    const logoAciVagas = "https://seusite.com.br/logo-aci-vagas.png";
-    const logoAciPanambi = "https://seusite.com.br/logo-aci-panambi.png";
+    const logoAciVagas = "https://acivagas.com.br/logo_aci_vagas.webp";
+    const logoAciPanambi = "https://acivagas.com.br/logo_aci.webp";
     const linkWhatsApp = "https://wa.me/555533759350"; // Link direto pro WhatsApp
 
     return `
