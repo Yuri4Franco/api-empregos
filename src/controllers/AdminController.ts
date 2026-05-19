@@ -204,6 +204,31 @@ export class AdminController {
     }
   }
 
+  async listarUsuarios(req: Request, res: Response) {
+    try {
+      // Extrai os filtros da Query String da URL
+      const { tipo, busca, page, limit } = req.query;
+
+      const resultado = await adminService.listarUsuarios({
+        tipo: tipo as string,
+        busca: busca as string,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+      });
+
+      return res.status(200).json({
+        success: true,
+        ...resultado,
+      });
+    } catch (error: any) {
+      console.error("Erro ao listar usuários:", error);
+      return res.status(400).json({
+        success: false,
+        error: "Erro ao buscar a lista de usuários.",
+      });
+    }
+  }
+
   // Resetar senha de qualquer usuário (Forçar troca)
   async resetarSenhaUsuario(req: Request, res: Response) {
     try {
@@ -492,6 +517,31 @@ export class AdminController {
       return res.status(200).json({ success: true, data: resultado });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  async listarVagas(req: Request, res: Response) {
+    try {
+      const id_empresa = Number(req.params.id);
+
+      if (!id_empresa || isNaN(id_empresa)) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "ID da empresa inválido." 
+        });
+      }
+
+      const vagas = await adminService.listarVagasDaEmpresa(id_empresa);
+
+      return res.status(200).json({
+        success: true,
+        data: vagas,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ 
+        success: false, 
+        error: error.message 
+      });
     }
   }
 }

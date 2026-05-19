@@ -248,7 +248,8 @@ model Empresa {
   creditos_vagas      Int            @default(0)
   creditos_curriculos Int            @default(0)
   status              StatusGeral  @default(ATIVO)
-
+  criado_em           DateTime      @default(now())
+ 
   usuarios             Usuario[]
   vagas                Vaga[]
   beneficios_padrao    EmpresaBeneficioPadrao[]

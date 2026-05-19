@@ -90,7 +90,7 @@ const empresaDashboardController = new EmpresaDashboardController();
 const empresaPublicaController = new EmpresaPublicaController();
 const contatoController = new ContatoController();
 const adminCompetenciaController = new AdminCompetenciaController();
-const adminDashboardController = new AdminDashboardController()
+const adminDashboardController = new AdminDashboardController();
 
 routes.post("/login", authLimiter, authController.login);
 
@@ -133,6 +133,12 @@ routes.get(
   adminController.listarEmpresas,
 );
 
+routes.get(
+  "/admin/empresas/:id/vagas",
+  authMiddleware(["ADM"]),
+  adminController.listarVagas
+);
+
 // Detalhar empresa - OK
 routes.get(
   "/admin/empresas/:id",
@@ -156,16 +162,22 @@ routes.patch(
 routes.get(
   "/admin/dashboard/resumo",
   authMiddleware(["ADM"]), // 🔒 Bloqueia empresas e candidatos
-  adminDashboardController.resumo
+  adminDashboardController.resumo,
 );
 
-// Adicionar usuário a empres - fora do piloto
+// Adicionar usuário a empres - ok
 routes.post(
   "/admin/empresas/:id/usuarios",
   authMiddleware(["ADM"]),
   validate(IdParamSchema, "params"),
   validate(ColaboradorSchema, "body"),
   adminController.cadastrarUsuarioEmEmpresa,
+);
+
+routes.get(
+  "/admin/usuarios",
+  authMiddleware(["ADM"]),
+  adminController.listarUsuarios,
 );
 
 // Gerenciamento de Usuários - fora do piloto
@@ -463,26 +475,26 @@ routes.get("/taxonomia/competencias", taxonomiaController.listarCompetencias);
 routes.get(
   "/admin/competencias/pendentes",
   authMiddleware(["ADM"]),
-  adminCompetenciaController.listarPendentes
+  adminCompetenciaController.listarPendentes,
 );
 
 routes.patch(
   "/admin/competencias/:id/aprovar",
   authMiddleware(["ADM"]),
-  adminCompetenciaController.aprovar
+  adminCompetenciaController.aprovar,
 );
 
 routes.patch(
   "/admin/competencias/:id/rejeitar",
   authMiddleware(["ADM"]),
-  adminCompetenciaController.rejeitar
+  adminCompetenciaController.rejeitar,
 );
 
 routes.put(
   "/admin/competencias/:id/editar",
   authMiddleware(["ADM"]),
   validate(editarCompetenciaSchema),
-  adminCompetenciaController.editarEAprovar
+  adminCompetenciaController.editarEAprovar,
 );
 
 // Empresa  - Gestão de Perfil Institucional
@@ -739,7 +751,7 @@ routes.post(
 routes.post(
   "/candidato/competencias/sugerir",
   authMiddleware(["CANDIDATO"]),
-  competenciaController.sugerir
+  competenciaController.sugerir,
 );
 
 routes.delete(
@@ -913,8 +925,6 @@ routes.post(
   validate(contatoSiteSchema),
   contatoController.enviarContato,
 );
-
-
 
 routes.get("/admin/vagas", authMiddleware(["ADM"]), vagaController.listarAdmin);
 

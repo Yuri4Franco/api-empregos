@@ -2,6 +2,7 @@ import { prisma } from "../config/prisma.js";
 import argon2 from "argon2";
 import { BaseUserService } from "./BaseUserService";
 import { generateSlug } from "../utils/slugify.js";
+import type { TipoUsuario } from "@prisma/client";
 
 const baseUser = new BaseUserService();
 
@@ -19,90 +20,161 @@ export class AdminService {
    */
 
   // Cadastrar nova empresa + primeiro usuário vinculado
-async cadastrarEmpresa(dados: any, id_autor: number) {
-  const cnpjLimpo = dados.cnpj.replace(/\D/g, "");
-  
-  // 1. Geração do Slug
-  const slugBase = generateSlug(dados.nome_fantasia);
 
-  // 2. Verificações Prévias (Fail Fast)
-  const [eExistente, uExistente, slugExistente] = await Promise.all([
-    prisma.empresa.findUnique({ where: { cnpj: cnpjLimpo } }),
-    prisma.usuario.findUnique({ where: { email: dados.email } }),
-    prisma.empresa.findUnique({ where: { slug: slugBase } }) // Verifica se o link já existe
-  ]);
+  async listarUsuarios(filtros: {
+    tipo?: string | undefined;
+    busca?: string | undefined;
+    page?: number | undefined;
+    limit?: number | undefined;
+  }) {
+    const page = filtros.page || 1;
+    const limit = filtros.limit || 20;
+    const skip = (page - 1) * limit;
 
-  if (eExistente) throw new Error("CNPJ já cadastrado.");
-  if (uExistente) throw new Error("E-mail de usuário já cadastrado.");
-  
-  // Se o slug já existir, avisamos para o admin adicionar um diferencial (ex: nome da cidade ou bairro)
-  if (slugExistente) {
-    throw new Error(
-      `O nome fantasia "${dados.nome_fantasia}" gera um link (slug) que já está em uso. Por favor, adicione um diferencial ao nome fantasia (ex: ${dados.nome_fantasia} - Centro).`
-    );
+    const onde: any = {};
+
+    // 1. Filtro por Tipo (CANDIDATO, EMPRESA, ADM)
+    if (
+      filtros.tipo &&
+      ["ADM", "CANDIDATO", "EMPRESA"].includes(filtros.tipo.toUpperCase())
+    ) {
+      onde.tipo_usuario = filtros.tipo.toUpperCase() as TipoUsuario;
+    }
+
+    // 2. Filtro de Busca (Nome ou E-mail)
+    if (filtros.busca) {
+      onde.OR = [
+        { nome: { contains: filtros.busca, mode: "insensitive" } },
+        { email: { contains: filtros.busca, mode: "insensitive" } },
+      ];
+    }
+
+    // 🚀 Consultas em paralelo para performance
+    const [total, usuarios] = await Promise.all([
+      prisma.usuario.count({ where: onde }),
+
+      prisma.usuario.findMany({
+        where: onde,
+        skip,
+        take: limit,
+        orderBy: { criado_em: "desc" },
+        // ✨ A MÁGICA DA SEGURANÇA: Oculta senha_hash, tokens e dados sensíveis
+        select: {
+          id_usuario: true,
+          nome: true,
+          email: true,
+          tipo_usuario: true,
+          status: true,
+          is_master: true,
+          ultimo_login: true,
+          criado_em: true,
+          // Se for uma conta de EMPRESA, traz os dados básicos dela
+          empresa: {
+            select: {
+              id_empresa: true,
+              nome_fantasia: true,
+              cnpj: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      meta: {
+        total,
+        page,
+        limit,
+        total_paginas: Math.ceil(total / limit),
+      },
+      data: usuarios,
+    };
   }
 
-  const senha_hash = await argon2.hash(dados.senha);
+  async cadastrarEmpresa(dados: any, id_autor: number) {
+    const cnpjLimpo = dados.cnpj.replace(/\D/g, "");
 
-  return await prisma.$transaction(async (tx) => {
-    // Cadastro do Endereço
-    const endereco = await tx.endereco.create({
-      data: {
-        logradouro: dados.logradouro,
-        numero: dados.numero,
-        complemento: dados.complemento || null,
-        cep: dados.cep,
-        cidade: dados.cidade || "Panambi",
-        uf: dados.uf || "RS",
-        bairro: dados.bairro,
-      },
+    // 1. Geração do Slug
+    const slugBase = generateSlug(dados.nome_fantasia);
+
+    // 2. Verificações Prévias (Fail Fast)
+    const [eExistente, uExistente, slugExistente] = await Promise.all([
+      prisma.empresa.findUnique({ where: { cnpj: cnpjLimpo } }),
+      prisma.usuario.findUnique({ where: { email: dados.email } }),
+      prisma.empresa.findUnique({ where: { slug: slugBase } }), // Verifica se o link já existe
+    ]);
+
+    if (eExistente) throw new Error("CNPJ já cadastrado.");
+    if (uExistente) throw new Error("E-mail de usuário já cadastrado.");
+
+    // Se o slug já existir, avisamos para o admin adicionar um diferencial (ex: nome da cidade ou bairro)
+    if (slugExistente) {
+      throw new Error(
+        `O nome fantasia "${dados.nome_fantasia}" gera um link (slug) que já está em uso. Por favor, adicione um diferencial ao nome fantasia (ex: ${dados.nome_fantasia} - Centro).`,
+      );
+    }
+
+    const senha_hash = await argon2.hash(dados.senha);
+
+    return await prisma.$transaction(async (tx) => {
+      // Cadastro do Endereço
+      const endereco = await tx.endereco.create({
+        data: {
+          logradouro: dados.logradouro,
+          numero: dados.numero,
+          complemento: dados.complemento || null,
+          cep: dados.cep,
+          cidade: dados.cidade || "Panambi",
+          uf: dados.uf || "RS",
+          bairro: dados.bairro,
+        },
+      });
+
+      // Cadastro da Empresa com o SLUG
+      const empresa = await tx.empresa.create({
+        data: {
+          cnpj: cnpjLimpo,
+          razao_social: dados.razao_social,
+          nome_fantasia: dados.nome_fantasia,
+          slug: slugBase, // ✨ O novo campo aqui
+          email: dados.email_institucional || null,
+          tipo_vinculo_aci: dados.tipo_vinculo_aci || "NAO_ASSOCIADA",
+          id_endereco: endereco.id_endereco,
+        },
+      });
+
+      // Cadastro do Usuário Master da Empresa
+      const usuario = await tx.usuario.create({
+        data: {
+          nome: dados.nome,
+          email: dados.email,
+          senha_hash,
+          tipo_usuario: "EMPRESA",
+          status: "ATIVO",
+          id_empresa: empresa.id_empresa,
+          exigir_troca_senha: true,
+          is_master: true, // Importante para as permissões que discutimos antes
+        },
+      });
+
+      // Log de Auditoria
+      await baseUser.registrarLog(
+        tx,
+        id_autor,
+        "CADASTRAR_EMPRESA",
+        "Empresa",
+        empresa.id_empresa,
+        {
+          razao_social: empresa.razao_social,
+          slug: empresa.slug,
+          vinculo: empresa.tipo_vinculo_aci,
+        },
+      );
+
+      return { usuario, empresa };
     });
-
-    // Cadastro da Empresa com o SLUG
-    const empresa = await tx.empresa.create({
-      data: {
-        cnpj: cnpjLimpo,
-        razao_social: dados.razao_social,
-        nome_fantasia: dados.nome_fantasia,
-        slug: slugBase, // ✨ O novo campo aqui
-        email: dados.email_institucional || null,
-        tipo_vinculo_aci: dados.tipo_vinculo_aci || "NAO_ASSOCIADA",
-        id_endereco: endereco.id_endereco,
-      },
-    });
-
-    // Cadastro do Usuário Master da Empresa
-    const usuario = await tx.usuario.create({
-      data: {
-        nome: dados.nome,
-        email: dados.email,
-        senha_hash,
-        tipo_usuario: "EMPRESA",
-        status: "ATIVO",
-        id_empresa: empresa.id_empresa,
-        exigir_troca_senha: true,
-        is_master: true, // Importante para as permissões que discutimos antes
-      },
-    });
-
-    // Log de Auditoria
-    await baseUser.registrarLog(
-      tx,
-      id_autor,
-      "CADASTRAR_EMPRESA",
-      "Empresa",
-      empresa.id_empresa,
-      {
-        razao_social: empresa.razao_social,
-        slug: empresa.slug,
-        vinculo: empresa.tipo_vinculo_aci,
-      },
-    );
-
-    return { usuario, empresa };
-  });
-}
-//89
+  }
+  //89
   async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
     const empresaExistente = await prisma.empresa.findUnique({
       where: { id_empresa },
@@ -260,7 +332,7 @@ async cadastrarEmpresa(dados: any, id_autor: number) {
             email: true,
             status: true,
             ultimo_login: true,
-          }, 
+          },
         },
         vagas: true,
         endereco: true,
@@ -504,7 +576,6 @@ async cadastrarEmpresa(dados: any, id_autor: number) {
     const { senha_hash, ...dadosSeguros } = perfil;
     return dadosSeguros;
   }
-
 
   // Adicionar Experiência Profissional
   async adicionarExperienciaCandidato(
@@ -989,5 +1060,34 @@ async cadastrarEmpresa(dados: any, id_autor: number) {
 
       return pedido;
     });
+  }
+
+  async listarVagasDaEmpresa(id_empresa: number) {
+    // Verifica se a empresa existe antes de buscar as vagas
+    const empresaExiste = await prisma.empresa.findUnique({
+      where: { id_empresa },
+      select: { id_empresa: true },
+    });
+
+    if (!empresaExiste) {
+      throw new Error("Empresa não encontrada no sistema.");
+    }
+
+    const vagas = await prisma.vaga.findMany({
+      where: { id_empresa },
+      orderBy: { data_publicacao: "desc" }, // Mostra as vagas mais recentes primeiro
+      select: {
+        id_vaga: true,
+        titulo: true,
+        status: true,
+        modelo_trabalho: true,
+        data_publicacao: true,
+        _count: {
+          select: { candidaturas: true },
+        },
+      },
+    });
+
+    return vagas;
   }
 }

@@ -93,8 +93,7 @@ export class AuthController {
   async esqueciSenha(req: Request, res: Response) {
     try {
       const { email } = req.body;
-
-      // Chama o service (ele roda assíncrono e já envia o e-mail)
+      
       await authService.solicitarRecuperacaoSenha(email);
 
       // Sempre retorna sucesso, mesmo se o email for inválido (medida de segurança)
