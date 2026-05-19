@@ -560,9 +560,16 @@ model FormacaoAcademica {
   @@map("formacoes_academicas")
 }
 
+enum StatusCompetencia {
+  APROVADA
+  PENDENTE
+  REJEITADA
+}
+
 model Competencia {
   id_competencia Int                    @id @default(autoincrement())
   nome           String                 @unique
+  status         StatusCompetencia @default(APROVADA)
   candidatos     CandidatoCompetencia[]
   vagas          VagaCompetencia[]
 

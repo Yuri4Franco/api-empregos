@@ -34,4 +34,34 @@ export class CompetenciaController {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
+
+  async sugerir(req: Request, res: Response) {
+    try {
+      const id_candidato = (req.user as any).id;
+      const { nome, nivel } = req.body;
+
+      if (!nome || !nivel) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "O nome e o nível da habilidade são obrigatórios." 
+        });
+      }
+
+      // Chama a nossa nova inteligência de roteamento de competências
+      const novaCompetencia = await competenciaService.sugerirOuVincularCompetencia(
+        id_candidato,
+        nome,
+        nivel
+      );
+
+      return res.status(201).json({
+        success: true,
+        message: "Habilidade adicionada ao seu currículo com sucesso!",
+        data: novaCompetencia,
+      });
+
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
 }

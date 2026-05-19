@@ -18,6 +18,8 @@ import { NotificacaoController } from "../controllers/NotificacaoController.js";
 import { EmpresaDashboardController } from "../controllers/EmpresaDashboardController.js";
 import { EmpresaPublicaController } from "../controllers/EmpresaPublicaController.js";
 import { ContatoController } from "../controllers/ContatoController.js";
+import { AdminCompetenciaController } from "../controllers/AdminCompetenciaController.js";
+import { AdminDashboardController } from "../controllers/AdminDashboardController.js";
 import {
   uploadBanner,
   uploadLogo,
@@ -36,6 +38,7 @@ import {
   contatoSiteSchema,
   CreditosSchema,
   DashboardFiltroSchema,
+  editarCompetenciaSchema,
   EmpresaSchema,
   esqueciSenhaSchema,
   experienciaSchema,
@@ -86,6 +89,8 @@ const notificacaoController = new NotificacaoController();
 const empresaDashboardController = new EmpresaDashboardController();
 const empresaPublicaController = new EmpresaPublicaController();
 const contatoController = new ContatoController();
+const adminCompetenciaController = new AdminCompetenciaController();
+const adminDashboardController = new AdminDashboardController()
 
 routes.post("/login", authLimiter, authController.login);
 
@@ -143,6 +148,15 @@ routes.patch(
   validate(IdParamSchema, "params"),
   validate(StatusEmpresaSchema, "body"),
   adminController.alterarStatusEmpresa,
+);
+
+// =========================================================
+// DASHBOARD ADM
+// =========================================================
+routes.get(
+  "/admin/dashboard/resumo",
+  authMiddleware(["ADM"]), // 🔒 Bloqueia empresas e candidatos
+  adminDashboardController.resumo
 );
 
 // Adicionar usuário a empres - fora do piloto
@@ -342,7 +356,7 @@ routes.get(
   "/admin/vagas/pendentes",
   authMiddleware(["ADM"]),
   validate(QueryListagemSchema, "query"),
-  adminVagaController.listarPendentes,
+  adminVagaController.listarPendencias,
 );
 
 // ok
@@ -445,6 +459,31 @@ routes.get(
 );
 
 routes.get("/taxonomia/competencias", taxonomiaController.listarCompetencias);
+
+routes.get(
+  "/admin/competencias/pendentes",
+  authMiddleware(["ADM"]),
+  adminCompetenciaController.listarPendentes
+);
+
+routes.patch(
+  "/admin/competencias/:id/aprovar",
+  authMiddleware(["ADM"]),
+  adminCompetenciaController.aprovar
+);
+
+routes.patch(
+  "/admin/competencias/:id/rejeitar",
+  authMiddleware(["ADM"]),
+  adminCompetenciaController.rejeitar
+);
+
+routes.put(
+  "/admin/competencias/:id/editar",
+  authMiddleware(["ADM"]),
+  validate(editarCompetenciaSchema),
+  adminCompetenciaController.editarEAprovar
+);
 
 // Empresa  - Gestão de Perfil Institucional
 routes.put(
@@ -697,6 +736,12 @@ routes.post(
   competenciaController.store,
 );
 
+routes.post(
+  "/candidato/competencias/sugerir",
+  authMiddleware(["CANDIDATO"]),
+  competenciaController.sugerir
+);
+
 routes.delete(
   "/candidato/competencias/:id_competencia",
   authMiddleware(["CANDIDATO"]),
@@ -868,6 +913,8 @@ routes.post(
   validate(contatoSiteSchema),
   contatoController.enviarContato,
 );
+
+
 
 routes.get("/admin/vagas", authMiddleware(["ADM"]), vagaController.listarAdmin);
 

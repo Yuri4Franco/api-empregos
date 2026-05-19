@@ -143,6 +143,10 @@ export const AtualizarPerfilCompletoSchema = z.object({
   competencias: z.array(z.any()).optional(),
 });
 
+export const editarCompetenciaSchema = z.object({
+  novo_nome: z.string().min(2, "O nome oficial deve ter pelo menos 2 caracteres."),
+});
+
 // 5. Filtros e Listagens
 export const QueryListagemSchema = z.object({
   page: z.coerce.number().default(1),

@@ -609,53 +609,27 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
     }
   }
 
-  async listarVagasPendentes(filtros: any) {
-    const page = Number(filtros.page) || 1;
-    const limit = Number(filtros.limit) || 10;
-    const search = filtros.search;
-
-    const skip = (page - 1) * limit;
-
-    const onde: any = {
-      status: "EM_ANALISE", // Filtro fixo da fila de aprovação
-      AND: [
-        search
-          ? {
-              OR: [
-                { titulo: { contains: search, mode: "insensitive" } },
-                {
-                  empresa: {
-                    nome_fantasia: { contains: search, mode: "insensitive" },
-                  },
-                },
-              ],
-            }
-          : {},
-      ],
-    };
-
-    const [total, vagas] = await Promise.all([
-      prisma.vaga.count({ where: onde }),
-      prisma.vaga.findMany({
-        where: onde,
-        skip,
-        take: limit,
-        include: {
-          empresa: {
-            select: {
-              nome_fantasia: true,
-              tipo_vinculo_aci: true,
-              cnpj: true,
-            },
-          },
+// Nova função unificada
+  async listarVagasPendentesAcao() {
+    // Busca vagas que estão EM_ANALISE ou AGUARDANDO_PAGAMENTO
+    // Isso centraliza a lógica do que é "tarefa pendente"
+    const vagas = await prisma.vaga.findMany({
+      where: {
+        status: {
+          in: ["EM_ANALISE", "AGUARDANDO_PAGAMENTO"]
+        }
+      },
+      include: {
+        empresa: {
+          select: { nome_fantasia: true, tipo_vinculo_aci: true, cnpj: true },
         },
-        orderBy: { data_publicacao: "asc" },
-      }),
-    ]);
+      },
+      orderBy: { data_publicacao: "asc" },
+    });
 
     return {
-      meta: { total, page, limit, total_paginas: Math.ceil(total / limit) },
       data: vagas,
+      total: vagas.length
     };
   }
 

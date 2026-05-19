@@ -66,13 +66,12 @@ export class AdminVagaController {
     }
   }
 
-  async listarPendentes(req: Request, res: Response) {
+  async listarPendencias(req: Request, res: Response) {
     try {
-      const resultado = await vagaService.listarVagasPendentes(req.query);
-
-      return res.status(200).json(resultado);
+      const resultado = await vagaService.listarVagasPendentesAcao();
+      return res.status(200).json({ success: true, ...resultado });
     } catch (error: any) {
-      return res.status(500).json({ success: false, error: error.message });
+      return res.status(400).json({ success: false, error: error.message });
     }
   }
 
