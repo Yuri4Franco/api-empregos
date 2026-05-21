@@ -296,6 +296,17 @@ async function main() {
     "Visão Sistêmica",
     "Windows",
     "XP (Extreme Programming)",
+    "Resolução de Problemas Complexos",
+    "Aprendizado Autodidata",
+    "Proatividade em Documentação",
+    "Liderança",
+    "Comunicação",
+    "Visão de Negócio",
+    "Autonomia",
+    "Debugging & Resolução de Problemas",
+    "Trabalho em Equipe",
+    "Flexibilidade",
+    "Criatividade",
   ];
 
   console.log("🌱 Iniciando a seed de competências...");
