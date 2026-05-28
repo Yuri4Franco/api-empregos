@@ -684,6 +684,12 @@ routes.get(
   candidatoController.meuCurriculo,
 );
 
+routes.patch(
+  "/candidato/primeiro-emprego",
+  authMiddleware(["CANDIDATO"]),
+  candidatoController.togglePrimeiroEmprego
+);
+
 routes.get(
   "/candidato/vaga/:id_vaga/status",
   authMiddleware(["CANDIDATO"]),

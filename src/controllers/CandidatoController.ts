@@ -59,7 +59,6 @@ export class CandidatoController {
     try {
       const id_usuario = (req.user as any).id;
       
-      // Converte explicitamente para booleano caso venha como string do front
       const perfil_visivel_empresas = Boolean(req.body.perfil_visivel_empresas);
 
       const resultado = await candidatoService.atualizarVisibilidade(
@@ -103,6 +102,36 @@ export class CandidatoController {
       return res.status(200).json({
         success: true,
         message: "Foto de perfil atualizada com sucesso!",
+        data: resultado,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  async togglePrimeiroEmprego(req: Request, res: Response) {
+    try {
+      const id_candidato = (req.user as any).id;
+      const { primeiro_emprego } = req.body;
+
+      // Validação rápida para garantir que enviaram um booleano
+      if (typeof primeiro_emprego !== "boolean") {
+        return res.status(400).json({
+          success: false,
+          error: "O valor deve ser verdadeiro ou falso.",
+        });
+      }
+
+      const resultado = await candidatoService.atualizarPrimeiroEmprego(
+        id_candidato,
+        primeiro_emprego
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: resultado.primeiro_emprego 
+          ? "Marcado como busca pelo primeiro emprego." 
+          : "Desmarcado como primeiro emprego.",
         data: resultado,
       });
     } catch (error: any) {

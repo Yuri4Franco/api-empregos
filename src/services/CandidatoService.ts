@@ -176,6 +176,7 @@ export class CandidatoService {
         throw new Error(
           "Para deixar seu currículo visível no banco de talentos, é obrigatório cadastrar seu CPF na aba em Dados Básicos.",
         );
+        console.log("Erro de cpf")
       }
     }
 
@@ -199,8 +200,6 @@ export class CandidatoService {
       data: {
         foto_url: foto_url,
       },
-      // No select, podemos inclusive trazer o nome que está na tabela Usuario
-      // para que o Front-end receba o objeto completo do perfil
       select: {
         id_usuario: true,
         foto_url: true,
@@ -210,6 +209,14 @@ export class CandidatoService {
           },
         },
       },
+    });
+  }
+
+  async atualizarPrimeiroEmprego(id_candidato: number, primeiro_emprego: boolean) {
+    return await prisma.candidato.update({
+      where: { id_usuario: id_candidato },
+      data: { primeiro_emprego },
+      select: { primeiro_emprego: true } // Retorna apenas o que mudou para economizar tráfego
     });
   }
 }
