@@ -221,10 +221,10 @@ model CurriculoSalvo {
 }
 
 enum TurnoPreferido {
-  PRIMEIRO_TURNO
-  SEGUNDO_TURNO
-  TERCEIRO_TURNO
-  HORARIO_COMERCIAL
+  MANHÃ
+  TARDE
+  NOITE
+  COMERCIAL
   QUALQUER_TURNO
 }
 
