@@ -270,7 +270,7 @@ export class BaseUserService {
             tipo_pcd: null,
             genero: null,
             id_endereco: null,
-            tipo_contato: null,
+            tipo_contato: { set: [] },
 
             // Campos que NÃO aceitam Null: Sanitizamos para o padrão inofensivo
             perfil_visivel_empresas: false,

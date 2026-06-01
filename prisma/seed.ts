@@ -5,14 +5,22 @@ import argon2 from "argon2";
 async function main() {
   console.log("🌱 Iniciando seeding...");
 
-  const emailAdmin = "admin@acivagas.com.br";
+  const emailAdmin = process.env.ADMIN_EMAIL;
+  const senhaAdmin = process.env.ADMIN_PASSWORD;
+
+  if (!emailAdmin || !senhaAdmin) {
+    throw new Error(
+      "🛑 ERRO FATAL: As variáveis ADMIN_EMAIL e ADMIN_PASSWORD não foram definidas no arquivo .env.",
+    );
+  }
 
   const adminExistente = await prisma.usuario.findUnique({
     where: { email: emailAdmin },
   });
 
   if (!adminExistente) {
-    const senhaHash = await argon2.hash("@ICA#19364$#acivagas");
+    // 3. Usa a senha que veio do .env
+    const senhaHash = await argon2.hash(senhaAdmin);
 
     await prisma.usuario.create({
       data: {
@@ -21,11 +29,13 @@ async function main() {
         senha_hash: senhaHash,
         tipo_usuario: "ADM",
         status: "ATIVO",
+        is_master: true,
+        exigir_troca_senha: true,
       },
     });
     console.log("✅ Administrador padrão criado com sucesso!");
   } else {
-    console.log("⚠️ Administrador já existe no sistema.");
+    console.log("⚠️ Administrador master já existe no sistema.");
   }
 }
 
