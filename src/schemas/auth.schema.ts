@@ -438,7 +438,7 @@ export const updateCandidatoSchema = z.object({
   // Profissional
   objetivo_profissional: z
     .string()
-    .max(200, "Tente ser mais direto no objetivo (máx 200 caracteres)")
+    .max(300, "Tente ser mais direto no objetivo (máx 3200 caracteres)")
     .optional()
     .nullable()
     .or(z.literal("")),
@@ -461,10 +461,10 @@ export const updateCandidatoSchema = z.object({
   turno_preferido: z
     .array(
       z.enum([
-        "PRIMEIRO_TURNO",
-        "SEGUNDO_TURNO",
-        "TERCEIRO_TURNO",
-        "HORARIO_COMERCIAL",
+        "MANHÃ",
+        "TARDE",
+        "NOITE",
+        "COMERCIAL",
         "QUALQUER_TURNO",
       ]),
     )
