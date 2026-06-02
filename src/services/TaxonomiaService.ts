@@ -52,6 +52,9 @@ export class TaxonomiaService {
 
   async listarCompetencias() {
     return await prisma.competencia.findMany({
+      where: {
+        status: "APROVADA",
+      },
       orderBy: {
         nome: "asc",
       },
