@@ -15,7 +15,6 @@ export class VagaController {
   async cadastrar(req: Request, res: Response) {
     try {
 
-      console.log ("dados recebidos: ", req.body)
       // 1. Descobrimos se é para mandar pra ACI ou se é só Rascunho
       const isSubmissao = req.body.enviar_para_aprovacao === true;
 

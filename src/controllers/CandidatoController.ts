@@ -11,7 +11,6 @@ export class CandidatoController {
   async meuCurriculo(req: Request, res: Response) {
     try {
       const id_usuario = (req.user as any).id;
-      console.log("ID do usuário autenticado:", id_usuario);
 
       if (!id_usuario) {
         return res
@@ -37,8 +36,6 @@ export class CandidatoController {
   async actualizar(req: Request, res: Response) {
     try {
       const id_usuario = (req.user as any).id;
-
-      console.log("Dados que chegaram no controller", req.body)
 
       const candidatoActualizado = await candidatoService.actualizarDadosGerais(
         id_usuario,
@@ -80,10 +77,8 @@ export class CandidatoController {
 
   async uploadFoto(req: Request, res: Response) {
     try {
-      console.log("Iniciando upload de foto de perfil...");
       const id_usuario = (req.user as any).id;
 
-      console.log("ID do usuário autenticado para upload de foto:", id_usuario);
       if (!req.file) {
         return res.status(400).json({
           success: false,
@@ -92,7 +87,6 @@ export class CandidatoController {
       }
 
       const foto_url = req.file.path;
-      console.log("URL da foto recebida:", foto_url);
 
       const resultado = await candidatoService.atualizarFotoPerfil(
         id_usuario,

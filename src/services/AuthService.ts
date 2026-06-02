@@ -12,7 +12,6 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
 export class AuthService {
   // #region FUNCIONALIDADES DE AUTENTICAÇÃO E GERAÇÃO DE TOKENS
   async loginPorEmail(email: string, senha_pura: string) {
-    console.log("email que chegou:", email);
     const usuario = await prisma.usuario.findUnique({
       where: { email },
     });

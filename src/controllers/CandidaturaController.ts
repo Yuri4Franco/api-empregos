@@ -160,8 +160,6 @@ export class CandidaturaController {
       const { id_candidaturas, motivo } = req.body;
       const id_usuario = (req.user as any).id;
 
-      console.log ("CANDIDATURAS SELECIONADAS:", id_candidaturas)
-
       // 2. Buscamos no banco a qual empresa esse usuário pertence
       const vinculo = await prisma.usuario.findUnique({
         where: { id_usuario },

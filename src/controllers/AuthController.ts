@@ -8,9 +8,6 @@ export class AuthController {
     try {
       const { email, senha, cnpj } = req.body;
 
-      console.log("email:", email);
-      console.log("senha:", senha);
-
       let result;
       if (cnpj) {
         result = await authService.loginEmpresa(cnpj, senha);
@@ -46,7 +43,6 @@ export class AuthController {
 
   async ativar(req: Request, res: Response) {
     try {
-      console.log("BODY RECEBIDO NO BACKEND:", req.body);
 
       const { token } = req.body;
 

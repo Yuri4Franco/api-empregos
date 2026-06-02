@@ -2,7 +2,6 @@ import { prisma } from "../config/prisma.js";
 import { StatusCandidatura } from "@prisma/client";
 
 export class CandidatoService {
-
   async inscrever(
     id_usuario: number,
     id_vaga: number,
@@ -131,9 +130,27 @@ export class CandidatoService {
 
   async actualizarDadosGerais(id_usuario: number, dados: any) {
     const { endereco, ...dadosCandidato } = dados;
-    console.log("Dados recebidos para atualização:", dados);
 
     return await prisma.$transaction(async (tx) => {
+      // 1. VERIFICAÇÃO DE DUPLICIDADE DE CPF
+      if (dadosCandidato.cpf) {
+        const candidatoExistente = await tx.candidato.findUnique({
+          where: { cpf: dadosCandidato.cpf },
+          select: { id_usuario: true }, // Trazemos só o ID para economizar memória
+        });
+
+        // Se encontrou alguém com esse CPF e o ID for diferente do usuário atual logado
+        if (
+          candidatoExistente &&
+          candidatoExistente.id_usuario !== id_usuario
+        ) {
+          throw new Error(
+            "Este CPF já está cadastrado em outra conta. Por favor, acesse sua conta original ou entre em contato com a ACI-Panambi para suporte.",
+          );
+        }
+      }
+
+      // 2. ATUALIZAÇÃO DOS DADOS
       return await tx.candidato.update({
         where: { id_usuario },
         data: {
@@ -148,7 +165,6 @@ export class CandidatoService {
             },
           }),
         },
-
         include: {
           endereco: true,
           areas_atuacao: {
@@ -176,7 +192,6 @@ export class CandidatoService {
         throw new Error(
           "Para deixar seu currículo visível no banco de talentos, é obrigatório cadastrar seu CPF na aba em Dados Básicos.",
         );
-        console.log("Erro de cpf")
       }
     }
 
@@ -212,11 +227,14 @@ export class CandidatoService {
     });
   }
 
-  async atualizarPrimeiroEmprego(id_candidato: number, primeiro_emprego: boolean) {
+  async atualizarPrimeiroEmprego(
+    id_candidato: number,
+    primeiro_emprego: boolean,
+  ) {
     return await prisma.candidato.update({
       where: { id_usuario: id_candidato },
       data: { primeiro_emprego },
-      select: { primeiro_emprego: true } // Retorna apenas o que mudou para economizar tráfego
+      select: { primeiro_emprego: true }, // Retorna apenas o que mudou para economizar tráfego
     });
   }
 }

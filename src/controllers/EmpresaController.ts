@@ -110,8 +110,6 @@ export class EmpresaController {
 
       const bannerUrl = req.file.path;
 
-      console.log("iniciando atualização de banner");
-
       await empresaService.atualizarBannerEmpresa(id_empresa_real, bannerUrl);
 
       return res.status(200).json({
@@ -170,8 +168,6 @@ export class EmpresaController {
     try {
       // No seu middleware, o ID costuma ser salvo em req.user.id
       const id_usuario = (req.user as any).id;
-
-      console.log("Buscando empresa para o usuário:", id_usuario);
 
       const empresa =
         await empresaService.obterDadosEmpresaPorUsuario(id_usuario);
