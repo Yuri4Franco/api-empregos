@@ -273,6 +273,8 @@ export class BancoTalentosService {
 
     const dadosProfissionais = {
       id_candidato: candidato.id_usuario,
+      data_nascimento: candidato.data_nascimento,
+      genero: candidato.genero,
       is_salvo: isCandidatoSalvo, // ✨ AQUI VAI A FLAG PARA O FRONTEND
       objetivo_profissional: candidato.objetivo_profissional,
       resumo_profissional: candidato.resumo_profissional,
