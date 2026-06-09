@@ -68,7 +68,6 @@ export class AdminService {
           is_master: true,
           ultimo_login: true,
           criado_em: true,
-          // Se for uma conta de EMPRESA, traz os dados básicos dela
           empresa: {
             select: {
               id_empresa: true,
@@ -1124,8 +1123,6 @@ export class AdminService {
           formacoes: { orderBy: { data_conclusao: "desc" } },
           areas_atuacao: { include: { area: true } },
           competencias: { include: { competencia: true } },
-          cnh: true,
-          turno_preferido: true,
           // Traz um resumo das últimas 5 candidaturas para o Admin saber o quão ativo ele é
           candidaturas: {
             take: 5,
@@ -1149,7 +1146,7 @@ export class AdminService {
           vagas: {
             take: 5,
             orderBy: { data_publicacao: "desc" },
-            select: { id_vaga: true, titulo: true, status: true, criado_em: true },
+            select: { id_vaga: true, titulo: true, status: true, data_publicacao: true },
           },
         },
       });

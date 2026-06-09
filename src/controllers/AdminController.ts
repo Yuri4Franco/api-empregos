@@ -549,6 +549,8 @@ export class AdminController {
     try {
       const id_usuario = Number(req.params.id);
 
+      console.log(id_usuario, "ID DO USUARIO")
+
       if (!id_usuario || isNaN(id_usuario)) {
         return res.status(400).json({ 
           success: false, 
