@@ -1090,4 +1090,75 @@ export class AdminService {
 
     return vagas;
   }
+
+  async obterDetalhesUsuario(id_usuario: number) {
+    // 1. Busca os dados de autenticação e descobre o tipo
+    const usuarioBase = await prisma.usuario.findUnique({
+      where: { id_usuario },
+      select: {
+        id_usuario: true,
+        nome: true,
+        email: true,
+        tipo_usuario: true,
+        status: true,
+        criado_em: true,
+        ultimo_login: true,
+        is_master: true,
+        id_empresa: true,
+      },
+    });
+
+    if (!usuarioBase) {
+      throw new Error("Usuário não encontrado.");
+    }
+
+    let perfilCompleto = null;
+
+    // 2. RAMIFICAÇÃO: Se for CANDIDATO, puxa o currículo completo
+    if (usuarioBase.tipo_usuario === "CANDIDATO") {
+      perfilCompleto = await prisma.candidato.findUnique({
+        where: { id_usuario },
+        include: {
+          endereco: true,
+          experiencias: { orderBy: { data_inicio: "desc" } },
+          formacoes: { orderBy: { data_conclusao: "desc" } },
+          areas_atuacao: { include: { area: true } },
+          competencias: { include: { competencia: true } },
+          cnh: true,
+          turno_preferido: true,
+          // Traz um resumo das últimas 5 candidaturas para o Admin saber o quão ativo ele é
+          candidaturas: {
+            take: 5,
+            orderBy: { data_candidatura: "desc" },
+            include: {
+              vaga: { select: { titulo: true, empresa: { select: { nome_fantasia: true } } } },
+            },
+          },
+        },
+      });
+    } 
+    
+    // 3. RAMIFICAÇÃO: Se for EMPRESA, puxa o perfil institucional
+    else if (usuarioBase.tipo_usuario === "EMPRESA" && usuarioBase.id_empresa) {
+      perfilCompleto = await prisma.empresa.findUnique({
+        where: { id_empresa: usuarioBase.id_empresa },
+        include: {
+          endereco: true,
+          beneficios_padrao: { include: { beneficio: true } },
+          // Traz um resumo das últimas 5 vagas dessa empresa
+          vagas: {
+            take: 5,
+            orderBy: { data_publicacao: "desc" },
+            select: { id_vaga: true, titulo: true, status: true, criado_em: true },
+          },
+        },
+      });
+    }
+
+    // 4. Retorna tudo empacotado para o frontend
+    return {
+      conta: usuarioBase,
+      detalhes: perfilCompleto,
+    };
+  }
 }

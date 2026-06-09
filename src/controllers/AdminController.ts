@@ -544,4 +544,30 @@ export class AdminController {
       });
     }
   }
+
+  async verDetalhesCompleto(req: Request, res: Response) {
+    try {
+      const id_usuario = Number(req.params.id);
+
+      if (!id_usuario || isNaN(id_usuario)) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "ID de usuário inválido." 
+        });
+      }
+
+      const dados = await adminService.obterDetalhesUsuario(id_usuario);
+
+      return res.status(200).json({
+        success: true,
+        data: dados,
+      });
+    } catch (error: any) {
+      console.error("Erro ao puxar raio-x do usuário:", error);
+      return res.status(400).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+  }
 }

@@ -156,6 +156,9 @@ routes.patch(
   adminController.alterarStatusEmpresa,
 );
 
+
+
+
 // =========================================================
 // DASHBOARD ADM
 // =========================================================
@@ -178,6 +181,12 @@ routes.get(
   "/admin/usuarios",
   authMiddleware(["ADM"]),
   adminController.listarUsuarios,
+);
+
+routes.get(
+  "/admin/usuarios/:id",
+  authMiddleware(["ADM"]),
+  adminController.verDetalhesCompleto
 );
 
 // Gerenciamento de Usuários - fora do piloto

@@ -3,8 +3,29 @@ import { validarCPF } from "../types/validarCpf";
 
 // --- ÁTOMOS  ---
 const UsuarioBaseSchema = z.object({
-  nome: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
-  email: z.string().email("E-mail inválido"),
+  nome: z
+    .string()
+    .min(3, "Nome deve ter no mínimo 3 caracteres")
+    .transform((nome) => {
+      return nome
+        .trim()
+        .split(/\s+/)
+        .map((palavra, index) => {
+          const lower = palavra.toLowerCase();
+          const excecoes = ["de", "da", "do", "das", "dos", "e"];
+          if (index > 0 && excecoes.includes(lower)) {
+            return lower;
+          }
+
+          return lower.charAt(0).toUpperCase() + lower.slice(1);
+        })
+        .join(" ");
+    }),
+    
+  email: z
+    .string()
+    .email("E-mail inválido")
+    .transform((email) => email.trim().toLowerCase()), 
 });
 
 const SenhaForte = z

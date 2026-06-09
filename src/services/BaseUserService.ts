@@ -306,7 +306,7 @@ export class BaseUserService {
               etapa_destino: cand.id_etapa_atual,
               status_destino: "DESISTENCIA",
               motivo:
-                "O candidato excluiu sua conta permanentemente na plataforma ACI Empregos.",
+                "O candidato excluiu sua conta permanentemente na plataforma ACI Vagas.",
             },
           });
         }
@@ -343,7 +343,7 @@ export class BaseUserService {
         where: { id_usuario },
         data: {
           nome: "Usuário Excluído",
-          email: `excluido_${id_usuario}_${hashExclusao}@aciempregos.com`, // Fica irreconhecível, mas mantém a regra UNIQUE
+          email: `excluido_${id_usuario}_${hashExclusao}@acivagas.com`, // Fica irreconhecível, mas mantém a regra UNIQUE
           senha_hash: "DELETED", // Destrói o hash da senha
           token_ativacao: null,
           token_recuperar: null,
