@@ -494,33 +494,51 @@ async listarMeusDesbloqueados(id_empresa: number) {
   }
 
   async listarAreasComContagem() {
-    const areas = await prisma.areaAtuacao.findMany({
-      orderBy: { nome: "asc" },
-      select: {
-        id_area: true,
-        nome: true,
-        _count: {
-          select: {
-            candidatos: {
-              where: {
-                candidato: {
-                  perfil_visivel_empresas: true,
-                  usuario: { status: "ATIVO" }, // Conta só quem está com a conta em dia
+    // Dispara as duas consultas ao mesmo tempo no banco de dados
+    const [areas, totalCandidatosUnicos] = await Promise.all([
+      // 1. Busca as áreas e a quantidade de candidatos em cada uma
+      prisma.areaAtuacao.findMany({
+        orderBy: { nome: "asc" },
+        select: {
+          id_area: true,
+          nome: true,
+          _count: {
+            select: {
+              candidatos: {
+                where: {
+                  candidato: {
+                    perfil_visivel_empresas: true,
+                    usuario: { status: "ATIVO" },
+                  },
                 },
               },
             },
           },
         },
-      },
-    });
+      }),
 
-    return areas.map((area) => ({
+      // 2. Conta o número real e único de candidatos visíveis na plataforma
+      prisma.candidato.count({
+        where: {
+          perfil_visivel_empresas: true,
+          usuario: { status: "ATIVO" },
+        },
+      }),
+    ]);
+
+    // Formata a lista de áreas para o frontend
+    const areasFormatadas = areas.map((area) => ({
       id_area: area.id_area,
       nome: area.nome,
       total_candidatos: area._count.candidatos,
     }));
-  }
 
+    // Retorna o objeto completo, agora com o número exato sem duplicações!
+    return {
+      total_geral: totalCandidatosUnicos,
+      areas: areasFormatadas,
+    };
+  }
   // 1. Alternar Favorito (Salvar / Remover)
   async alternarCurriculoSalvo(
     id_candidato: number,
