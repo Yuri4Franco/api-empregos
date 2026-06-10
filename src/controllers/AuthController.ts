@@ -29,6 +29,8 @@ export class AuthController {
 
   async register(req: Request, res: Response) {
     try {
+
+      
       const resultado = await authService.registrarCandidato(req.body);
 
       return res.status(201).json({

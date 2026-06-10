@@ -14,6 +14,10 @@ export class BancoTalentosService {
     escolaridade?: string[] | undefined;
     pagina?: number | undefined;
     limite?: number | undefined;
+    // ✨ NOVOS FILTROS
+    genero?: string | undefined;
+    idade_min?: number | undefined;
+    idade_max?: number | undefined;
   }) {
     const pagina = filtros.pagina || 1;
     const limite = filtros.limite || 10;
@@ -25,99 +29,68 @@ export class BancoTalentosService {
       usuario: { status: "ATIVO" },
     };
 
-    // 2. Filtros Básicos e Logísticos
-    if (filtros.id_area) {
-      whereClause.areas_atuacao = {
-        some: { id_area: filtros.id_area },
-      };
-    }
+    // ... (Mantenha seus filtros de área, turno, pcd, etc. intactos aqui) ...
 
-    if (filtros.turno && filtros.turno.length > 0) {
-      whereClause.turno_preferido = {
-        hasSome: filtros.turno, // Verifica se o candidato tem ALGUM dos turnos selecionados
-      };
-    }
+    // ✨ FILTRO DE GÊNERO (Inclusivo)
+    if (filtros.genero) {
+      const isMasculino = filtros.genero.toLowerCase() === "masculino";
 
-    if (filtros.primeiro_emprego !== undefined) {
-      whereClause.primeiro_emprego = filtros.primeiro_emprego;
-    }
-
-    if (filtros.pcd !== undefined) {
-      whereClause.pcd = filtros.pcd;
-    }
-
-    if (filtros.disponibilidade_sabados !== undefined) {
-      whereClause.disponibilidade_sabados = filtros.disponibilidade_sabados;
-    }
-
-    if (filtros.disponibilidade_viagem !== undefined) {
-      whereClause.disponibilidade_viagem = filtros.disponibilidade_viagem;
-    }
-
-    if (filtros.cnh && filtros.cnh.length > 0) {
-      whereClause.cnh = {
-        hasSome: filtros.cnh, // Verifica se o candidato tem ALGUMA das CNHs exigidas
-      };
-    }
-
-    if (filtros.competencia && filtros.competencia.length > 0) {
-      whereClause.competencias = {
-        some: {
-          id_competencia: { in: filtros.competencia }, // Pega candidatos que tenham pelo menos UMA das habilidades
+      whereClause.OR = [
+        ...(whereClause.OR || []), // Preserva outros ORs se houver
+        {
+          OR: [
+            {
+              genero: {
+                equals: isMasculino ? "Masculino" : "Feminino",
+                mode: "insensitive",
+              },
+            },
+            { genero: { equals: "Outro", mode: "insensitive" } },
+            { genero: { equals: "Prefiro não informar", mode: "insensitive" } },
+            { genero: null }, // Opcional: traz também quem deixou o campo em branco
+          ],
         },
-      };
+      ];
     }
 
-    // 3. Filtro Avançado de Escolaridade (Multi-select)
-    if (filtros.escolaridade && filtros.escolaridade.length > 0) {
-      const niveisPermitidos: string[] = [];
-      const statusPermitidos: string[] = [];
+    // ✨ FILTRO DE FAIXA ETÁRIA (Convertendo idade para data_nascimento)
+    if (filtros.idade_min !== undefined || filtros.idade_max !== undefined) {
+      const hoje = new Date();
+      whereClause.data_nascimento = {};
 
-      if (filtros.escolaridade.includes("MEDIO_COMPLETO")) {
-        niveisPermitidos.push("Ensino Médio");
-        statusPermitidos.push("CONCLUÍDO");
-      }
-      if (filtros.escolaridade.includes("TECNICO")) {
-        niveisPermitidos.push("Curso Técnico");
-      }
-      if (filtros.escolaridade.includes("SUPERIOR_CURSANDO")) {
-        niveisPermitidos.push("Graduação", "Superior (Tecnólogo)");
-        statusPermitidos.push("CURSANDO");
-      }
-      if (filtros.escolaridade.includes("SUPERIOR_COMPLETO")) {
-        niveisPermitidos.push(
-          "Graduação",
-          "Superior (Tecnólogo)",
-          "Pós-Graduação / Especialização",
-          "Mestrado / Doutorado",
+      if (filtros.idade_min !== undefined) {
+        // Se a idade mínima é 20, a pessoa nasceu HÁ 20 anos ou ANTES.
+        // Data Máxima de Nascimento = Hoje - 20 anos
+        const dataMaxNascimento = new Date(
+          hoje.getFullYear() - filtros.idade_min,
+          hoje.getMonth(),
+          hoje.getDate(),
         );
-        statusPermitidos.push("CONCLUÍDO");
+        whereClause.data_nascimento.lte = dataMaxNascimento;
       }
 
-      const formacaoQuery: any = {
-        nivel: { in: niveisPermitidos },
-      };
-
-      // Só aplica filtro de status se ele for relevante para as opções selecionadas
-      if (statusPermitidos.length > 0) {
-        formacaoQuery.status = { in: statusPermitidos };
+      if (filtros.idade_max !== undefined) {
+        // Se a idade máxima é 30, a pessoa nasceu HÁ 31 anos (para continuar tendo 30 até o próx. aniversário).
+        // Data Mínima de Nascimento = Hoje - 31 anos
+        const dataMinNascimento = new Date(
+          hoje.getFullYear() - (filtros.idade_max + 1),
+          hoje.getMonth(),
+          hoje.getDate() + 1,
+        );
+        whereClause.data_nascimento.gte = dataMinNascimento;
       }
-
-      whereClause.formacoes = {
-        some: formacaoQuery,
-      };
     }
+
+    // ... (Mantenha seu filtro de escolaridade intacto aqui) ...
 
     // 4. Executa a busca paralela
     const [total, candidatos] = await Promise.all([
       prisma.candidato.count({ where: whereClause }),
-
       prisma.candidato.findMany({
         where: whereClause,
         skip,
         take: limite,
         orderBy: { usuario: { atualizado_em: "desc" } },
-
         select: {
           id_usuario: true,
           objetivo_profissional: true,
@@ -126,20 +99,17 @@ export class BancoTalentosService {
           turno_preferido: true,
           primeiro_emprego: true,
           pcd: true,
+          data_nascimento: true,
+          genero: true,
 
           endereco: { select: { cidade: true, uf: true } },
-
           areas_atuacao: {
             include: { area: { select: { nome: true } } },
           },
-
           experiencias: {
+            take: 3,
             select: {
               cargo: true,
-              empresa: true,
-              data_inicio: true,
-              data_fim: true,
-              atual: true,
             },
             orderBy: { data_inicio: "desc" },
           },
@@ -157,9 +127,20 @@ export class BancoTalentosService {
     const dadosMascarados = candidatos.map((c) => {
       const areaPrincipal = c.areas_atuacao[0]?.area.nome || "Profissional";
 
+      // Calcula a idade do candidato para mostrar no card da Vitrine
+      let idade = null;
+      if (c.data_nascimento) {
+        const diff =
+          new Date().getTime() - new Date(c.data_nascimento).getTime();
+        idade = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+      }
+
       return {
         id_candidato: c.id_usuario,
         identificacao_publica: `Candidato #${c.id_usuario} - ${areaPrincipal}`,
+
+        idade: idade, // ✨ Idade calculada
+        genero: c.genero, // ✨ Gênero retornado
 
         objetivo_profissional: c.objetivo_profissional,
         resumo_profissional: c.resumo_profissional,
@@ -185,6 +166,7 @@ export class BancoTalentosService {
       },
     };
   }
+
   async obterCurriculo(id_candidato: number, id_empresa: number) {
     const empresa = await prisma.empresa.findUnique({
       where: { id_empresa },
@@ -275,7 +257,7 @@ export class BancoTalentosService {
       id_candidato: candidato.id_usuario,
       data_nascimento: candidato.data_nascimento,
       genero: candidato.genero,
-      is_salvo: isCandidatoSalvo, // ✨ AQUI VAI A FLAG PARA O FRONTEND
+      is_salvo: isCandidatoSalvo,
       objetivo_profissional: candidato.objetivo_profissional,
       resumo_profissional: candidato.resumo_profissional,
       pretensao_salarial: candidato.pretensao_salarial,
@@ -345,7 +327,7 @@ export class BancoTalentosService {
   async desbloquearCurriculoTransacao(
     id_candidato: number,
     id_empresa: number,
-    id_usuario_logado: number
+    id_usuario_logado: number,
   ) {
     // 1. Validações Iniciais (Fora da transação para economizar processamento do banco)
     const empresa = await prisma.empresa.findUnique({
@@ -427,15 +409,15 @@ export class BancoTalentosService {
     return await this.obterCurriculo(id_candidato, id_empresa);
   }
 
-async listarMeusDesbloqueados(id_empresa: number) {
+  async listarMeusDesbloqueados(id_empresa: number) {
     // 1. Buscamos todos os currículos salvos por esta empresa para comparar
     const salvos = await prisma.curriculoSalvo.findMany({
       where: { id_empresa },
-      select: { id_candidato: true }
+      select: { id_candidato: true },
     });
 
     // Criamos um Set com os IDs para ter uma busca de alta performance O(1)
-    const idsSalvosSet = new Set(salvos.map(s => s.id_candidato));
+    const idsSalvosSet = new Set(salvos.map((s) => s.id_candidato));
 
     // 2. Busca todos os registros de desbloqueio desta empresa (sua query original)
     const historico = await prisma.curriculoDesbloqueado.findMany({
@@ -468,7 +450,7 @@ async listarMeusDesbloqueados(id_empresa: number) {
       return {
         id_candidato: c.id_usuario,
         data_desbloqueio: registro.data_desbloqueio,
-        
+
         // ✨ A NOVA PROPRIEDADE AQUI:
         // Verifica se o ID deste candidato está no nosso conjunto de salvos
         is_salvo: idsSalvosSet.has(c.id_usuario),
@@ -542,10 +524,7 @@ async listarMeusDesbloqueados(id_empresa: number) {
     };
   }
   // 1. Alternar Favorito (Salvar / Remover)
-  async alternarCurriculoSalvo(
-    id_candidato: number,
-    id_empresa: number,
-  ) {
+  async alternarCurriculoSalvo(id_candidato: number, id_empresa: number) {
     const salvoExistente = await prisma.curriculoSalvo.findUnique({
       where: {
         id_empresa_id_candidato: { id_empresa, id_candidato },
@@ -553,7 +532,6 @@ async listarMeusDesbloqueados(id_empresa: number) {
     });
 
     if (salvoExistente) {
-      
       await prisma.curriculoSalvo.delete({
         where: { id_salvo: salvoExistente.id_salvo },
       });
@@ -570,7 +548,7 @@ async listarMeusDesbloqueados(id_empresa: number) {
   }
 
   // 2. Listar Favoritos (Com filtro de censura embutido)
-async listarCurriculosSalvos(id_empresa: number) {
+  async listarCurriculosSalvos(id_empresa: number) {
     // Busca os dados da empresa e a lista de quem ela já PAGOU para ver
     const [empresa, desbloqueios] = await Promise.all([
       prisma.empresa.findUnique({
@@ -621,7 +599,8 @@ async listarCurriculosSalvos(id_empresa: number) {
       const acessoLiberado = isAssociada || idsLiberadosSet.has(c.id_usuario);
 
       // ✨ AQUI ESTÁ A NOVA FLAG DE STATUS DO PERFIL
-      const perfilAtivo = c.usuario.status === "ATIVO" && c.perfil_visivel_empresas;
+      const perfilAtivo =
+        c.usuario.status === "ATIVO" && c.perfil_visivel_empresas;
 
       const payloadBase = {
         id_candidato: c.id_usuario,

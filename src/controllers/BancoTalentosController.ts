@@ -5,7 +5,7 @@ import { prisma } from "../config/prisma.js";
 const bancoService = new BancoTalentosService();
 
 export class BancoTalentosController {
-async listar(req: Request, res: Response) {
+  async listar(req: Request, res: Response) {
     try {
       const {
         area,
@@ -19,6 +19,10 @@ async listar(req: Request, res: Response) {
         competencia,
         pagina,
         limite,
+        // ✨ NOVOS CAMPOS NA QUERY
+        genero,
+        idade_min,
+        idade_max,
       } = req.query;
 
       const parseArray = (param: any): string[] | undefined => {
@@ -34,6 +38,12 @@ async listar(req: Request, res: Response) {
         cnh: parseArray(cnh),
         escolaridade: parseArray(escolaridade),
         competencia: parseArray(competencia)?.map((num) => Number(num)),
+
+        // ✨ REPASSANDO PARA O SERVICE
+        genero: genero ? String(genero) : undefined,
+        idade_min: idade_min ? Number(idade_min) : undefined,
+        idade_max: idade_max ? Number(idade_max) : undefined,
+
         primeiro_emprego:
           primeiro_emprego === "true"
             ? true
@@ -143,7 +153,7 @@ async listar(req: Request, res: Response) {
       const resultado = await bancoService.desbloquearCurriculoTransacao(
         Number(id_candidato),
         id_empresa_real,
-        id_usuario
+        id_usuario,
       );
 
       return res.status(200).json({
@@ -170,7 +180,7 @@ async listar(req: Request, res: Response) {
         where: { id_usuario },
         select: { id_empresa: true },
       });
-      
+
       if (!vinculo || !vinculo.id_empresa) {
         return res.status(403).json({
           success: false,
@@ -185,7 +195,8 @@ async listar(req: Request, res: Response) {
           .json({ success: false, error: "Acesso restrito a empresas." });
       }
 
-      const resultado = await bancoService.listarMeusDesbloqueados(id_empresa_real);
+      const resultado =
+        await bancoService.listarMeusDesbloqueados(id_empresa_real);
 
       return res.status(200).json({
         success: true,
@@ -263,7 +274,8 @@ async listar(req: Request, res: Response) {
           .status(403)
           .json({ success: false, error: "Acesso restrito." });
 
-      const resultado = await bancoService.listarCurriculosSalvos(id_empresa_real);
+      const resultado =
+        await bancoService.listarCurriculosSalvos(id_empresa_real);
 
       return res
         .status(200)

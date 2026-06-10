@@ -52,6 +52,7 @@ import {
   ModeracaoVagaSchema,
   QueryListagemSchema,
   redefinirSenhaSchema,
+  RegistroUsuario,
   ResetSenhaSchema,
   sincronizarAreasSchema,
   SolicitacaoMidiaSchema,
@@ -94,7 +95,7 @@ const adminDashboardController = new AdminDashboardController();
 
 routes.post("/login", authLimiter, authController.login);
 
-routes.post("/register", authLimiter, authController.register);
+routes.post("/register", validate(RegistroUsuario), authLimiter, authController.register);
 
 routes.post("/ativar", authLimiter, authController.ativar);
 

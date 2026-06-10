@@ -25,7 +25,7 @@ const UsuarioBaseSchema = z.object({
   email: z
     .string()
     .email("E-mail inválido")
-    .transform((email) => email.trim().toLowerCase()), 
+    .transform((email) => email.trim().toLowerCase()),
 });
 
 const SenhaForte = z
@@ -42,6 +42,11 @@ const EnderecoSchema = z.object({
   numero: z.string().optional(),
   bairro: z.string().optional(),
 });
+
+export const RegistroUsuario = UsuarioBaseSchema.extend({
+  senha: SenhaForte,
+});
+
 
 export const esqueciSenhaSchema = z.object({
   email: z.string().email("Por favor, insira um e-mail válido."),
