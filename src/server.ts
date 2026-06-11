@@ -9,6 +9,7 @@ import { globalLimiter } from "./middlewares/rateLimiter";
 // Importações do Sentry
 import * as Sentry from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
+import { agendarLimpezaContasPendentes } from "./jobs/worker";
 
 const app = express();
 
@@ -63,4 +64,8 @@ app.get("/health", async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT} 🚀`);
+
+  agendarLimpezaContasPendentes();
+  console.log('⏳ Cronjobs inicializados com sucesso!');
 });
+

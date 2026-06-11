@@ -8,8 +8,8 @@ export class BancoTalentosService {
     turno?: string[] | undefined;
     primeiro_emprego?: boolean | undefined;
     pcd?: boolean | undefined;
-    disponibilidade_sabados?: boolean | undefined;
-    disponibilidade_viagem?: boolean | undefined;
+    sabados?: boolean | undefined;
+    viagem?: boolean | undefined;
     cnh?: string[] | undefined;
     escolaridade?: string[] | undefined;
     pagina?: number | undefined;
@@ -29,7 +29,88 @@ export class BancoTalentosService {
       usuario: { status: "ATIVO" },
     };
 
-    // ... (Mantenha seus filtros de área, turno, pcd, etc. intactos aqui) ...
+    if (filtros.id_area) {
+      whereClause.areas_atuacao = {
+        some: { id_area: filtros.id_area },
+      };
+    }
+
+    if (filtros.turno && filtros.turno.length > 0) {
+      whereClause.turno_preferido = {
+        hasSome: [...filtros.turno, "QUALQUER_TURNO"],
+      };
+    }
+
+    if (filtros.primeiro_emprego !== undefined) {
+      whereClause.primeiro_emprego = filtros.primeiro_emprego;
+    }
+
+    if (filtros.pcd !== undefined) {
+      whereClause.pcd = filtros.pcd;
+    }
+
+    if (filtros.sabados === true) {
+      whereClause.disponibilidade_sabados = true;
+    }
+
+    if (filtros.viagem === true) {
+      whereClause.disponibilidade_viagem = true;
+    }
+
+    if (filtros.cnh && filtros.cnh.length > 0) {
+      whereClause.cnh = {
+        hasSome: filtros.cnh,
+      };
+    }
+
+    if (filtros.competencia && filtros.competencia.length > 0) {
+      whereClause.competencias = {
+        some: {
+          id_competencia: { in: filtros.competencia },
+        },
+      };
+    }
+
+    // ==========================================
+    // 3. FILTROS AVANÇADOS (Escolaridade, Gênero, Idade)
+    // ==========================================
+    if (filtros.escolaridade && filtros.escolaridade.length > 0) {
+      const niveisPermitidos: string[] = [];
+      const statusPermitidos: string[] = [];
+
+      if (filtros.escolaridade.includes("MEDIO_COMPLETO")) {
+        niveisPermitidos.push("Ensino Médio");
+        statusPermitidos.push("CONCLUÍDO");
+      }
+      if (filtros.escolaridade.includes("TECNICO")) {
+        niveisPermitidos.push("Curso Técnico");
+      }
+      if (filtros.escolaridade.includes("SUPERIOR_CURSANDO")) {
+        niveisPermitidos.push("Graduação", "Superior (Tecnólogo)");
+        statusPermitidos.push("CURSANDO");
+      }
+      if (filtros.escolaridade.includes("SUPERIOR_COMPLETO")) {
+        niveisPermitidos.push(
+          "Graduação",
+          "Superior (Tecnólogo)",
+          "Pós-Graduação / Especialização",
+          "Mestrado / Doutorado",
+        );
+        statusPermitidos.push("CONCLUÍDO");
+      }
+
+      const formacaoQuery: any = {
+        nivel: { in: niveisPermitidos },
+      };
+
+      if (statusPermitidos.length > 0) {
+        formacaoQuery.status = { in: statusPermitidos };
+      }
+
+      whereClause.formacoes = {
+        some: formacaoQuery,
+      };
+    }
 
     // ✨ FILTRO DE GÊNERO (Inclusivo)
     if (filtros.genero) {

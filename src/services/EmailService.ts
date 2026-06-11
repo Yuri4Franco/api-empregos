@@ -7,7 +7,8 @@ export class EmailService {
   private gerarTemplateEmail(conteudoHtml: string): string {
     // ⚠️ SUBSTITUA ESTES LINKS PELAS URLS REAIS DAS SUAS LOGOS APÓS HOSPEDÁ-LAS
     const logoAciVagas = "https://acivagas.com.br/logo-aci-vagas.png";
-    const logoAciPanambi = "https://acivagas.com.br/logo-site-aci-transparente.png";
+    const logoAciPanambi =
+      "https://acivagas.com.br/logo-site-aci-transparente.png";
     const linkWhatsApp = "https://wa.me/555533759350"; // Link direto pro WhatsApp
 
     return `
@@ -90,6 +91,35 @@ export class EmailService {
       to: email,
       subject: "Ative sua conta - ACI Vagas",
       html: this.gerarTemplateEmail(conteudo), // ✨ Aplicando o template
+    };
+
+    return await transporter.sendMail(mailOptions);
+  }
+
+  async enviarEmailAvisoExclusao(email: string, nome: string, token: string) {
+    const urlAtivacao = `${process.env.APP_URL}/ativar/${token}`;
+
+    const conteudo = `
+      <h2 style="color: #003366; margin-top: 0;">Olá, ${nome}!</h2>
+      <p>Notamos que você iniciou o seu cadastro na <strong>ACI Empregos</strong>, mas ainda não ativou a sua conta.</p>
+      <p>Para mantermos a segurança e a organização do nosso banco de talentos, cadastros inativos há muito tempo são removidos do sistema. <strong>Sua conta será excluída permanentemente em 5 dias.</strong></p>
+      <p>Se você ainda quer ter acesso às vagas exclusivas de Panambi e região, ative sua conta clicando no botão abaixo:</p>
+      
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="${urlAtivacao}" style="background-color: #d9534f; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px;">
+          Ativar Minha Conta Agora
+        </a>
+      </div>
+
+      <p style="margin-bottom: 5px;">Se o botão não funcionar, copie e cole este link no seu navegador:</p>
+      <p style="font-size: 13px; color: #0056b3; word-break: break-all;">${urlAtivacao}</p>
+    `;
+
+    const mailOptions = {
+      from: `"ACI Empregos" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Aviso: Sua conta será excluída em 5 dias",
+      html: this.gerarTemplateEmail(conteudo),
     };
 
     return await transporter.sendMail(mailOptions);

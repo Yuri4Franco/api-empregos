@@ -98,9 +98,11 @@ model Usuario {
   tipo_usuario    TipoUsuario
   status          StatusGeral   @default(PENDENTE)
 
-  token_ativacao  String?       @unique // 
-  token_recuperar String?       @unique // 
+  token_troca_email String?     @unique 
+  token_ativacao  String?       @unique 
+  token_recuperar String?       @unique 
   expira_token    DateTime?
+
   
   is_master       Boolean       @default(false)
   id_empresa      Int?          
@@ -112,12 +114,28 @@ model Usuario {
   ultimo_login    DateTime?
   exigir_troca_senha Boolean    @default(false)
 
+  data_aviso_inativo   DateTime?  
+  motivo_inativacao    String?
+  ultima_atividade_candidato DateTime?
+  data_aviso_inativacao DateTime?    
+
   candidato       Candidato?
   notificacoes    Notificacao[]
+  logs_disparos_jobs  LogDisparosJobs[]
   logs_admin      LogAuditoria[]
   tickets         TicketSuporte[]
 
   @@map("usuarios")
+}
+
+model LogDisparosJobs {
+  id_log       Int       @id @default(autoincrement())
+  id_usuario   Int
+  usuario      Usuario   @relation(fields: [id_usuario], references: [id_usuario])
+  tipo         String    // Ex: "LEMBRETE_PERFIL_INCOMPLETO"
+  data_envio   DateTime  @default(now())
+
+  @@map("logs_disparos_jobs")
 }
 
 model Endereco {

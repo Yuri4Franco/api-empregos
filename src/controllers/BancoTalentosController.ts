@@ -12,14 +12,13 @@ export class BancoTalentosController {
         turno,
         primeiro_emprego,
         pcd,
-        disponibilidade_sabados,
-        disponibilidade_viagem,
+        sabados,
+        viagem,
         cnh,
         escolaridade,
         competencia,
         pagina,
         limite,
-        // ✨ NOVOS CAMPOS NA QUERY
         genero,
         idade_min,
         idade_max,
@@ -51,16 +50,16 @@ export class BancoTalentosController {
               ? false
               : undefined,
         pcd: pcd === "true" ? true : pcd === "false" ? false : undefined,
-        disponibilidade_sabados:
-          disponibilidade_sabados === "true"
+        sabados:
+          sabados === "true"
             ? true
-            : disponibilidade_sabados === "false"
+            : sabados === "false"
               ? false
               : undefined,
-        disponibilidade_viagem:
-          disponibilidade_viagem === "true"
+        viagem:
+          viagem === "true"
             ? true
-            : disponibilidade_viagem === "false"
+            : viagem === "false"
               ? false
               : undefined,
       });
