@@ -1,6 +1,6 @@
 import cron from "node-cron";
-import { prisma } from "../config/prisma"; // Ajuste o caminho se necessário
-import { EmailService } from "../services/EmailService"; // Ajuste o caminho se necessário
+import { prisma } from "../config/prisma.js"; // Ajuste o caminho se necessário
+import { EmailService } from "../services/EmailService.js"; // Ajuste o caminho se necessário
 
 const emailService = new EmailService();
 
