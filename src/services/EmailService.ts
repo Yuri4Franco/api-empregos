@@ -248,7 +248,7 @@ export class EmailService {
   }
 
   async enviarEmailLembretePerfil(email: string, nome: string) {
-    const urlPainel = `${process.env.APP_URL}/painel/curriculo`;
+    const urlPainel = `${process.env.APP_URL}/candidato/meu-curriculo`;
 
     const conteudo = `
       <h2 style="color: #003366; margin-top: 0;">Olá, ${nome}!</h2>
