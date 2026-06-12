@@ -1,6 +1,6 @@
-import { agendarInativacaoPorInatividade } from "./jobs/InativacaoPerfilJob";
-import { agendarLembretePerfilIncompleto } from "./jobs/LembretePerfilJob";
-import { agendarLimpezaContasPendentes } from "./jobs/LimpezaContasJob";
+import { agendarInativacaoPorInatividade } from "./jobs/InativacaoPerfilJob.js";
+import { agendarLembretePerfilIncompleto } from "./jobs/LembretePerfilJob.js";
+import { agendarLimpezaContasPendentes } from "./jobs/LimpezaContasJob.js";
 
 
 console.log("Iniciando o Worker de Tarefas Agendadas da ACI Vagas...");
