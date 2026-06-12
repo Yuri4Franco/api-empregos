@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { AdminCompetenciaService } from "../services/AdminCompetenciaService";
+import { AdminCompetenciaService } from "../services/AdminCompetenciaService.js";
 
 const adminCompetenciaService = new AdminCompetenciaService();
 

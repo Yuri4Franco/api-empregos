@@ -1,13 +1,15 @@
 import express from "express";
 import "dotenv/config";
-import { prisma } from "./config/prisma";
+
 import routes from "./routes/index.js";
 import cors from "cors";
 import helmet from "helmet";
-import { globalLimiter } from "./middlewares/rateLimiter";
+
 
 import * as Sentry from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
+import { prisma } from "./config/prisma.js";
+import { globalLimiter } from "./middlewares/rateLimiter.js";
 
 const app = express();
 

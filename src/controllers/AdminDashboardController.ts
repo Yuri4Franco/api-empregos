@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { AdminDashboardService } from "../services/AdminDashboardService";
+import { AdminDashboardService } from "../services/AdminDashboardService.js";
 
 const adminDashboardService = new AdminDashboardService();
 

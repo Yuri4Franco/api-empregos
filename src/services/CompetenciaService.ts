@@ -1,5 +1,6 @@
 import { prisma } from "../config/prisma.js";
 
+
 export class CompetenciaService {
   async adicionar(id_usuario: number, dados: any) {
     // 1. REGRA DE NEGÓCIO: Checar o limite de 10 competências

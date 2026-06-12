@@ -1,5 +1,6 @@
 import type { TurnoPreferido } from "@prisma/client";
 import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 
 export class BancoTalentosService {
   async listarVitrine(filtros: {
@@ -447,7 +448,7 @@ export class BancoTalentosService {
     }
 
     // 3. A Transação Financeira e de Métricas (Tudo ou Nada)
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 3.1. Deduz 1 crédito do saldo da empresa
       await tx.empresa.update({
         where: { id_empresa },

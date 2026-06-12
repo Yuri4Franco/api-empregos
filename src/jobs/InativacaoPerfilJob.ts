@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 import { EmailService } from "../services/EmailService.js";
 
 const emailService = new EmailService();
@@ -36,7 +37,7 @@ export const agendarInativacaoPorInatividade = () => {
 
     for (const cand of candidatosParaAvisar) {
       try {
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
           await tx.usuario.update({
             where: { id_usuario: cand.id_usuario },
             data: { data_aviso_inativo: hoje },
@@ -74,7 +75,7 @@ export const agendarInativacaoPorInatividade = () => {
 
     for (const cand of candidatosParaOcultar) {
       try {
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
           await tx.candidato.update({
             where: { id_usuario: cand.id_usuario },
             data: { perfil_visivel_empresas: false },

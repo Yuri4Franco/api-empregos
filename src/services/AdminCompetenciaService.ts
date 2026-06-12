@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 
 export class AdminCompetenciaService {
   // =========================================================
@@ -38,7 +39,7 @@ export class AdminCompetenciaService {
   // 3. REJEITAR E LIMPAR DO CURRÍCULO
   // =========================================================
   async rejeitar(id_competencia: number) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Deleta os vínculos do currículo de quem sugeriu (ela "some" do currículo)
       await tx.candidatoCompetencia.deleteMany({
         where: { id_competencia },
@@ -66,7 +67,7 @@ export class AdminCompetenciaService {
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ');
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const competenciaPendente = await tx.competencia.findUnique({
         where: { id_competencia },
         include: { candidatos: true }

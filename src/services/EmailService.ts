@@ -1,4 +1,5 @@
-import { transporter } from "../config/mailer";
+import { transporter } from "../config/mailer.js";
+
 
 export class EmailService {
   // ============================================================================

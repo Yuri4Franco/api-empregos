@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 import argon2 from "argon2";
 
 export class BaseUserService {
@@ -95,7 +96,7 @@ export class BaseUserService {
 
     if (!usuarioExistente) throw new Error("Usuário não encontrado.");
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const dataUpdate: any = {};
 
       if (dados.nome) dataUpdate.nome = dados.nome;
@@ -131,7 +132,7 @@ export class BaseUserService {
     novoStatus: "ATIVO" | "BLOQUEADO" | "INATIVO" | "PENDENTE",
     id_autor: number,
   ) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const usuario = await tx.usuario.update({
         where: { id_usuario },
         data: {
@@ -228,7 +229,7 @@ export class BaseUserService {
 
     const hashExclusao = Date.now().toString();
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       if (usuario.tipo_usuario === "CANDIDATO" && usuario.candidato) {
         // 1. APAGA AS TABELAS RELACIONAIS (Hard Delete no que não afeta as métricas das empresas)
         await tx.experienciaProfissional.deleteMany({

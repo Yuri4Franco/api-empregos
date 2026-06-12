@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 import { ModeloTrabalho, StatusVaga } from "@prisma/client";
 
 export class VagaService {
@@ -22,7 +23,7 @@ export class VagaService {
           : "EM_ANALISE";
     }
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const endereco = await tx.endereco.create({
         data: {
           logradouro: dados.logradouro || "",
@@ -237,7 +238,7 @@ export class VagaService {
   }
 
   async duplicarVaga(id_vaga: number, id_empresa: number) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const original = await tx.vaga.findFirst({
         where: { id_vaga, id_empresa },
         include: {
@@ -377,7 +378,7 @@ export class VagaService {
       }
     }
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 4. Desconto do Crédito (Se aplicável)
       if (cobrarCredito) {
         await tx.empresa.update({
@@ -657,7 +658,7 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
       );
     }
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const vagaAtualizada = await tx.vaga.update({
         where: { id_vaga },
         data: {
@@ -1103,7 +1104,7 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
       throw new Error("Apenas vagas ativas podem ser pausadas.");
     }
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const atualizada = await tx.vaga.update({
         where: { id_vaga },
         data: { status: "PAUSADA" },
@@ -1137,7 +1138,7 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
       throw new Error("Apenas vagas pausadas podem ser reativadas.");
     }
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const atualizada = await tx.vaga.update({
         where: { id_vaga },
         data: { status: "ATIVA" },
@@ -1166,7 +1167,7 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
     id_autor: number,
     motivo: string = "A vaga foi encerrada e o processo seletivo finalizado."
   ) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Validar a vaga
       const vaga = await tx.vaga.findFirst({
         where: { id_vaga, id_empresa },

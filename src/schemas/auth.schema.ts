@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { validarCPF } from "../types/validarCpf";
+import { validarCPF } from "../types/validarCpf.js";
 
 // --- ÁTOMOS  ---
 const UsuarioBaseSchema = z.object({

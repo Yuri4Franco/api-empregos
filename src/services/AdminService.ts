@@ -1,6 +1,7 @@
 import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 import argon2 from "argon2";
-import { BaseUserService } from "./BaseUserService";
+import { BaseUserService } from "./BaseUserService.js";
 import { generateSlug } from "../utils/slugify.js";
 import type { TipoUsuario } from "@prisma/client";
 
@@ -115,7 +116,7 @@ export class AdminService {
 
     const senha_hash = await argon2.hash(dados.senha);
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Cadastro do Endereço
       const endereco = await tx.endereco.create({
         data: {
@@ -190,7 +191,7 @@ export class AdminService {
 
     const idEnderecoValido: number = empresaExistente.id_endereco;
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Atualizar o Endereço
       await tx.endereco.update({
         where: { id_endereco: idEnderecoValido },
@@ -349,7 +350,7 @@ export class AdminService {
     acao: "ATIVAR" | "DESATIVAR",
     id_autor: number,
   ) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const novoStatus = acao === "ATIVAR" ? "ATIVO" : "BLOQUEADO";
 
       await tx.empresa.update({
@@ -416,7 +417,7 @@ export class AdminService {
 
     const senhaHash = await argon2.hash(dados.senha);
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 3. Criação do Usuário Colaborador
       const novoUsuario = await tx.usuario.create({
         data: {
@@ -468,7 +469,7 @@ export class AdminService {
       throw new Error("Nenhum dado informado para atualização.");
     }
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const usuario = await tx.usuario.update({
         where: { id_usuario },
         data: dataUpdate,
@@ -582,7 +583,7 @@ export class AdminService {
     dados: any,
     id_autor: number,
   ) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const experiencia = await tx.experienciaProfissional.create({
         data: {
           id_candidato: id_usuario,
@@ -612,7 +613,7 @@ export class AdminService {
     dados: any,
     id_autor: number,
   ) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const formacao = await tx.formacaoAcademica.create({
         data: {
           id_candidato: id_usuario,
@@ -641,7 +642,7 @@ export class AdminService {
     dados: any,
     id_autor: number,
   ) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const vinculo = await tx.candidatoCompetencia.upsert({
         where: {
           id_candidato_id_competencia: {
@@ -697,7 +698,7 @@ export class AdminService {
 
     const senhaHash = await argon2.hash(dados.senha);
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const novoAdmin = await tx.usuario.create({
         data: {
           nome: dados.nome,
@@ -777,7 +778,7 @@ export class AdminService {
   async atualizarDadosAdmin(id_admin: number, dados: any, id_autor: number) {
     const senha_hash = dados.senha ? await argon2.hash(dados.senha) : undefined;
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const admin = await tx.usuario.update({
         where: { id_usuario: id_admin },
         data: {
@@ -814,7 +815,7 @@ export class AdminService {
   ) {
     const senha_hash = await argon2.hash(novaSenhaPura);
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const usuario = await tx.usuario.update({
         where: { id_usuario },
         data: {
@@ -848,7 +849,7 @@ export class AdminService {
     const empresa = await prisma.empresa.findUnique({ where: { id_empresa } });
     if (!empresa) throw new Error("Empresa não encontrada.");
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const novaData: any = {};
 
       // Lógica para Vagas
@@ -960,7 +961,7 @@ export class AdminService {
     novoStatus: string,
     id_autor: number,
   ) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const ticket = await tx.ticketSuporte.update({
         where: { id_ticket },
         data: { status: novoStatus },
@@ -983,7 +984,7 @@ export class AdminService {
     dados: { tipo: "VAGA" | "CURRICULO"; quantidade: number },
     id_autor: number,
   ) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Verificar se a empresa existe
       const empresa = await tx.empresa.findUnique({ where: { id_empresa } });
       if (!empresa) throw new Error("Empresa não encontrada.");
@@ -1034,7 +1035,7 @@ export class AdminService {
     dados: any,
     id_autor: number,
   ) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const pedido = await tx.solicitacaoMidia.update({
         where: { id_solicitacao },
         data: {

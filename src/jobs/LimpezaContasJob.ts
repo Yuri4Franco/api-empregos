@@ -1,5 +1,6 @@
 import cron from "node-cron";
-import { prisma } from "../config/prisma.js"; // Ajuste o caminho se necessário
+import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 import { EmailService } from "../services/EmailService.js"; // Ajuste o caminho se necessário
 
 const emailService = new EmailService();
@@ -59,7 +60,7 @@ export const agendarLimpezaContasPendentes = () => {
 
     for (const usuario of usuariosParaDeletar) {
       try {
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
           await tx.candidato.deleteMany({
             where: { id_usuario: usuario.id_usuario },
           });

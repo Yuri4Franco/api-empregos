@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 import { startOfDay, endOfDay, subDays } from "date-fns";
 
 export class EmpresaService {
@@ -24,7 +25,7 @@ export class EmpresaService {
   }
 
   async atualizarPerfilInstitucional(id_empresa: number, dados: any) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Atualizar dados básicos e links
       const empresa = await tx.empresa.update({
         where: { id_empresa },

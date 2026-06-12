@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { prisma } from "../src/config/prisma";
+import { prisma } from "../src/config/prisma.js";
 import argon2 from "argon2";
 
 async function main() {

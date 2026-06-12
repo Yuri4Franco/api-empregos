@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 import { StatusCandidatura } from "@prisma/client";
 
 export class CandidatoService {
@@ -7,7 +8,7 @@ export class CandidatoService {
     id_vaga: number,
     respostas: { id_pergunta: number; resposta: string }[],
   ) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Validar se a vaga existe e está ativa
       const vaga = await tx.vaga.findUnique({
         where: { id_vaga },
@@ -131,7 +132,7 @@ export class CandidatoService {
   async actualizarDadosGerais(id_usuario: number, dados: any) {
     const { endereco, ...dadosCandidato } = dados;
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. VERIFICAÇÃO DE DUPLICIDADE DE CPF
       if (dadosCandidato.cpf) {
         const candidatoExistente = await tx.candidato.findUnique({

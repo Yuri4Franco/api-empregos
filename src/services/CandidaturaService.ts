@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 import { StatusCandidatura } from "@prisma/client";
 
 export class CandidaturaService {
@@ -127,7 +128,7 @@ export class CandidaturaService {
     id_etapa_destino: number,
     id_empresa: number,
   ) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Validações iniciais
       const candidatura = await tx.candidatura.findUnique({
         where: { id_candidatura },
@@ -263,7 +264,7 @@ export class CandidaturaService {
     id_empresa: number,
     dados: { data_hora: Date; local_link: string; observacoes?: string },
   ) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Validar se a empresa é dona da vaga do candidato
       const candidatura = await tx.candidatura.findUnique({
         where: { id_candidatura },
@@ -374,7 +375,7 @@ export class CandidaturaService {
     // 1. Garantir que os IDs sejam numéricos (o Express as vezes envia como string)
     const idsNumericos = id_candidaturas.map((id) => Number(id));
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 2. Busca apenas as candidaturas que REALMENTE podem ser reprovadas
       const candidaturasValidas = await tx.candidatura.findMany({
         where: {
@@ -711,7 +712,7 @@ export class CandidaturaService {
   }
 
   async avancarEmMassa(id_candidaturas: number[], id_empresa: number) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const candidaturas = await tx.candidatura.findMany({
         where: {
           id_candidatura: { in: id_candidaturas },
@@ -954,7 +955,7 @@ export class CandidaturaService {
     }
 
     // 3. A Transação (Tudo ou nada)
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Atualiza o status principal para DESISTENCIA
       const atualizada = await tx.candidatura.update({
         where: { id_candidatura },

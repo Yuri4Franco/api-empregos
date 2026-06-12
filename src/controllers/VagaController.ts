@@ -1,7 +1,6 @@
 import type { Request, Response } from "express";
 import { VagaService } from "../services/VagaService.js";
-import { vagaSchema } from "../schemas/auth.schema.js"; // Importando o Zod que corrigimos
-import type { ModeloTrabalho } from "@prisma/client";
+import { vagaSchema } from "../schemas/auth.schema.js";
 import { prisma } from "../config/prisma.js";
 
 const vagaService = new VagaService();

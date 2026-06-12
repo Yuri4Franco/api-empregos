@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 import argon2 from "argon2";
 import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
@@ -123,7 +124,7 @@ export class AuthService {
     const senhaHash = await argon2.hash(senha);
     const tokenAtivacao = crypto.randomBytes(32).toString("hex");
 
-    const resultado = await prisma.$transaction(async (tx) => {
+    const resultado = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const user = await tx.usuario.create({
         data: {
           nome,

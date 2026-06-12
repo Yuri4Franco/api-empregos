@@ -1,7 +1,5 @@
 import type { Request, Response } from "express";
 import { CandidatoService } from "../services/CandidatoService.js";
-import { updateCandidatoSchema } from "../schemas/auth.schema.js";
-import { prisma } from "../config/prisma.js";
 
 const candidatoService = new CandidatoService();
 

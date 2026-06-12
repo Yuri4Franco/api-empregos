@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 
 export class AreaAtuacaoService {
   async adicionar(id_usuario: number, id_area: number) {
@@ -53,7 +54,7 @@ export class AreaAtuacaoService {
   }
 
   async sincronizarAreas(id_usuario: number, areas_ids: number[]) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Apaga todas as áreas que o candidato tem cadastradas hoje
       await tx.candidatoAreaAtuacao.deleteMany({
         where: { id_candidato: id_usuario },
