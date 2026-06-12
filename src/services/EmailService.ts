@@ -101,7 +101,7 @@ export class EmailService {
 
     const conteudo = `
       <h2 style="color: #003366; margin-top: 0;">Olá, ${nome}!</h2>
-      <p>Notamos que você iniciou o seu cadastro na <strong>ACI Empregos</strong>, mas ainda não ativou a sua conta.</p>
+      <p>Notamos que você iniciou o seu cadastro na <strong>ACI Vagas</strong>, mas ainda não ativou a sua conta.</p>
       <p>Para mantermos a segurança e a organização do nosso banco de talentos, cadastros inativos há muito tempo são removidos do sistema. <strong>Sua conta será excluída permanentemente em 5 dias.</strong></p>
       <p>Se você ainda quer ter acesso às vagas exclusivas de Panambi e região, ative sua conta clicando no botão abaixo:</p>
       
@@ -116,7 +116,7 @@ export class EmailService {
     `;
 
     const mailOptions = {
-      from: `"ACI Empregos" <${process.env.EMAIL_USER}>`,
+      from: `"ACI Vagas" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: "Aviso: Sua conta será excluída em 5 dias",
       html: this.gerarTemplateEmail(conteudo),
@@ -124,6 +124,66 @@ export class EmailService {
 
     return await transporter.sendMail(mailOptions);
   }
+
+  async enviarEmailAvisoOcultacao(email: string, nome: string) {
+    const urlLogin = `${process.env.APP_URL}/entrar`;
+
+    const conteudo = `
+      <h2 style="color: #003366; margin-top: 0;">Sentimos sua falta, ${nome}!</h2>
+      <p>Faz quase 6 meses que você não acessa a sua conta na <strong>ACI Vagas</strong>.</p>
+      <p>Para garantir que as empresas encontrem apenas profissionais disponíveis, nosso sistema oculta automaticamente perfis que estão há muito tempo sem atividade. <strong>Seu perfil ficará oculto para as empresas em 20 dias.</strong></p>
+      <p>Se você ainda está em busca de oportunidades ou quer deixar seu currículo visível para futuras vagas, basta fazer o login na plataforma para revalidar seu perfil:</p>
+      
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="${urlLogin}" style="background-color: #0056b3; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px;">
+          Acessar Minha Conta e Continuar Visível
+        </a>
+      </div>
+
+      <p style="font-size: 13px; color: #666;">Basta fazer o login uma única vez para que o seu perfil continue ativo e visível na nossa vitrine de talentos.</p>
+    `;
+
+    const mailOptions = {
+      from: `"ACI Vagas" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Aviso: Seu currículo ficará oculto em 20 dias",
+      html: this.gerarTemplateEmail(conteudo),
+    };
+
+    return await transporter.sendMail(mailOptions);
+  }
+
+  async enviarEmailPerfilOcultado(email: string, nome: string) {
+    const urlLogin = `${process.env.APP_URL}/entrar`;
+
+    const conteudo = `
+      <h2 style="color: #333; margin-top: 0;">Seu perfil foi ocultado temporariamente</h2>
+      <p>Olá, ${nome}. Como seu último acesso à <strong>ACI Vagas</strong> foi há mais de 6 meses, seu perfil foi movido para o modo oculto para as empresas da região.</p>
+      <p>Mas não se preocupe! <strong>Nenhum dado seu foi apagado.</strong> Suas experiências, formações e dados continuam salvos com total segurança.</p>
+      <p>Se você quiser voltar a aparecer na vitrine de talentos para que as empresas te encontrem, o processo é super simples:</p>
+      
+      <ol>
+        <li>Faça o login na plataforma clicando no botão abaixo.</li>
+        <li>Ative a opção <strong>"Perfil Visível para Empresas"</strong>.</li>
+      </ol>
+      
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="${urlLogin}" style="background-color: #28a745; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px;">
+          Fazer Login e Reativar Perfil
+        </a>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: `"ACI Vagas" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Seu perfil foi ocultado por inatividade - ACI Vagas",
+      html: this.gerarTemplateEmail(conteudo),
+    };
+
+    return await transporter.sendMail(mailOptions);
+  }
+
 
   async enviarEmailContatoEmpresa(
     nome: string,
@@ -180,6 +240,34 @@ export class EmailService {
       from: `"ACI Vagas" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: "Recuperação de Senha - ACI Vagas",
+      html: this.gerarTemplateEmail(conteudo),
+    };
+
+    return await transporter.sendMail(mailOptions);
+  }
+
+  async enviarEmailLembretePerfil(email: string, nome: string) {
+    const urlPainel = `${process.env.APP_URL}/painel/curriculo`;
+
+    const conteudo = `
+      <h2 style="color: #003366; margin-top: 0;">Olá, ${nome}!</h2>
+      <p>Notamos que o seu perfil na plataforma <strong>ACI Vagas</strong> está ativo, mas ainda faltam algumas informações cruciais para você começar a se destacar para as empresas locais.</p>
+      <p>Um currículo completo e com a <strong>visibilidade ativada</strong> aumenta as suas chances de ser chamado para entrevistas.</p>
+      <p>Não perca tempo! Acesse seu painel agora mesmo para preencher seus dados, cadastrar suas áreas de interesse e deixar seu perfil pronto para os recrutadores:</p>
+      
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="${urlPainel}" style="background-color: #28a745; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px;">
+          Completar Meu Perfil Agora
+        </a>
+      </div>
+
+      <p style="font-size: 13px; color: #666;">Se você já atualizou seu perfil recentemente, certifique-se de que a opção "Perfil Visível para Empresas" está ativada nas suas configurações.</p>
+    `;
+
+    const mailOptions = {
+      from: `"ACI Vagas" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Aumente suas chances: complete seu perfil na ACI Vagas",
       html: this.gerarTemplateEmail(conteudo),
     };
 

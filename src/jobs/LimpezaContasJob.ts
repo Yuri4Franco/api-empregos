@@ -1,10 +1,10 @@
 import cron from "node-cron";
-import { prisma } from "../config/prisma";
-import { EmailService } from "../services/EmailService.js";
+import { prisma } from "../config/prisma"; // Ajuste o caminho se necessário
+import { EmailService } from "../services/EmailService"; // Ajuste o caminho se necessário
+
 const emailService = new EmailService();
 
 export const agendarLimpezaContasPendentes = () => {
-
   cron.schedule("0 3 * * *", async () => {
     console.log("Iniciando rotina de higiene de contas pendentes...");
 
@@ -67,6 +67,7 @@ export const agendarLimpezaContasPendentes = () => {
           await tx.logDisparosJobs.deleteMany({
             where: { id_usuario: usuario.id_usuario },
           });
+
           await tx.usuario.delete({
             where: { id_usuario: usuario.id_usuario },
           });

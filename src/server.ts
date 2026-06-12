@@ -6,14 +6,10 @@ import cors from "cors";
 import helmet from "helmet";
 import { globalLimiter } from "./middlewares/rateLimiter";
 
-// Importações do Sentry
 import * as Sentry from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
-import { agendarLimpezaContasPendentes } from "./jobs/worker";
 
 const app = express();
-
-// (As linhas antigas requestHandler e tracingHandler foram removidas daqui)
 
 app.set("trust proxy", 1); 
 app.use(globalLimiter);
@@ -63,9 +59,6 @@ app.get("/health", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Servidor rodando em http://localhost:${PORT} 🚀`);
-
-  agendarLimpezaContasPendentes();
-  console.log('⏳ Cronjobs inicializados com sucesso!');
+  console.log(`Servidor rodando na porta ${PORT} 🚀`);
 });
 

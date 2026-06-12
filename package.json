@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch --import ./src/instrument.ts src/server.ts",
+    "worker": "tsx watch src/worker.ts",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "build": "tsc",

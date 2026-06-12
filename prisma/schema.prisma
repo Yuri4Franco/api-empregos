@@ -115,9 +115,8 @@ model Usuario {
   exigir_troca_senha Boolean    @default(false)
 
   data_aviso_inativo   DateTime?  
-  motivo_inativacao    String?
-  ultima_atividade_candidato DateTime?
-  data_aviso_inativacao DateTime?    
+  motivo_inativacao  String?
+  ultima_atividade DateTime?   
 
   candidato       Candidato?
   notificacoes    Notificacao[]
@@ -132,7 +131,7 @@ model LogDisparosJobs {
   id_log       Int       @id @default(autoincrement())
   id_usuario   Int
   usuario      Usuario   @relation(fields: [id_usuario], references: [id_usuario])
-  tipo         String    // Ex: "LEMBRETE_PERFIL_INCOMPLETO"
+  tipo         String 
   data_envio   DateTime  @default(now())
 
   @@map("logs_disparos_jobs")
