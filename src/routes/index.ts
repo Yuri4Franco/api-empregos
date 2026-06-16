@@ -517,7 +517,7 @@ routes.put(
 
 routes.patch(
   "/empresa/vagas/:id_vaga/pausar",
-  authMiddleware(["EMPRESA"]), // Garante que é uma empresa
+  authMiddleware(["EMPRESA"]), 
   vagaController.pausar,
 );
 
