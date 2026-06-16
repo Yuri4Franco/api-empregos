@@ -13,7 +13,6 @@ export class VagaController {
    */
   async cadastrar(req: Request, res: Response) {
     try {
-
       // 1. Descobrimos se é para mandar pra ACI ou se é só Rascunho
       const isSubmissao = req.body.enviar_para_aprovacao === true;
 
@@ -103,13 +102,13 @@ export class VagaController {
 
       const usuario = await prisma.usuario.findUnique({
         where: { id_usuario },
-        select: { id_empresa: true }
+        select: { id_empresa: true },
       });
 
       if (!usuario || !usuario.id_empresa) {
-        return res.status(403).json({ 
-          success: false, 
-          error: "Acesso negado. Nenhuma empresa vinculada a este usuário." 
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado. Nenhuma empresa vinculada a este usuário.",
         });
       }
 
@@ -253,6 +252,20 @@ export class VagaController {
     }
   }
 
+  async deletarVaga(req: Request, res: Response) {
+    const { id } = req.params;
+
+    // Pega o ID da empresa logada (Ajuste 'req.usuario.id' para como seu middleware injeta o payload do JWT)
+    const idEmpresa = (req.user as any).id_empresa;
+    const idVaga = Number(id);
+    try {
+      const result = await vagaService.deletarVaga(idVaga, idEmpresa);
+      return res.status(200).json(result);
+    } catch (error: any) {
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
   async listarCandidatos(req: Request, res: Response) {
     try {
       const { id } = req.params; // ID da Vaga
@@ -393,11 +406,16 @@ export class VagaController {
 
       if (!id_vaga) throw new Error("ID da vaga não fornecido.");
 
-      const vagaPausada = await vagaService.pausarVaga(id_vaga, id_empresa, id_autor);
+      const vagaPausada = await vagaService.pausarVaga(
+        id_vaga,
+        id_empresa,
+        id_autor,
+      );
 
       return res.status(200).json({
         success: true,
-        message: "Vaga pausada com sucesso. Ela não receberá mais candidaturas até ser reativada.",
+        message:
+          "Vaga pausada com sucesso. Ela não receberá mais candidaturas até ser reativada.",
         data: vagaPausada,
       });
     } catch (error: any) {
@@ -417,11 +435,18 @@ export class VagaController {
 
       if (!id_vaga) throw new Error("ID da vaga não fornecido.");
 
-      const vagaAtivada = await vagaService.ativarVaga(id_vaga, id_empresa, id_autor);
+      console.log(`Tentando ativar vaga ID ${id_vaga} para empresa ID ${id_empresa} por usuário ID ${id_autor}`);
+
+      const vagaAtivada = await vagaService.ativarVaga(
+        id_vaga,
+        id_empresa,
+        id_autor,
+      );
 
       return res.status(200).json({
         success: true,
-        message: "Vaga reativada! Ela já está visível novamente no painel de vagas.",
+        message:
+          "Vaga reativada! Ela já está visível novamente no painel de vagas.",
         data: vagaAtivada,
       });
     } catch (error: any) {
@@ -438,22 +463,25 @@ export class VagaController {
       const user = req.user as any;
       const id_empresa = user.id_empresa;
       const id_autor = (req.user as any).id;
-      
-      // O motivo vem do schema validado (opcional)
-      const { motivo } = req.body;
+      const motivo = "A vaga foi encerrada e o processo seletivo finalizado.";
 
       if (!id_vaga) throw new Error("ID da vaga não fornecido.");
 
-      const vagaEncerrada = await vagaService.encerrarVaga(id_vaga, id_empresa, id_autor, motivo);
+      const vagaEncerrada = await vagaService.encerrarVaga(
+        id_vaga,
+        id_empresa,
+        id_autor,
+        motivo,
+      );
 
       return res.status(200).json({
         success: true,
-        message: "Vaga encerrada com sucesso. Os candidatos não aprovados foram reprovados e serão notificados.",
+        message:
+          "Vaga encerrada com sucesso. Os candidatos não aprovados foram reprovados e serão notificados.",
         data: vagaEncerrada,
       });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
-  
 }

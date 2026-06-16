@@ -4,7 +4,6 @@ import { ModeloTrabalho, StatusVaga } from "@prisma/client";
 
 export class VagaService {
   async criarVaga(dados: any, id_empresa: number, is_admin: boolean = false) {
-
     const empresa = await prisma.empresa.findUnique({
       where: { id_empresa },
       select: { tipo_vinculo_aci: true, creditos_vagas: true },
@@ -60,18 +59,18 @@ export class VagaService {
           diferenciais: dados.diferenciais || "",
           empresa_confidencial: dados.empresa_confidencial || false,
           status: statusFinal,
-          data_encerramento: dados.data_encerramento ? new Date(dados.data_encerramento) : null,
-          
-          vaga_externa: dados.vaga_externa || false,    
-          link_externo: dados.link_externo || null,         
-          instrucoes_candidatura: dados.instrucoes_candidatura || null,
+          data_encerramento: dados.data_encerramento
+            ? new Date(dados.data_encerramento)
+            : null,
 
+          vaga_externa: dados.vaga_externa || false,
+          link_externo: dados.link_externo || null,
+          instrucoes_candidatura: dados.instrucoes_candidatura || null,
 
           data_publicacao: statusFinal === "ATIVA" ? new Date() : new Date(),
         },
       });
 
-      // Se for rascunho, essas listas podem vir vazias ou undefined, o '?' protege o código
       if (dados.beneficios_ids?.length > 0) {
         await tx.vagaBeneficio.createMany({
           data: dados.beneficios_ids.map((id_ben: number) => ({
@@ -91,13 +90,11 @@ export class VagaService {
         });
       }
 
-      // Se o usuário não enviou etapas no rascunho, não criamos as padrão ainda, ou criamos as básicas
       const etapasPadrao = [
         { nome_etapa: "Inscritos", requer_agendamento: false },
         { nome_etapa: "Entrevista", requer_agendamento: true },
         { nome_etapa: "Finalistas", requer_agendamento: false },
       ];
-      
 
       const etapasParaCriar =
         dados.etapas?.length > 0 ? dados.etapas : etapasPadrao;
@@ -253,7 +250,7 @@ export class VagaService {
 
       if (!original)
         throw new Error("Vaga original não encontrada ou acesso negado.");
-      
+
       const novoEndereco = original.endereco
         ? await tx.endereco.create({
             data: {
@@ -269,7 +266,7 @@ export class VagaService {
         : null;
 
       const novaVaga = await tx.vaga.create({
-       data: {
+        data: {
           id_empresa: original.id_empresa,
           titulo: original.titulo,
           nivel_hierarquico: original.nivel_hierarquico,
@@ -286,8 +283,8 @@ export class VagaService {
           diferenciais: original.diferenciais,
           empresa_confidencial: original.empresa_confidencial,
           id_area_atuacao: original.id_area_atuacao,
-          tipo_diversidade: original.tipo_diversidade, 
-          status: "RASCUNHO", 
+          tipo_diversidade: original.tipo_diversidade,
+          status: "RASCUNHO",
         },
       });
       if (original.beneficios.length > 0) {
@@ -355,23 +352,38 @@ export class VagaService {
       );
     }
 
-    // 3. REGRA DE NEGÓCIO: Verificação de Créditos ao Submeter Rascunho
+    // 3. REGRA DE NEGÓCIO: Verificação de Créditos ao Submeter
     let novoStatus = vagaExistente.status;
     let cobrarCredito = false;
+    let limparObservacoes = false; // ✨ Flag para limpar o recado do admin
 
     if (is_admin && dados.status) {
       novoStatus = dados.status;
     } else if (
       dados.enviar_para_aprovacao &&
-      vagaExistente.status === "RASCUNHO"
+      (vagaExistente.status === "RASCUNHO" ||
+        vagaExistente.status === "REPROVADA") // ✨ Aceita Reprovada
     ) {
-      // Se era rascunho e agora quer enviar pra aprovação, aplicamos a regra da ACI
+      // Se está re-enviando uma reprovada, limpa o recado antigo do admin
+      if (vagaExistente.status === "REPROVADA") {
+        limparObservacoes = true;
+      }
+
+      // Aplica a regra da ACI
       if (vagaExistente.empresa.tipo_vinculo_aci === "NAO_ASSOCIADA") {
-        if (vagaExistente.empresa.creditos_vagas <= 0) {
+        // Se for rascunho e não tiver crédito, barra.
+        // Se for reprovada, deixa passar (pois já pagou no primeiro envio)
+        if (
+          vagaExistente.empresa.creditos_vagas <= 0 &&
+          vagaExistente.status === "RASCUNHO"
+        ) {
           novoStatus = "AGUARDANDO_PAGAMENTO";
         } else {
           novoStatus = "EM_ANALISE";
-          cobrarCredito = true; // Marca para descontar o crédito na transação!
+          // ✨ Só cobra o crédito se for o primeiro envio (Rascunho)
+          if (vagaExistente.status === "RASCUNHO") {
+            cobrarCredito = true;
+          }
         }
       } else {
         novoStatus = "EM_ANALISE"; // Associadas têm passe livre
@@ -449,7 +461,7 @@ export class VagaService {
         if (dados[campo] !== undefined) dadosVaga[campo] = dados[campo];
       });
 
-      // Conversão Segura de Números (Se vier "" do Frontend, vira null)
+      // Conversão Segura de Números
       if (dados.id_area_atuacao !== undefined)
         dadosVaga.id_area_atuacao = dados.id_area_atuacao
           ? Number(dados.id_area_atuacao)
@@ -467,6 +479,11 @@ export class VagaService {
       dadosVaga.status = novoStatus;
       if (novoStatus === "ATIVA" && !vagaExistente.data_publicacao) {
         dadosVaga.data_publicacao = new Date();
+      }
+
+      // ✨ Limpa as observações do admin se a vaga foi reenviada após reprovação
+      if (limparObservacoes) {
+        dadosVaga.observacoes_admin = null;
       }
 
       const vaga = await tx.vaga.update({
@@ -509,13 +526,12 @@ export class VagaService {
 
         // Upsert das Etapas
         for (const [idx, e] of dados.etapas.entries()) {
-          // Se o Zod stripou o tipo, recriamos a lógica de INICIAL, INTERMEDIARIA, FINAL
           let tipoSeguro = e.tipo || "INTERMEDIARIA";
           if (idx === 0) tipoSeguro = "INICIAL";
           else if (idx === dados.etapas.length - 1) tipoSeguro = "FINAL";
 
           await tx.etapaProcesso.upsert({
-            where: { id_etapa: e.id_etapa || 0 }, // 0 não vai achar, forçando o 'create'
+            where: { id_etapa: e.id_etapa || 0 },
             update: {
               nome_etapa: e.nome_etapa || e.nome,
               ordem: e.ordem ?? idx,
@@ -550,7 +566,7 @@ export class VagaService {
     });
   }
 
-async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
+  async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
     // 1. Forçamos a conversão para número e definimos valores padrão caso venham nulos
     const page = Number(filtros.page) || 1;
     const limit = Number(filtros.limit) || 10;
@@ -568,9 +584,8 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
               OR: [
                 { titulo: { contains: search, mode: "insensitive" } },
                 {
-                  // 🚀 CORREÇÃO AQUI: Entramos na relação "area_atuacao" e buscamos no "nome"
-                  area_atuacao: { 
-                    nome: { contains: search, mode: "insensitive" } 
+                  area_atuacao: {
+                    nome: { contains: search, mode: "insensitive" },
                   },
                 },
               ],
@@ -588,8 +603,8 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
           take: limit,
           include: {
             _count: { select: { candidaturas: true } },
-            // É bom incluir a área de atuação no retorno para o Front-end mostrar no card!
-            area_atuacao: { select: { nome: true } } 
+            area_atuacao: { select: { nome: true } },
+            endereco: { select: { cidade: true, uf: true } },
           },
           orderBy: { data_publicacao: "desc" },
         }),
@@ -610,15 +625,43 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
     }
   }
 
-// Nova função unificada
+  async deletarVaga(idVaga: number, idEmpresa: number) {
+    const vaga = await prisma.vaga.findFirst({
+      where: {
+        id_vaga: idVaga,
+        id_empresa: idEmpresa,
+      },
+    });
+
+    if (!vaga) {
+      throw new Error(
+        "Vaga não encontrada ou você não tem permissão para excluí-la.",
+      );
+    }
+
+    if (vaga.status !== "RASCUNHO") {
+      throw new Error("Apenas vagas salvas como rascunho podem ser excluídas.");
+    }
+
+    // 2. Executa a exclusão
+    await prisma.vaga.delete({
+      where: {
+        id_vaga: idVaga,
+      },
+    });
+
+    return { message: "Rascunho de vaga excluído com sucesso." };
+  }
+
+  // Nova função unificada
   async listarVagasPendentesAcao() {
     // Busca vagas que estão EM_ANALISE ou AGUARDANDO_PAGAMENTO
     // Isso centraliza a lógica do que é "tarefa pendente"
     const vagas = await prisma.vaga.findMany({
       where: {
         status: {
-          in: ["EM_ANALISE", "AGUARDANDO_PAGAMENTO"]
-        }
+          in: ["EM_ANALISE", "AGUARDANDO_PAGAMENTO"],
+        },
       },
       include: {
         empresa: {
@@ -630,7 +673,7 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
 
     return {
       data: vagas,
-      total: vagas.length
+      total: vagas.length,
     };
   }
 
@@ -1089,14 +1132,13 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
     };
   }
 
-
   // =========================================================
   // 1. PAUSAR VAGA
   // =========================================================
   async pausarVaga(id_vaga: number, id_empresa: number, id_autor: number) {
     const vaga = await prisma.vaga.findFirst({
       where: { id_vaga, id_empresa },
-      select: { status: true }
+      select: { status: true },
     });
 
     if (!vaga) throw new Error("Vaga não encontrada ou acesso negado.");
@@ -1116,8 +1158,8 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
           acao: "PAUSAR_VAGA",
           entidade: "Vaga",
           id_entidade: id_vaga,
-          detalhes: { status_anterior: "ATIVA", novo_status: "PAUSADA" }
-        }
+          detalhes: { status_anterior: "ATIVA", novo_status: "PAUSADA" },
+        },
       });
 
       return atualizada;
@@ -1130,7 +1172,7 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
   async ativarVaga(id_vaga: number, id_empresa: number, id_autor: number) {
     const vaga = await prisma.vaga.findFirst({
       where: { id_vaga, id_empresa },
-      select: { status: true }
+      select: { status: true },
     });
 
     if (!vaga) throw new Error("Vaga não encontrada ou acesso negado.");
@@ -1150,8 +1192,8 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
           acao: "ATIVAR_VAGA",
           entidade: "Vaga",
           id_entidade: id_vaga,
-          detalhes: { status_anterior: "PAUSADA", novo_status: "ATIVA" }
-        }
+          detalhes: { status_anterior: "PAUSADA", novo_status: "ATIVA" },
+        },
       });
 
       return atualizada;
@@ -1165,17 +1207,18 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
     id_vaga: number,
     id_empresa: number,
     id_autor: number,
-    motivo: string = "A vaga foi encerrada e o processo seletivo finalizado."
+    motivo: string,
   ) {
     return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Validar a vaga
       const vaga = await tx.vaga.findFirst({
         where: { id_vaga, id_empresa },
-        select: { status: true }
+        select: { status: true },
       });
 
       if (!vaga) throw new Error("Vaga não encontrada ou acesso negado.");
-      if (vaga.status === "ENCERRADA") throw new Error("Esta vaga já está encerrada.");
+      if (vaga.status === "ENCERRADA")
+        throw new Error("Esta vaga já está encerrada.");
 
       // 2. Buscar candidatos ativos (que não estão Aprovados, Reprovados ou Desistentes)
       const candidatosPendentes = await tx.candidatura.findMany({
@@ -1229,11 +1272,11 @@ async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
           acao: "ENCERRAR_VAGA",
           entidade: "Vaga",
           id_entidade: id_vaga,
-          detalhes: { 
-            candidatos_reprovados_automaticamente: candidatosPendentes.length, 
-            motivo 
-          }
-        }
+          detalhes: {
+            candidatos_reprovados_automaticamente: candidatosPendentes.length,
+            motivo,
+          },
+        },
       });
 
       return vagaEncerrada;

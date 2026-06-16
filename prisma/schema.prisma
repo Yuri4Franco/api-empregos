@@ -340,6 +340,8 @@ model Vaga {
   status                  StatusVaga      @default(RASCUNHO)
   data_publicacao         DateTime?
   data_encerramento       DateTime?
+  criada_em               DateTime         @default(now())
+  data_atualizacao        DateTime?        @updatedAt
   observacoes_admin       String?          @db.Text
   tipo_diversidade        TipoDiversidade @default(AMPLA_CONCORRENCIA)
 
@@ -351,6 +353,8 @@ model Vaga {
   area_atuacao            AreaAtuacao?     @relation(fields: [id_area_atuacao], references: [id_area])
 
   configuracao            ConfiguracaoVaga?
+
+  
   
   beneficios              VagaBeneficio[]
   etapas                  EtapaProcesso[]
@@ -365,7 +369,7 @@ model Vaga {
 model ConfiguracaoVaga {
   id_configuracao Int  @id @default(autoincrement())
   id_vaga         Int  @unique
-  vaga            Vaga @relation(fields: [id_vaga], references: [id_vaga])
+  vaga            Vaga @relation(fields: [id_vaga], references: [id_vaga], onDelete: Cascade)
 
   campos_destaque Json?
 
@@ -376,7 +380,7 @@ model ConfiguracaoVaga {
 model EtapaProcesso {
   id_etapa           Int           @id @default(autoincrement())
   id_vaga            Int
-  vaga               Vaga          @relation(fields: [id_vaga], references: [id_vaga])
+  vaga               Vaga          @relation(fields: [id_vaga], references: [id_vaga], onDelete: Cascade)
   nome_etapa         String
   ordem              Int
   tipo               TipoEtapa     @default(INTERMEDIARIA)
@@ -479,7 +483,7 @@ model VagaPerguntaEliminatoria {
   id_pergunta       Int
   resposta_esperada String 
   
-  vaga              Vaga                 @relation(fields: [id_vaga], references: [id_vaga])
+  vaga              Vaga                 @relation(fields: [id_vaga], references: [id_vaga], onDelete: Cascade)
   pergunta          PerguntaEliminatoria @relation(fields: [id_pergunta], references: [id_pergunta])
 
   @@id([id_vaga, id_pergunta])
@@ -546,7 +550,7 @@ model EmpresaBeneficioPadrao {
 model VagaBeneficio {
   id_vaga      Int
   id_beneficio Int
-  vaga         Vaga      @relation(fields: [id_vaga], references: [id_vaga])
+  vaga         Vaga      @relation(fields: [id_vaga], references: [id_vaga], onDelete: Cascade)
   beneficio    Beneficio @relation(fields: [id_beneficio], references: [id_beneficio])
   @@id([id_vaga, id_beneficio])
   @@map("vaga_beneficios")
@@ -612,7 +616,7 @@ model VagaCompetencia {
   id_competencia Int
   obrigatoria    Boolean     @default(false)
 
-  vaga           Vaga        @relation(fields: [id_vaga], references: [id_vaga])
+  vaga           Vaga        @relation(fields: [id_vaga], references: [id_vaga], onDelete: Cascade)
   competencia    Competencia @relation(fields: [id_competencia], references: [id_competencia])
 
   @@id([id_vaga, id_competencia])
@@ -671,7 +675,7 @@ enum StatusMidia {
 model SolicitacaoMidia {
   id_solicitacao Int          @id @default(autoincrement())
   id_vaga        Int
-  vaga           Vaga         @relation(fields: [id_vaga], references: [id_vaga])
+  vaga           Vaga         @relation(fields: [id_vaga], references: [id_vaga], onDelete: Cascade)
   id_empresa     Int
   empresa        Empresa      @relation(fields: [id_empresa], references: [id_empresa])
   

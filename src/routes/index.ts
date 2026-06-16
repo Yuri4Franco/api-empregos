@@ -515,6 +515,12 @@ routes.put(
   empresaController.atualizarPerfil,
 );
 
+routes.delete(
+  "/empresa/vagas/:id", 
+  authMiddleware(["EMPRESA"]),
+  vagaController.deletarVaga,
+);
+
 routes.patch(
   "/empresa/vagas/:id_vaga/pausar",
   authMiddleware(["EMPRESA"]), 

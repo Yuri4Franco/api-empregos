@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "vagas" ADD COLUMN     "criada_em" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN     "data_atualizacao" TIMESTAMP(3);
