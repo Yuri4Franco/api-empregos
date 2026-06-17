@@ -254,8 +254,6 @@ export class VagaController {
 
   async deletarVaga(req: Request, res: Response) {
     const { id } = req.params;
-
-    // Pega o ID da empresa logada (Ajuste 'req.usuario.id' para como seu middleware injeta o payload do JWT)
     const idEmpresa = (req.user as any).id_empresa;
     const idVaga = Number(id);
     try {
@@ -290,7 +288,6 @@ export class VagaController {
 
   async listarPublicas(req: Request, res: Response) {
     try {
-      // Extrai TODOS os filtros da Query String
       const {
         busca,
         cidade,
@@ -329,6 +326,40 @@ export class VagaController {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
+
+  async detalharVaga(req: Request, res: Response) {
+    const id_vaga = Number(req.params.id);
+      const id_usuario = (req.user as any).id;
+      const vinculo = await prisma.usuario.findUnique({
+        where: { id_usuario },
+        select: { id_empresa: true },
+      });
+      if (!vinculo || !vinculo.id_empresa) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado. Usuário não vinculado a uma empresa.",
+        });
+      }
+      const id_empresa = vinculo.id_empresa;
+
+    if (isNaN(id_vaga)) {
+      return res.status(400).json({ error: "ID da vaga inválido." });
+    }
+
+    if (!id_empresa) {
+      return res.status(403).json({ error: "Acesso negado: Usuário não vinculado a uma empresa." });
+    }
+
+    try {
+      const vaga = await vagaService.detalharVaga(id_vaga, id_empresa);
+      return res.status(200).json(vaga);
+    } catch (error: any) {
+      return res.status(404).json({ error: error.message });
+    }
+  }
+
+
+
 
   async detalharPublica(req: Request, res: Response) {
     try {

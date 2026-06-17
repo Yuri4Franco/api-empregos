@@ -1014,6 +1014,46 @@ export class VagaService {
     };
   }
 
+  async detalharVaga(idVaga: number, idEmpresa: number) {
+      const vaga = await prisma.vaga.findFirst({
+        where: {
+          id_vaga: idVaga,
+          id_empresa: idEmpresa, // Trava de segurança: a vaga TEM que ser dessa empresa
+        },
+        include: {
+          endereco: true,
+          area_atuacao: true,
+          configuracao: true,
+          beneficios: {
+            include: {
+              beneficio: true,
+            },
+          },
+          competencias: {
+            include: {
+              competencia: true,
+            },
+          },
+          perguntas_eliminatorias: {
+            include: {
+              pergunta: true,
+            },
+          },
+          etapas: {
+            orderBy: {
+              ordem: "asc", // Garante que as etapas venham na ordem correta (1, 2, 3...)
+            },
+          },
+        },
+      });
+  
+      if (!vaga) {
+        throw new Error("Vaga não encontrada ou você não tem permissão para acessá-la.");
+      }
+  
+      return vaga;
+    }
+
   async obterDetalhesVagaPublica(id_vaga: number) {
     const vaga = await prisma.vaga.findUnique({
       where: {
