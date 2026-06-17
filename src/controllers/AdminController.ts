@@ -308,6 +308,27 @@ export class AdminController {
     }
   }
 
+  async atualizarEmpresa(req: Request, res: Response) {
+    const id_empresa = Number(req.params.id);
+    const dados = req.body;
+    const id_autor = (req.user as any).id;
+
+    if (isNaN(id_empresa)) {
+      return res.status(400).json({ error: "ID da empresa inválido." });
+    }
+
+
+    try {
+      const resultado = await adminService.atualizarEmpresa(id_empresa, dados, id_autor);
+      return res.status(200).json({ 
+        message: "Empresa atualizada com sucesso.", 
+        dados: resultado 
+      });
+    } catch (error: any) {
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
   async atualizarAdmin(req: Request, res: Response) {
     try {
       if (!req.user.is_master) {

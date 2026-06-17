@@ -148,6 +148,14 @@ routes.get(
   adminController.obterDetalhesEmpresa,
 );
 
+
+routes.put(
+  "/admin/empresas/:id",
+  authMiddleware(["ADM"]),
+  adminController.atualizarEmpresa,
+);
+
+
 // Desativar empresa (Soft Delete) - SEMI-OK
 routes.patch(
   "/admin/empresas/:id/status",

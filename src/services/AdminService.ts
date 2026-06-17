@@ -174,62 +174,158 @@ export class AdminService {
       return { usuario, empresa };
     });
   }
-  //89
-  async editarEmpresa(id_empresa: number, dados: any, id_autor: number) {
+
+  
+  async atualizarEmpresa(id_empresa: number, dados: any, id_autor: number) {
+    // 1. Busca a empresa existente, o endereço e o Usuário Master
     const empresaExistente = await prisma.empresa.findUnique({
       where: { id_empresa },
-      select: { id_endereco: true, nome_fantasia: true },
+      include: {
+        endereco: true,
+        usuarios: {
+          where: { is_master: true }, // Traz apenas o dono/responsável
+        },
+      },
     });
 
-    if (!empresaExistente) throw new Error("Empresa não encontrada.");
-
-    if (!empresaExistente.id_endereco) {
-      throw new Error(
-        "Esta empresa não possui um endereço vinculado para editar.",
-      );
+    if (!empresaExistente) {
+      throw new Error("Empresa não encontrada.");
     }
 
-    const idEnderecoValido: number = empresaExistente.id_endereco;
+    const usuarioMaster = empresaExistente.usuarios[0];
 
-    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // 1. Atualizar o Endereço
-      await tx.endereco.update({
-        where: { id_endereco: idEnderecoValido },
-        data: {
-          logradouro: dados.logradouro,
-          numero: dados.numero,
-          complemento: dados.complemento || null,
-          cep: dados.cep,
-          cidade: dados.cidade,
-          uf: dados.uf,
-          bairro: dados.bairro,
-        },
+    // 2. Validações Prévias de Conflito (Ignorando a própria empresa)
+    let cnpjLimpo = empresaExistente.cnpj;
+    if (dados.cnpj) {
+      cnpjLimpo = dados.cnpj.replace(/\D/g, "");
+      if (cnpjLimpo !== empresaExistente.cnpj) {
+        const cnpjEmUso = await prisma.empresa.findUnique({
+          where: { cnpj: cnpjLimpo },
+        });
+        if (cnpjEmUso)
+          throw new Error("Este CNPJ já está cadastrado em outra empresa.");
+      }
+    }
+
+    let slugFinal = empresaExistente.slug;
+    if (
+      dados.nome_fantasia &&
+      dados.nome_fantasia !== empresaExistente.nome_fantasia
+    ) {
+      slugFinal = generateSlug(dados.nome_fantasia);
+      const slugEmUso = await prisma.empresa.findFirst({
+        where: { slug: slugFinal, id_empresa: { not: id_empresa } },
       });
 
-      // 2. Atualizar a Empresa
-      const empresaAtualizada = await tx.empresa.update({
+      if (slugEmUso) {
+        throw new Error(
+          `O nome fantasia "${dados.nome_fantasia}" gera um link (slug) que já está em uso por outra empresa. Adicione um diferencial (ex: - Matriz).`,
+        );
+      }
+    }
+
+    if (dados.email && usuarioMaster && dados.email !== usuarioMaster.email) {
+      const emailEmUso = await prisma.usuario.findUnique({
+        where: { email: dados.email },
+      });
+      if (emailEmUso)
+        throw new Error("Este e-mail de usuário já está sendo utilizado.");
+    }
+
+    // 3. Execução da Transação Segura
+    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Atualiza o Endereço
+      if (empresaExistente.id_endereco) {
+        await tx.endereco.update({
+          where: { id_endereco: empresaExistente.id_endereco },
+          data: {
+            logradouro:
+              dados.logradouro !== undefined
+                ? dados.logradouro
+                : empresaExistente.endereco?.logradouro,
+            numero:
+              dados.numero !== undefined
+                ? dados.numero
+                : empresaExistente.endereco?.numero,
+            complemento:
+              dados.complemento !== undefined
+                ? dados.complemento
+                : empresaExistente.endereco?.complemento,
+            cep:
+              dados.cep !== undefined
+                ? dados.cep
+                : empresaExistente.endereco?.cep,
+            cidade:
+              dados.cidade !== undefined
+                ? dados.cidade
+                : empresaExistente.endereco?.cidade,
+            uf:
+              dados.uf !== undefined ? dados.uf : empresaExistente.endereco?.uf,
+            bairro:
+              dados.bairro !== undefined
+                ? dados.bairro
+                : empresaExistente.endereco?.bairro,
+          },
+        });
+      }
+
+      // Atualiza a Empresa (Sem tocar no email_institucional)
+      const empresa = await tx.empresa.update({
         where: { id_empresa },
         data: {
-          cnpj: dados.cnpj,
-          razao_social: dados.razao_social,
-          nome_fantasia: dados.nome_fantasia,
-          email: dados.email_institucional || null,
-          tipo_vinculo_aci: dados.tipo_vinculo_aci,
+          cnpj: cnpjLimpo,
+          razao_social:
+            dados.razao_social !== undefined
+              ? dados.razao_social
+              : empresaExistente.razao_social,
+          nome_fantasia:
+            dados.nome_fantasia !== undefined
+              ? dados.nome_fantasia
+              : empresaExistente.nome_fantasia,
+          slug: slugFinal,
+          tipo_vinculo_aci:
+            dados.tipo_vinculo_aci !== undefined
+              ? dados.tipo_vinculo_aci
+              : empresaExistente.tipo_vinculo_aci,
+          status:
+            dados.status !== undefined ? dados.status : empresaExistente.status,
         },
       });
 
-      // 3. Registrar Log de Auditoria (ACI Panambi)
+      // Atualiza o Usuário Master
+      let usuarioAtualizado = null;
+      if (usuarioMaster && (dados.nome || dados.email || dados.senha)) {
+        const dadosUsuario: any = {};
+
+        if (dados.nome) dadosUsuario.nome = dados.nome;
+        if (dados.email) dadosUsuario.email = dados.email;
+
+        if (dados.senha) {
+          dadosUsuario.senha_hash = await argon2.hash(dados.senha);
+          dadosUsuario.exigir_troca_senha = true; // Força a troca de senha se o admin alterar
+        }
+
+        usuarioAtualizado = await tx.usuario.update({
+          where: { id_usuario: usuarioMaster.id_usuario },
+          data: dadosUsuario,
+        });
+      }
+
+      // Log de Auditoria
       await tx.logAuditoria.create({
         data: {
           id_usuario: id_autor,
-          acao: "ATUALIZAR_EMPRESA",
-          detalhes: `Dados da empresa ${empresaExistente.nome_fantasia} (ID: ${id_empresa}) atualizados pelo administrador.`,
-          entidade: "EMPRESA",
-          id_entidade: id_empresa,
+          acao: "ADM_ATUALIZAR_EMPRESA",
+          entidade: "Empresa",
+          id_entidade: empresa.id_empresa,
+          detalhes: {
+            alterado_por: id_autor,
+            data: new Date(),
+          },
         },
       });
 
-      return empresaAtualizada;
+      return { empresa, usuario: usuarioAtualizado };
     });
   }
   // Listar todas as empresas com dados básicos e número de vagas
@@ -1129,13 +1225,18 @@ export class AdminService {
             take: 5,
             orderBy: { data_candidatura: "desc" },
             include: {
-              vaga: { select: { titulo: true, empresa: { select: { nome_fantasia: true } } } },
+              vaga: {
+                select: {
+                  titulo: true,
+                  empresa: { select: { nome_fantasia: true } },
+                },
+              },
             },
           },
         },
       });
-    } 
-    
+    }
+
     // 3. RAMIFICAÇÃO: Se for EMPRESA, puxa o perfil institucional
     else if (usuarioBase.tipo_usuario === "EMPRESA" && usuarioBase.id_empresa) {
       perfilCompleto = await prisma.empresa.findUnique({
@@ -1147,7 +1248,12 @@ export class AdminService {
           vagas: {
             take: 5,
             orderBy: { data_publicacao: "desc" },
-            select: { id_vaga: true, titulo: true, status: true, data_publicacao: true },
+            select: {
+              id_vaga: true,
+              titulo: true,
+              status: true,
+              data_publicacao: true,
+            },
           },
         },
       });
