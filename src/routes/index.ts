@@ -20,6 +20,7 @@ import { EmpresaPublicaController } from "../controllers/EmpresaPublicaControlle
 import { ContatoController } from "../controllers/ContatoController.js";
 import { AdminCompetenciaController } from "../controllers/AdminCompetenciaController.js";
 import { AdminDashboardController } from "../controllers/AdminDashboardController.js";
+import { MetricaController } from "../controllers/MetricaController.js";
 import {
   uploadBanner,
   uploadLogo,
@@ -92,10 +93,15 @@ const empresaPublicaController = new EmpresaPublicaController();
 const contatoController = new ContatoController();
 const adminCompetenciaController = new AdminCompetenciaController();
 const adminDashboardController = new AdminDashboardController();
-
+const metricaController = new MetricaController();
 routes.post("/login", authLimiter, authController.login);
 
-routes.post("/register", validate(RegistroUsuario), authLimiter, authController.register);
+routes.post(
+  "/register",
+  validate(RegistroUsuario),
+  authLimiter,
+  authController.register,
+);
 
 routes.post("/ativar", authLimiter, authController.ativar);
 
@@ -137,7 +143,7 @@ routes.get(
 routes.get(
   "/admin/empresas/:id/vagas",
   authMiddleware(["ADM"]),
-  adminController.listarVagas
+  adminController.listarVagas,
 );
 
 // Detalhar empresa - OK
@@ -148,13 +154,11 @@ routes.get(
   adminController.obterDetalhesEmpresa,
 );
 
-
 routes.put(
   "/admin/empresas/:id",
   authMiddleware(["ADM"]),
   adminController.atualizarEmpresa,
 );
-
 
 // Desativar empresa (Soft Delete) - SEMI-OK
 routes.patch(
@@ -165,9 +169,6 @@ routes.patch(
   adminController.alterarStatusEmpresa,
 );
 
-
-
-
 // =========================================================
 // DASHBOARD ADM
 // =========================================================
@@ -175,6 +176,12 @@ routes.get(
   "/admin/dashboard/resumo",
   authMiddleware(["ADM"]), // 🔒 Bloqueia empresas e candidatos
   adminDashboardController.resumo,
+);
+
+routes.get(
+  "/admin/metricas/vagas-ativas",
+  authMiddleware(["ADM"]),
+  metricaController.relatorioVagasAtivas,
 );
 
 // Adicionar usuário a empres - ok
@@ -195,7 +202,7 @@ routes.get(
 routes.get(
   "/admin/usuarios/:id",
   authMiddleware(["ADM"]),
-  adminController.verDetalhesCompleto
+  adminController.verDetalhesCompleto,
 );
 
 // Gerenciamento de Usuários - fora do piloto
@@ -374,7 +381,6 @@ routes.get(
   adminVagaController.listarPendencias,
 );
 
-
 //detalhar uma vaga
 routes.get(
   "/admin/vagas/:id",
@@ -397,7 +403,6 @@ routes.get(
   validate(FiltroVagasEmpresaSchema, "query"),
   vagaController.listarMinhasVagas,
 );
-
 
 // ok
 routes.patch(
@@ -547,20 +552,20 @@ routes.put(
 );
 
 routes.get(
-  "/empresa/vagas/:id", 
+  "/empresa/vagas/:id",
   authMiddleware(["EMPRESA"]),
   vagaController.detalharVaga,
 );
 
 routes.delete(
-  "/empresa/vagas/:id", 
+  "/empresa/vagas/:id",
   authMiddleware(["EMPRESA"]),
   vagaController.deletarVaga,
 );
 
 routes.patch(
   "/empresa/vagas/:id_vaga/pausar",
-  authMiddleware(["EMPRESA"]), 
+  authMiddleware(["EMPRESA"]),
   vagaController.pausar,
 );
 
@@ -740,7 +745,7 @@ routes.get(
 routes.patch(
   "/candidato/primeiro-emprego",
   authMiddleware(["CANDIDATO"]),
-  candidatoController.togglePrimeiroEmprego
+  candidatoController.togglePrimeiroEmprego,
 );
 
 routes.get(
