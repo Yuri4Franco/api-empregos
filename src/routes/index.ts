@@ -364,7 +364,24 @@ routes.put(
   vagaController.atualizar,
 );
 
-// O Admin tem poder de superusuário para editar qualquer vaga - fora do piloto
+routes.get("/admin/vagas", authMiddleware(["ADM"]), vagaController.listarAdmin);
+
+// Listar vagas pendentes para moderação (Apenas ADM) - ok
+routes.get(
+  "/admin/vagas/pendentes",
+  authMiddleware(["ADM"]),
+  validate(QueryListagemSchema, "query"),
+  adminVagaController.listarPendencias,
+);
+
+
+//detalhar uma vaga
+routes.get(
+  "/admin/vagas/:id",
+  authMiddleware(["ADM"]),
+  adminVagaController.detalharVaga,
+);
+
 routes.put(
   "/admin/vagas/:id",
   authMiddleware(["ADM"]),
@@ -381,13 +398,6 @@ routes.get(
   vagaController.listarMinhasVagas,
 );
 
-// Listar vagas pendentes para moderação (Apenas ADM) - ok
-routes.get(
-  "/admin/vagas/pendentes",
-  authMiddleware(["ADM"]),
-  validate(QueryListagemSchema, "query"),
-  adminVagaController.listarPendencias,
-);
 
 // ok
 routes.patch(
@@ -460,6 +470,14 @@ routes.post(
   validate(TaxonomiaSchema),
   taxonomiaController.criarArea,
 );
+
+routes.put(
+  "/admin/taxonomia/:id",
+  authMiddleware(["ADM"]),
+  validate(TaxonomiaSchema),
+  taxonomiaController.editarArea,
+);
+
 routes.delete(
   "/admin/taxonomia/areas/:id",
   authMiddleware(["ADM"]),
@@ -472,8 +490,13 @@ routes.get("/taxonomia/beneficios", taxonomiaController.listarBeneficios);
 routes.post(
   "/admin/taxonomia/beneficios",
   authMiddleware(["ADM"]),
-  validate(TaxonomiaSchema),
   taxonomiaController.criarBeneficio,
+);
+
+routes.put(
+  "/admin/taxonomia/beneficios/:id",
+  authMiddleware(["ADM"]),
+  taxonomiaController.editarBeneficio,
 );
 
 routes.delete(
@@ -961,8 +984,6 @@ routes.post(
   validate(contatoSiteSchema),
   contatoController.enviarContato,
 );
-
-routes.get("/admin/vagas", authMiddleware(["ADM"]), vagaController.listarAdmin);
 
 routes.get("/vagas", vagaController.listarPublicas);
 

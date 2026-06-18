@@ -177,22 +177,17 @@ export class AdminService {
 
   
   async atualizarEmpresa(id_empresa: number, dados: any, id_autor: number) {
-    // 1. Busca a empresa existente, o endereço e o Usuário Master
+    // 1. Busca a empresa existente e o endereço (Sem buscar usuários)
     const empresaExistente = await prisma.empresa.findUnique({
       where: { id_empresa },
       include: {
         endereco: true,
-        usuarios: {
-          where: { is_master: true }, // Traz apenas o dono/responsável
-        },
       },
     });
 
     if (!empresaExistente) {
       throw new Error("Empresa não encontrada.");
     }
-
-    const usuarioMaster = empresaExistente.usuarios[0];
 
     // 2. Validações Prévias de Conflito (Ignorando a própria empresa)
     let cnpjLimpo = empresaExistente.cnpj;
@@ -222,14 +217,6 @@ export class AdminService {
           `O nome fantasia "${dados.nome_fantasia}" gera um link (slug) que já está em uso por outra empresa. Adicione um diferencial (ex: - Matriz).`,
         );
       }
-    }
-
-    if (dados.email && usuarioMaster && dados.email !== usuarioMaster.email) {
-      const emailEmUso = await prisma.usuario.findUnique({
-        where: { email: dados.email },
-      });
-      if (emailEmUso)
-        throw new Error("Este e-mail de usuário já está sendo utilizado.");
     }
 
     // 3. Execução da Transação Segura
@@ -269,7 +256,7 @@ export class AdminService {
         });
       }
 
-      // Atualiza a Empresa (Sem tocar no email_institucional)
+      // Atualiza a Empresa (Sem tocar no status e sem e-mail institucional)
       const empresa = await tx.empresa.update({
         where: { id_empresa },
         data: {
@@ -287,29 +274,8 @@ export class AdminService {
             dados.tipo_vinculo_aci !== undefined
               ? dados.tipo_vinculo_aci
               : empresaExistente.tipo_vinculo_aci,
-          status:
-            dados.status !== undefined ? dados.status : empresaExistente.status,
         },
       });
-
-      // Atualiza o Usuário Master
-      let usuarioAtualizado = null;
-      if (usuarioMaster && (dados.nome || dados.email || dados.senha)) {
-        const dadosUsuario: any = {};
-
-        if (dados.nome) dadosUsuario.nome = dados.nome;
-        if (dados.email) dadosUsuario.email = dados.email;
-
-        if (dados.senha) {
-          dadosUsuario.senha_hash = await argon2.hash(dados.senha);
-          dadosUsuario.exigir_troca_senha = true; // Força a troca de senha se o admin alterar
-        }
-
-        usuarioAtualizado = await tx.usuario.update({
-          where: { id_usuario: usuarioMaster.id_usuario },
-          data: dadosUsuario,
-        });
-      }
 
       // Log de Auditoria
       await tx.logAuditoria.create({
@@ -325,7 +291,8 @@ export class AdminService {
         },
       });
 
-      return { empresa, usuario: usuarioAtualizado };
+      // Retorna apenas a empresa atualizada
+      return { empresa };
     });
   }
   // Listar todas as empresas com dados básicos e número de vagas
@@ -1171,13 +1138,16 @@ export class AdminService {
 
     const vagas = await prisma.vaga.findMany({
       where: { id_empresa },
-      orderBy: { data_publicacao: "desc" }, // Mostra as vagas mais recentes primeiro
+      orderBy: { criada_em: "desc" }, // Mostra as vagas mais recentes primeiro
       select: {
         id_vaga: true,
         titulo: true,
         status: true,
         modelo_trabalho: true,
         data_publicacao: true,
+        data_encerramento: true,
+        data_atualizacao: true,
+        criada_em: true,
         _count: {
           select: { candidaturas: true },
         },
@@ -1264,5 +1234,58 @@ export class AdminService {
       conta: usuarioBase,
       detalhes: perfilCompleto,
     };
+  }
+
+
+  async detalharVaga(idVaga: number) {
+    const vaga = await prisma.vaga.findUnique({
+      where: {
+        id_vaga: idVaga,
+      },
+      include: {
+        // Dados essenciais da empresa para o Admin
+        empresa: {
+          select: {
+            id_empresa: true,
+            razao_social: true,
+            nome_fantasia: true,
+            cnpj: true,
+            slug: true,
+            tipo_vinculo_aci: true,
+            logotipo_url: true,
+            status: true,
+          },
+        },
+        endereco: true,
+        area_atuacao: true,
+        configuracao: true,
+        beneficios: {
+          include: {
+            beneficio: true,
+          },
+        },
+        competencias: {
+          include: {
+            competencia: true,
+          },
+        },
+        perguntas_eliminatorias: {
+          include: {
+            pergunta: true,
+          },
+        },
+        etapas: {
+          orderBy: {
+            ordem: "asc", // Garante a ordem correta das etapas (1, 2, 3...)
+          },
+        },
+      },
+    });
+
+    if (!vaga) {
+      throw new Error("Vaga não encontrada.");
+    }
+
+    return vaga;
   }
 }

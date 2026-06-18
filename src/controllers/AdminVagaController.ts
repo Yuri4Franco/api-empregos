@@ -1,8 +1,11 @@
 import type { Request, Response } from "express";
 import { VagaService } from "../services/VagaService.js";
+import { AdminService } from "../services/AdminService.js";
 import { vagaSchema } from "../schemas/auth.schema.js";
 
+
 const vagaService = new VagaService();
+const adminService = new AdminService();
 
 export class AdminVagaController {
   /**
@@ -138,6 +141,19 @@ export class AdminVagaController {
     }
   }
 
+  async detalharVaga(req: Request, res: Response) {
+    const id_vaga = Number(req.params.id);
 
+    if (isNaN(id_vaga)) {
+      return res.status(400).json({ error: "ID da vaga inválido." });
+    }
+
+    try {
+      const vaga = await adminService.detalharVaga(id_vaga);
+      return res.status(200).json(vaga);
+    } catch (error: any) {
+      return res.status(404).json({ error: error.message });
+    }
+  }
   
 }

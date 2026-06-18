@@ -26,6 +26,41 @@ export class TaxonomiaController {
     }
   }
 
+
+  async editarArea(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { nome } = req.body;
+
+      if (!nome) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "O nome da área de atuação é obrigatório." 
+        });
+      }
+
+      const atualizado = await taxonomiaService.gerenciarAreas("EDITAR", { 
+        id: Number(id), 
+        nome 
+      });
+
+      return res.status(200).json({ success: true, data: atualizado });
+    } catch (error: any) {
+      // Tratamento específico do Prisma para chave única duplicada
+      if (error.code === 'P2002') {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Já existe uma área de atuação cadastrada com este nome." 
+        });
+      }
+
+      return res.status(400).json({ 
+        success: false, 
+        error: "Erro ao editar área de atuação." 
+      });
+    }
+  }
+
   async excluirArea(req: Request, res: Response) {
     try {
       const { id } = req.params;
@@ -54,15 +89,48 @@ export class TaxonomiaController {
 
   async criarBeneficio(req: Request, res: Response) {
     try {
-      const { nome } = req.body;
+      const { descricao } = req.body;
       const novo = await taxonomiaService.gerenciarBeneficios("CRIAR", {
-        nome,
+        descricao,
       });
       return res.status(201).json({ success: true, data: novo });
     } catch (error: any) {
       return res
         .status(400)
         .json({ success: false, error: "Erro ao criar benefício padrão." });
+    }
+  }
+
+  async editarBeneficio(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { descricao } = req.body; // Puxa como "nome" para manter o padrão do seu front
+
+      if (!descricao) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "A descrição do benefício é obrigatória." 
+        });
+      }
+
+      const atualizado = await taxonomiaService.gerenciarBeneficios("EDITAR", { 
+        id: Number(id), 
+        descricao 
+      });
+
+      return res.status(200).json({ success: true, data: atualizado });
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Já existe um benefício cadastrado com esta descrição." 
+        });
+      }
+
+      return res.status(400).json({ 
+        success: false, 
+        error: "Erro ao editar benefício." 
+      });
     }
   }
 
