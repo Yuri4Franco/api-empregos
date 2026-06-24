@@ -1072,6 +1072,7 @@ export class VagaService {
         empresa: {
           select: {
             nome_fantasia: true,
+            slug: true,
             email: true,
             tipo_vinculo_aci: true,
             logotipo_url: true,

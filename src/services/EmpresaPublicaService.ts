@@ -39,7 +39,7 @@ export class EmpresaPublicaService {
 
         // Vitrine de Vagas: APENAS vagas ativas e com dados resumidos
         vagas: {
-          where: { status: "ATIVA" },
+          where: { status: "ATIVA", empresa_confidencial: false },
           orderBy: { data_publicacao: "desc" },
           select: {
             id_vaga: true,
