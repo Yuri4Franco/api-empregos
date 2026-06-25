@@ -39,6 +39,7 @@ export class AuthService {
 
     return this.gerarToken(
       usuario.id_usuario,
+      usuario.id_empresa,
       usuario.tipo_usuario,
       usuario.is_master,
       usuario.exigir_troca_senha,
@@ -77,6 +78,7 @@ export class AuthService {
 
     return this.gerarToken(
       usuarioPrincipal.id_usuario,
+      usuarioPrincipal.id_empresa,
       usuarioPrincipal.tipo_usuario,
       usuarioPrincipal.is_master,
       usuarioPrincipal.exigir_troca_senha,
@@ -88,6 +90,7 @@ export class AuthService {
   // #region FUNÇÃO AUXILIAR PARA GERAR TOKENS JWT
   private gerarToken(
     id_usuario: number,
+    id_empresa: number | null,
     tipo: string,
     is_master: boolean,
     exigir_troca_senha: boolean,
@@ -101,6 +104,7 @@ export class AuthService {
       role: tipo,
       master: is_master,
       exigir_troca_senha: exigir_troca_senha,
+      id_empresa: id_empresa,
     };
 
     const token = jwt.sign(payload, JWT_SECRET, {

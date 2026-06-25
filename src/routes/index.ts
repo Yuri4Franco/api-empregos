@@ -7,7 +7,7 @@ import { VagaController } from "../controllers/VagaController.js";
 import { AdminVagaController } from "../controllers/AdminVagaController.js";
 import { EmpresaController } from "../controllers/EmpresaController.js";
 import { CandidatoController } from "../controllers/CandidatoController.js";
-import { CandidaturaController } from "../controllers/CandidaturaController.js";
+import { CandidatoCandidaturaController } from "../controllers/CandidatoCandidaturaController.js";
 import { UserController } from "../controllers/UserController.js";
 import { ExperienciaController } from "../controllers/ExperienciaController.js";
 import { FormacaoController } from "../controllers/FormacaoController.js";
@@ -21,6 +21,8 @@ import { ContatoController } from "../controllers/ContatoController.js";
 import { AdminCompetenciaController } from "../controllers/AdminCompetenciaController.js";
 import { AdminDashboardController } from "../controllers/AdminDashboardController.js";
 import { MetricaController } from "../controllers/MetricaController.js";
+import { EmpresaCandidaturaController } from "../controllers/EmpresaCandidaturaController.js";
+import { EmpresaEntrevistaController } from "../controllers/EmpresaEntrevistaController.js";
 import {
   uploadBanner,
   uploadLogo,
@@ -79,7 +81,7 @@ const adminVagaController = new AdminVagaController();
 const empresaController = new EmpresaController();
 const taxonomiaController = new TaxonomiaController();
 const candidatoController = new CandidatoController();
-const candidaturaController = new CandidaturaController();
+const candidatoCandidaturaController = new CandidatoCandidaturaController();
 const usuarioController = new UserController();
 const experienciaController = new ExperienciaController();
 const formacaoController = new FormacaoController();
@@ -94,6 +96,8 @@ const contatoController = new ContatoController();
 const adminCompetenciaController = new AdminCompetenciaController();
 const adminDashboardController = new AdminDashboardController();
 const metricaController = new MetricaController();
+const empresaCandidaturaController = new EmpresaCandidaturaController();
+const empresaEntrevistaController = new EmpresaEntrevistaController();
 routes.post("/login", authLimiter, authController.login);
 
 routes.post(
@@ -585,56 +589,42 @@ routes.patch(
 routes.get(
   "/empresa/vagas/:id_vaga/painel-gestao",
   authMiddleware(["EMPRESA"]),
-  candidaturaController.obterPainelGestao,
-);
-
-// Mover Card individual
-routes.patch(
-  "/empresa/candidaturas/:id_candidatura/mover",
-  authMiddleware(["EMPRESA"]),
-  candidaturaController.mover,
+  empresaCandidaturaController.obterPainelGestao,
 );
 
 // Avançar candidato para a próxima etapa
 routes.patch(
   "/empresa/candidaturas/:id_candidatura/avancar",
   authMiddleware(["EMPRESA"]),
-  candidaturaController.avancar,
+  empresaCandidaturaController.avancar,
 );
 
 // Avançar em massa
 routes.patch(
   "/empresa/candidaturas/avancar-massa",
   authMiddleware(["EMPRESA"]),
-  candidaturaController.avancarMassa,
+  empresaCandidaturaController.avancarMassa,
 );
 
 // Ações em Massa (Reprovar)
 routes.post(
   "/empresa/candidaturas/reprovar-lote",
   authMiddleware(["EMPRESA"]),
-  candidaturaController.reprovarEmLote,
-);
-
-// Safe Send (Botão Publicar)
-routes.post(
-  "/empresa/vagas/:id_vaga/notificar-candidatos",
-  authMiddleware(["EMPRESA"]),
-  candidaturaController.publicarNotificacoes,
+  empresaCandidaturaController.reprovarEmLote,
 );
 
 // Perfil completo do candidato (Dados + Currículo + Agendamento + Avaliação)
 routes.get(
   "/empresa/candidaturas/:id_candidatura/perfil",
   authMiddleware(["EMPRESA"]),
-  candidaturaController.verPerfil,
+  empresaCandidaturaController.verPerfil,
 );
 
 // Salvar avaliação interna
 routes.post(
   "/empresa/candidaturas/:id_candidatura/avaliar",
   authMiddleware(["EMPRESA"]),
-  candidaturaController.avaliar,
+  empresaCandidaturaController.avaliar,
 );
 
 // Agendar Entrevista
@@ -642,7 +632,7 @@ routes.post(
   "/empresa/candidaturas/:id_candidatura/agendar",
   authMiddleware(["EMPRESA"]),
   validate(AgendarEntrevistaSchema, "body"),
-  candidaturaController.agendar,
+  empresaEntrevistaController.agendar,
 );
 
 // Configurar quais campos aparecem no resumo estratégico do candidato
@@ -651,7 +641,7 @@ routes.patch(
   authMiddleware(["EMPRESA"]),
 
   validate(ConfigurarDestaquesSchema, "body"),
-  candidaturaController.salvarConfiguracaoDestaques,
+  empresaCandidaturaController.salvarConfiguracaoDestaques,
 );
 
 // Duplicar vaga
@@ -665,7 +655,7 @@ routes.post(
 routes.get(
   "/empresa/candidaturas/:id_candidatura/historico",
   authMiddleware(["EMPRESA"]),
-  candidaturaController.verHistorico,
+  empresaCandidaturaController.verHistorico,
 );
 
 // Resumo operacional para a tela inicial da empresa
@@ -680,7 +670,7 @@ routes.get(
 routes.post(
   "/vagas/:id_vaga/candidatar",
   authMiddleware(["CANDIDATO"]),
-  candidaturaController.aplicar,
+  candidatoCandidaturaController.aplicar,
 );
 
 // Trocar senha
@@ -751,7 +741,7 @@ routes.patch(
 routes.get(
   "/candidato/vaga/:id_vaga/status",
   authMiddleware(["CANDIDATO"]),
-  candidaturaController.verificarStatus,
+  candidatoCandidaturaController.verificarStatus,
 );
 
 // Rota para o candidato atualizar seu próprio currículo completo
@@ -924,19 +914,19 @@ routes.get(
 routes.get(
   "/candidato/minhas-candidaturas",
   authMiddleware(["CANDIDATO"]),
-  candidaturaController.listarMinhasCandidaturas,
+  candidatoCandidaturaController.listarMinhasCandidaturas,
 );
 
 routes.get(
   "/candidato/agendamentos",
   authMiddleware(["CANDIDATO"]),
-  candidaturaController.listarAgendamentos,
+  candidatoController.listarAgendamentos,
 );
 
 routes.patch(
   "/candidato/candidaturas/:id_candidatura/desistir",
   authMiddleware(["CANDIDATO"]),
-  candidaturaController.desistir,
+  candidatoCandidaturaController.desistir,
 );
 
 routes.get(
@@ -989,6 +979,10 @@ routes.post(
   validate(contatoSiteSchema),
   contatoController.enviarContato,
 );
+
+//=========================================
+// Rotas Públicas (Sem Autenticação)
+//=========================================
 
 routes.get("/vagas", vagaController.listarPublicas);
 

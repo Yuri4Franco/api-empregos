@@ -4,8 +4,6 @@ import { CandidatoService } from "../services/CandidatoService.js";
 const candidatoService = new CandidatoService();
 
 export class CandidatoController {
-
-
   async meuCurriculo(req: Request, res: Response) {
     try {
       const id_usuario = (req.user as any).id;
@@ -53,7 +51,7 @@ export class CandidatoController {
   async toggleVisibilidade(req: Request, res: Response) {
     try {
       const id_usuario = (req.user as any).id;
-      
+
       const perfil_visivel_empresas = Boolean(req.body.perfil_visivel_empresas);
 
       const resultado = await candidatoService.atualizarVisibilidade(
@@ -116,15 +114,38 @@ export class CandidatoController {
 
       const resultado = await candidatoService.atualizarPrimeiroEmprego(
         id_candidato,
-        primeiro_emprego
+        primeiro_emprego,
       );
 
       return res.status(200).json({
         success: true,
-        message: resultado.primeiro_emprego 
-          ? "Marcado como busca pelo primeiro emprego." 
+        message: resultado.primeiro_emprego
+          ? "Marcado como busca pelo primeiro emprego."
           : "Desmarcado como primeiro emprego.",
         data: resultado,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  async listarAgendamentos(req: Request, res: Response) {
+    try {
+      const id_usuario = (req.user as any).id;
+
+      if (!id_usuario) {
+        return res
+          .status(401)
+          .json({ success: false, error: "Usuário não autenticado." });
+      }
+
+      const dados =
+        await candidatoService.listarMeusAgendamentos(id_usuario);
+
+      return res.status(200).json({
+        success: true,
+        total: dados.length,
+        data: dados,
       });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });

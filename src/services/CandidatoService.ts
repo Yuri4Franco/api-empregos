@@ -238,4 +238,69 @@ export class CandidatoService {
       select: { primeiro_emprego: true }, // Retorna apenas o que mudou para economizar tráfego
     });
   }
+
+  async listarMeusAgendamentos(id_usuario: number) {
+    // 🕒 Lógica para pegar o início do dia atual (00:00:00)
+    const inicioDoDia = new Date();
+    inicioDoDia.setHours(0, 0, 0, 0);
+
+    const agendamentos = await prisma.agendamentoEntrevista.findMany({
+      where: {
+        // 🔥 FILTRO: Mostra agendamentos de HOJE (desde as 00:00) em diante
+        data_hora: {
+          gte: inicioDoDia,
+        },
+
+        // Busca os agendamentos que pertencem às candidaturas deste usuário
+        candidatura: {
+          id_candidato: id_usuario,
+          // Filtro de Limpeza: Ignora se o processo já acabou para ele
+          status_atual: {
+            notIn: ["DESISTENCIA", "REPROVADO"],
+          },
+        },
+      },
+      // Ordena pela data: As entrevistas mais próximas do dia de hoje aparecem primeiro
+      orderBy: {
+        data_hora: "asc",
+      },
+      include: {
+        candidatura: {
+          select: {
+            id_candidatura: true,
+            status_atual: true,
+            vaga: {
+              select: {
+                titulo: true,
+                empresa_confidencial: true,
+                empresa: {
+                  select: { nome_fantasia: true, logotipo_url: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return agendamentos.map((ag) => {
+      const isConfidencial = ag.candidatura.vaga.empresa_confidencial;
+
+      return {
+        id_agendamento: ag.id_agendamento,
+        id_candidatura: ag.candidatura.id_candidatura,
+        data_hora: ag.data_hora,
+        local_link: ag.local_link,
+        observacoes: ag.observacoes,
+        vaga_titulo: ag.candidatura.vaga.titulo,
+        empresa_nome: isConfidencial
+          ? "Empresa Confidencial"
+          : ag.candidatura.vaga.empresa.nome_fantasia,
+        empresa_logo: isConfidencial
+          ? null
+          : ag.candidatura.vaga.empresa.logotipo_url,
+        status_candidatura: ag.candidatura.status_atual,
+      };
+    });
+  }
 }

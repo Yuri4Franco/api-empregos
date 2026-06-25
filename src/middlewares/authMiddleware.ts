@@ -5,6 +5,8 @@ interface TokenPayload {
   sub: number;
   role: "CANDIDATO" | "EMPRESA" | "ADM";
   master: boolean;
+  id_empresa: number | null; // ✨ Mapeando o que vem do token
+  exigir_troca_senha: boolean; // ✨ Mapeando o que vem do token
 }
 
 export function authMiddleware(roles?: string[]) {
@@ -29,17 +31,20 @@ export function authMiddleware(roles?: string[]) {
 
     try {
       const decoded = jwt.verify(token, jwtSecret) as unknown as TokenPayload;
-    
+
       if (roles && !roles.includes(decoded.role)) {
         return res.status(403).json({
           message: "Acesso negado para este perfil.",
         });
       }
 
-      req.user = { 
-        id: decoded.sub, 
+      // ✨ Injetando TODOS os dados decodificados no req.user
+      req.user = {
+        id: decoded.sub,
         role: decoded.role,
         is_master: decoded.master,
+        id_empresa: decoded.id_empresa,
+        exigir_troca_senha: decoded.exigir_troca_senha,
       };
 
       return next();
@@ -47,5 +52,4 @@ export function authMiddleware(roles?: string[]) {
       return res.status(401).json({ message: "Token inválido ou expirado." });
     }
   };
-// #endregion FIM DO MIDDLEWARE DE AUTENTICAÇÃO E AUTORIZAÇÃO
 }

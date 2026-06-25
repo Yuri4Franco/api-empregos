@@ -4,6 +4,8 @@ declare namespace Express {
       id: number;
       role: "CANDIDATO" | "EMPRESA" | "ADM";
       is_master: boolean; 
+      id_empresa: number | null;
+      exigir_troca_senha: boolean;
     };
   }
 }
