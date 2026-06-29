@@ -31,6 +31,7 @@ import {
 import {
   AgendarEntrevistaSchema,
   AtualizarAdminSchema,
+  AtualizarNomeSchema,
   AtualizarPerfilEmpresaSchema,
   AtualizarUsuarioSchema,
   CadastroAdminSchema,
@@ -125,6 +126,13 @@ routes.post(
   "/auth/redefinir-senha",
   validate(redefinirSenhaSchema),
   authController.redefinirSenha,
+);
+
+routes.patch(
+  "/usuario/trocar-nome",
+  authMiddleware(["CANDIDATO", "EMPRESA", "ADM"]),
+  validate(AtualizarNomeSchema),
+  usuarioController.alterarNome,
 );
 
 // Rotas de Admin

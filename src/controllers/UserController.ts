@@ -4,6 +4,24 @@ import { BaseUserService } from "../services/BaseUserService.js";
 const userService = new BaseUserService();
 
 export class UserController {
+  async alterarNome(req: Request, res: Response) {
+    try {
+      const { nome } = req.body;
+      const id = req.user.id;
+      
+
+      const resultado = await userService.atualizarNome(id, nome);
+
+      return res.status(200).json({
+        success: true,
+        message: "Nome atualizado com sucesso!",
+        data: resultado,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
   async toggleStatus(req: Request, res: Response) {
     try {
       const id_usuario = parseInt(req.params.id as string);
@@ -79,7 +97,6 @@ export class UserController {
 
   async deletarConta(req: Request, res: Response) {
     try {
-      
       const id_usuario = req.user.id;
       const { senha_confirmacao } = req.body;
 

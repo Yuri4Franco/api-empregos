@@ -6,6 +6,11 @@ const UsuarioBaseSchema = z.object({
   nome: z
     .string()
     .min(3, "Nome deve ter no mínimo 3 caracteres")
+
+    .regex(
+      /^[a-zA-ZÀ-ÿ\s\-']+$/,
+      "O nome não deve conter números ou caracteres inválidos",
+    )
     .transform((nome) => {
       return nome
         .trim()
@@ -16,12 +21,18 @@ const UsuarioBaseSchema = z.object({
           if (index > 0 && excecoes.includes(lower)) {
             return lower;
           }
+          if (lower.includes("-")) {
+            return lower
+              .split("-")
+              .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+              .join("-");
+          }
 
           return lower.charAt(0).toUpperCase() + lower.slice(1);
         })
         .join(" ");
     }),
-    
+
   email: z
     .string()
     .email("E-mail inválido")
@@ -43,10 +54,13 @@ const EnderecoSchema = z.object({
   bairro: z.string().optional(),
 });
 
+export const AtualizarNomeSchema = UsuarioBaseSchema.pick({
+  nome: true,
+});
+
 export const RegistroUsuario = UsuarioBaseSchema.extend({
   senha: SenhaForte,
 });
-
 
 export const esqueciSenhaSchema = z.object({
   email: z.string().email("Por favor, insira um e-mail válido."),
@@ -170,7 +184,9 @@ export const AtualizarPerfilCompletoSchema = z.object({
 });
 
 export const editarCompetenciaSchema = z.object({
-  novo_nome: z.string().min(2, "O nome oficial deve ter pelo menos 2 caracteres."),
+  novo_nome: z
+    .string()
+    .min(2, "O nome oficial deve ter pelo menos 2 caracteres."),
 });
 
 // 5. Filtros e Listagens
@@ -485,15 +501,7 @@ export const updateCandidatoSchema = z.object({
   disponibilidade_mudanca: z.boolean().optional(),
   disponibilidade_sabados: z.boolean().optional(),
   turno_preferido: z
-    .array(
-      z.enum([
-        "MANHÃ",
-        "TARDE",
-        "NOITE",
-        "COMERCIAL",
-        "QUALQUER_TURNO",
-      ]),
-    )
+    .array(z.enum(["MANHÃ", "TARDE", "NOITE", "COMERCIAL", "QUALQUER_TURNO"]))
     .max(3, "Você pode selecionar no máximo 3 turnos")
     .optional()
     .default([]),

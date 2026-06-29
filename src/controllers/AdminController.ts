@@ -292,15 +292,14 @@ export class AdminController {
 
   async listarAdmins(req: Request, res: Response) {
     try {
-      // 1. Segurança: Apenas Master gerencia a equipe
+      const {id} = req.user;
       if (!req.user.is_master) {
         return res
           .status(403)
           .json({ error: "Acesso restrito ao Administrador Master." });
       }
 
-      // 2. Filtros validados pelo Zod (FiltroUsuarioSchema)
-      const result = await adminService.listarAdministradores(req.query);
+      const result = await adminService.listarAdministradores(req.query, id);
 
       return res.status(200).json(result);
     } catch (error: any) {

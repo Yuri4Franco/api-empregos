@@ -3,7 +3,6 @@ import { Prisma } from "@prisma/client";
 import argon2 from "argon2";
 
 export class BaseUserService {
-  // Centralizamos o log para reuso em todos os services
   async registrarLog(
     tx: any,
     id_autor: number,
@@ -21,6 +20,20 @@ export class BaseUserService {
         detalhes: detalhes || {},
       },
     });
+  }
+
+  async atualizarNome(id_usuario: number, novo_nome: string) {
+    if (!novo_nome || novo_nome.trim().length === 0) {
+      throw new Error("O nome não pode estar vazio.");
+    }
+
+    const usuarioAtualizado = await prisma.usuario.update({
+      where: { id_usuario },
+      data: { nome: novo_nome }, 
+      select: { id_usuario: true, nome: true }, 
+    });
+
+    return usuarioAtualizado;
   }
 
   async alterarSenha(

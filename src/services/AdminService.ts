@@ -8,6 +8,18 @@ import type { TipoUsuario } from "@prisma/client";
 const baseUser = new BaseUserService();
 
 export class AdminService {
+  private async verificarMaster(id_autor: number) {
+    const autor = await prisma.usuario.findUnique({
+      where: { id_usuario: id_autor },
+      select: { is_master: true },
+    });
+
+    if (!autor || !autor.is_master) {
+      throw new Error(
+        "Acesso negado: Apenas administradores Master podem realizar esta operação.",
+      );
+    }
+  }
   /** #region GESTÃO DE EMPRESAS:
    *
    *
@@ -175,7 +187,6 @@ export class AdminService {
     });
   }
 
-  
   async atualizarEmpresa(id_empresa: number, dados: any, id_autor: number) {
     // 1. Busca a empresa existente e o endereço (Sem buscar usuários)
     const empresaExistente = await prisma.empresa.findUnique({
@@ -754,6 +765,8 @@ export class AdminService {
 
   // Cadastrar novo administrador (Master ou ADM comum)
   async cadastrarNovoAdmin(dados: any, id_autor: number) {
+    await this.verificarMaster(id_autor);
+
     const emailExistente = await prisma.usuario.findUnique({
       where: { email: dados.email },
     });
@@ -770,6 +783,7 @@ export class AdminService {
           tipo_usuario: "ADM",
           status: "ATIVO",
           is_master: dados.is_master || false,
+          exigir_troca_senha: true,
           id_empresa: dados.id_empresa,
         },
       });
@@ -789,7 +803,9 @@ export class AdminService {
   }
 
   // Listar apenas os administradores
-  async listarAdministradores(filtros: any) {
+  async listarAdministradores(filtros: any, id_autor: number) {
+    await this.verificarMaster(id_autor);
+
     const { page = 1, limit = 10, search, status } = filtros;
     const skip = (page - 1) * limit;
 
@@ -838,7 +854,9 @@ export class AdminService {
     };
   }
 
+  // Atualizar dados do administrador (nome, email, senha, is_master)
   async atualizarDadosAdmin(id_admin: number, dados: any, id_autor: number) {
+    await this.verificarMaster(id_autor);
     const senha_hash = dados.senha ? await argon2.hash(dados.senha) : undefined;
 
     return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -1235,7 +1253,6 @@ export class AdminService {
       detalhes: perfilCompleto,
     };
   }
-
 
   async detalharVaga(idVaga: number) {
     const vaga = await prisma.vaga.findUnique({
