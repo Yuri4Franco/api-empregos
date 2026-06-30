@@ -12,9 +12,15 @@ export class AdminDashboardService {
       competenciasSugeridas,
       pagamentosAguardando,
     ] = await Promise.all([
-      prisma.candidato.count(),
-      // Filtra candidatos cujo status do usuário vinculado está como ATIVO
-      prisma.candidato.count({ where: { usuario: { status: "ATIVO" } } }),
+      prisma.candidato.count({
+        where: { usuario: { status: "ATIVO" } },
+      }),
+      prisma.candidato.count({
+        where: {
+          perfil_visivel_empresas: true,
+          usuario: { status: "ATIVO" },
+        },
+      }),
       prisma.empresa.count({ where: { status: "ATIVO" } }),
       prisma.vaga.count({ where: { status: "ATIVA" } }),
       prisma.empresa.count({ where: { status: "PENDENTE" } }),
