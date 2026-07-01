@@ -3,7 +3,6 @@ import { Prisma } from "@prisma/client";
 import { StatusCandidatura } from "@prisma/client";
 
 export class CandidatoCandidaturaService {
-
   // função do candidato
   async candidatar(id_vaga: number, id_candidato: number) {
     // 1. Trava de Segurança: Verificar se já existe candidatura ativa para este usuário nesta vaga
@@ -68,10 +67,11 @@ export class CandidatoCandidaturaService {
             empresa_confidencial: true,
             endereco: { select: { cidade: true, uf: true } },
             empresa: { select: { nome_fantasia: true, logotipo_url: true } },
+            // ✨ Adicionado: Busca todas as etapas da vaga ordenadas sequencialmente
+            etapas: { orderBy: { ordem: "asc" } },
           },
         },
         agendamento: true,
-        // ✨ O NOVO Pulo do Gato: Trazemos TODO o histórico de movimentações da candidatura
         movimentacoes: {
           orderBy: { criado_em: "asc" }, // Crescente para montar a linha do tempo (timeline)
           select: {
@@ -89,16 +89,30 @@ export class CandidatoCandidaturaService {
       const isConfidencial = c.vaga.empresa_confidencial;
       const endereco = c.vaga.endereco;
 
-      // Pegamos a última movimentação para extrair o feedback caso ele tenha sido reprovado
       const ultimaMovimentacao =
         c.movimentacoes.length > 0
           ? c.movimentacoes[c.movimentacoes.length - 1]
           : null;
 
+      // ✨ Encontra em memória os dados da etapa atual do candidato
+      const dadosEtapaAtual = c.vaga.etapas.find(
+        (e) => e.id_etapa === c.id_etapa_atual,
+      );
+
       return {
         id_candidatura: c.id_candidatura,
         data_inscricao: c.data_candidatura,
         status: c.status_atual,
+
+        // ✨ Dados da Etapa Atual mapeados para o Front-end usar em Badges/Cards
+        etapa_atual: dadosEtapaAtual
+          ? {
+              id_etapa: dadosEtapaAtual.id_etapa,
+              nome_etapa: dadosEtapaAtual.nome_etapa,
+              ordem: dadosEtapaAtual.ordem,
+              tipo: dadosEtapaAtual.tipo,
+            }
+          : null,
 
         // Agrupamos os dados da vaga para ficar organizado no Front-end
         vaga: {
@@ -119,6 +133,15 @@ export class CandidatoCandidaturaService {
             ? "Empresa Confidencial"
             : c.vaga.empresa.nome_fantasia,
           empresa_logo: isConfidencial ? null : c.vaga.empresa.logotipo_url,
+
+          // ✨ Retorna o fluxo do processo seletivo estruturado para barras de progresso (Stepper)
+          etapas_processo: c.vaga.etapas.map((e) => ({
+            id_etapa: e.id_etapa,
+            nome_etapa: e.nome_etapa,
+            ordem: e.ordem,
+            tipo: e.tipo,
+            requer_agendamento: e.requer_agendamento,
+          })),
         },
 
         // Mandamos o array de movimentações para a Timeline do Frontend
