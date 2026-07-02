@@ -52,6 +52,7 @@ const EnderecoSchema = z.object({
   logradouro: z.string().optional(),
   numero: z.string().optional(),
   bairro: z.string().optional(),
+  cep: z.string().optional(),
 });
 
 export const AtualizarNomeSchema = UsuarioBaseSchema.pick({
