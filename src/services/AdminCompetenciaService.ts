@@ -6,15 +6,79 @@ export class AdminCompetenciaService {
   // 1. LISTAR PENDENTES
   // =========================================================
   async listarPendentes() {
-    return await prisma.competencia.findMany({
+    const competencias = await prisma.competencia.findMany({
       where: { status: "PENDENTE" },
       orderBy: { id_competencia: "desc" },
       include: {
-        // Traz a contagem de quantos candidatos estão usando essa sugestão
+        // Traz a contagem de quantos candidatos já estão surfando nessa skill
         _count: {
           select: { candidatos: true },
         },
+        // Buscamos os candidatos vinculados para rastrear se veio de um candidato
+        candidatos: {
+          take: 1, // Só precisamos do primeiro (quem criou/sugeriu)
+          select: {
+            candidato: {
+              select: {
+                usuario: {
+                  select: {
+                    id_usuario: true,
+                    nome: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        // Buscamos também as vagas vinculadas, caso tenha sido sugerida por uma empresa
+        vagas: {
+          take: 1, // Só precisamos do primeiro
+          select: {
+            vaga: {
+              select: {
+                titulo: true,
+                empresa: {
+                  select: {
+                    id_empresa: true,
+                    nome_fantasia: true,
+                  },
+                },
+              },
+            },
+          },
+        },
       },
+    });
+
+    // Mapeamos os dados para entregar um JSON limpo e mastigado para o painel administrativo
+    return competencias.map((comp) => {
+      const primeiroCandidato = comp.candidatos[0]?.candidato?.usuario;
+      const primeiraVaga = comp.vagas[0]?.vaga;
+
+      let sugeridoPor = null;
+
+      if (primeiroCandidato) {
+        sugeridoPor = {
+          id: primeiroCandidato.id_usuario,
+          nome: primeiroCandidato.nome,
+          origem: "CANDIDATO",
+        };
+      } else if (primeiraVaga) {
+        sugeridoPor = {
+          id: primeiraVaga.empresa.id_empresa,
+          nome: primeiraVaga.empresa.nome_fantasia,
+          origem: "EMPRESA",
+          detalhe: `Sugerido na vaga: ${primeiraVaga.titulo}`,
+        };
+      }
+
+      return {
+        id_competencia: comp.id_competencia,
+        nome: comp.nome,
+        status: comp.status,
+        total_usuarios: comp._count.candidatos,
+        sugerido_por: sugeridoPor,
+      };
     });
   }
 
@@ -27,7 +91,8 @@ export class AdminCompetenciaService {
     });
 
     if (!competencia) throw new Error("Habilidade não encontrada.");
-    if (competencia.status !== "PENDENTE") throw new Error("Esta habilidade não está pendente.");
+    if (competencia.status !== "PENDENTE")
+      throw new Error("Esta habilidade não está pendente.");
 
     return await prisma.competencia.update({
       where: { id_competencia },
@@ -62,40 +127,42 @@ export class AdminCompetenciaService {
     // Sanitiza o nome exatamente como fizemos no fluxo do candidato
     const nomeSanitizado = novo_nome
       .trim()
-      .replace(/\s+/g, ' ')
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ');
+      .replace(/\s+/g, " ")
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
 
     return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const competenciaPendente = await tx.competencia.findUnique({
         where: { id_competencia },
-        include: { candidatos: true }
+        include: { candidatos: true },
       });
 
-      if (!competenciaPendente) throw new Error("Habilidade pendente não encontrada.");
+      if (!competenciaPendente)
+        throw new Error("Habilidade pendente não encontrada.");
 
       // Procura se o nome corrigido JÁ EXISTE no banco
       const competenciaExistente = await tx.competencia.findFirst({
-        where: { 
-          nome: { equals: nomeSanitizado, mode: 'insensitive' }
-        }
+        where: {
+          nome: { equals: nomeSanitizado, mode: "insensitive" },
+        },
       });
 
       // CENÁRIO A: O nome corrigido já existe (Ex: Consertou "Ecxel" para "Excel", e "Excel" já existia)
-      if (competenciaExistente && competenciaExistente.id_competencia !== id_competencia) {
-        
+      if (
+        competenciaExistente &&
+        competenciaExistente.id_competencia !== id_competencia
+      ) {
         // Vamos fundir (merge) as duas: Mover todos os candidatos da errada para a certa
         for (const vinculo of competenciaPendente.candidatos) {
-          
           // Confere se o candidato já não tinha o "Excel" certo também cadastrado
           const jaTemACerta = await tx.candidatoCompetencia.findUnique({
             where: {
               id_candidato_id_competencia: {
                 id_candidato: vinculo.id_candidato,
-                id_competencia: competenciaExistente.id_competencia
-              }
-            }
+                id_competencia: competenciaExistente.id_competencia,
+              },
+            },
           });
 
           if (!jaTemACerta) {
@@ -104,8 +171,8 @@ export class AdminCompetenciaService {
               data: {
                 id_candidato: vinculo.id_candidato,
                 id_competencia: competenciaExistente.id_competencia,
-                nivel: vinculo.nivel
-              }
+                nivel: vinculo.nivel,
+              },
             });
           }
         }
@@ -116,15 +183,13 @@ export class AdminCompetenciaService {
 
         // Retorna a competência oficial existente
         return competenciaExistente;
-      } 
-      
-    else {
+      } else {
         return await tx.competencia.update({
           where: { id_competencia },
           data: {
             nome: nomeSanitizado,
-            status: "APROVADA" // Já aprova automaticamente
-          }
+            status: "APROVADA", // Já aprova automaticamente
+          },
         });
       }
     });
