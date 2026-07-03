@@ -219,10 +219,10 @@ export class BancoTalentosService {
 
       return {
         id_candidato: c.id_usuario,
-        identificacao_publica: `Candidato #${c.id_usuario} - ${areaPrincipal}`,
+        identificacao_publica: `PERFIL BLOQUEADO`,
 
-        idade: idade, // ✨ Idade calculada
-        genero: c.genero, // ✨ Gênero retornado
+        idade: idade,
+        genero: c.genero,
 
         objetivo_profissional: c.objetivo_profissional,
         resumo_profissional: c.resumo_profissional,
@@ -386,7 +386,7 @@ export class BancoTalentosService {
         saldo_creditos_empresa: empresa.creditos_curriculos,
         perfil: {
           ...dadosProfissionais,
-          nome: `Candidato #${candidato.id_usuario} - ${areaPrincipal}`,
+          nome: `PERFIL BLOQUEADO`,
           foto_url: null,
           email: "***@***.com",
           cpf: "***.***.***-**",
@@ -709,7 +709,7 @@ export class BancoTalentosService {
       } else {
         return {
           ...payloadBase,
-          nome: `Candidato #${c.id_usuario} - ${areaPrincipal}`,
+          nome: `PERFIL BLOQUEADO`,
           email: "***@***.com",
           foto_url: null,
           telefone: "(**) *****-****",
