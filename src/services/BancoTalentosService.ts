@@ -3,7 +3,7 @@ import { prisma } from "../config/prisma.js";
 import { Prisma } from "@prisma/client";
 
 export class BancoTalentosService {
-  async listarVitrine(filtros: {
+async listarVitrine(filtros: {
     competencia?: number[] | undefined;
     id_area?: number | undefined;
     turno?: string[] | undefined;
@@ -15,7 +15,6 @@ export class BancoTalentosService {
     escolaridade?: string[] | undefined;
     pagina?: number | undefined;
     limite?: number | undefined;
-    // ✨ NOVOS FILTROS
     genero?: string | undefined;
     idade_min?: number | undefined;
     idade_max?: number | undefined;
@@ -24,7 +23,6 @@ export class BancoTalentosService {
     const limite = filtros.limite || 10;
     const skip = (pagina - 1) * limite;
 
-    // 1. Regra de Ouro: SÓ busca quem quer ser visto e está ativo
     const whereClause: any = {
       perfil_visivel_empresas: true,
       usuario: { status: "ATIVO" },
@@ -72,9 +70,6 @@ export class BancoTalentosService {
       };
     }
 
-    // ==========================================
-    // 3. FILTROS AVANÇADOS (Escolaridade, Gênero, Idade)
-    // ==========================================
     if (filtros.escolaridade && filtros.escolaridade.length > 0) {
       const niveisPermitidos: string[] = [];
       const statusPermitidos: string[] = [];
@@ -113,12 +108,11 @@ export class BancoTalentosService {
       };
     }
 
-    // ✨ FILTRO DE GÊNERO (Inclusivo)
     if (filtros.genero) {
       const isMasculino = filtros.genero.toLowerCase() === "masculino";
 
       whereClause.OR = [
-        ...(whereClause.OR || []), // Preserva outros ORs se houver
+        ...(whereClause.OR || []),
         {
           OR: [
             {
@@ -129,20 +123,17 @@ export class BancoTalentosService {
             },
             { genero: { equals: "Outro", mode: "insensitive" } },
             { genero: { equals: "Prefiro não informar", mode: "insensitive" } },
-            { genero: null }, // Opcional: traz também quem deixou o campo em branco
+            { genero: null },
           ],
         },
       ];
     }
 
-    // ✨ FILTRO DE FAIXA ETÁRIA (Convertendo idade para data_nascimento)
     if (filtros.idade_min !== undefined || filtros.idade_max !== undefined) {
       const hoje = new Date();
       whereClause.data_nascimento = {};
 
       if (filtros.idade_min !== undefined) {
-        // Se a idade mínima é 20, a pessoa nasceu HÁ 20 anos ou ANTES.
-        // Data Máxima de Nascimento = Hoje - 20 anos
         const dataMaxNascimento = new Date(
           hoje.getFullYear() - filtros.idade_min,
           hoje.getMonth(),
@@ -152,8 +143,6 @@ export class BancoTalentosService {
       }
 
       if (filtros.idade_max !== undefined) {
-        // Se a idade máxima é 30, a pessoa nasceu HÁ 31 anos (para continuar tendo 30 até o próx. aniversário).
-        // Data Mínima de Nascimento = Hoje - 31 anos
         const dataMinNascimento = new Date(
           hoje.getFullYear() - (filtros.idade_max + 1),
           hoje.getMonth(),
@@ -163,18 +152,15 @@ export class BancoTalentosService {
       }
     }
 
-    // ... (Mantenha seu filtro de escolaridade intacto aqui) ...
-
-    // 4. Executa a busca paralela
-    const [total, candidatos] = await Promise.all([
+    // ✨ Removemos o skip e take daqui para podermos ordenar pela % em JS antes de paginar
+    const [total, candidatosBrutos] = await Promise.all([
       prisma.candidato.count({ where: whereClause }),
       prisma.candidato.findMany({
         where: whereClause,
-        skip,
-        take: limite,
-        orderBy: { usuario: { atualizado_em: "desc" } },
         select: {
           id_usuario: true,
+          cpf: true, // Necessário para pontuação
+          whatsapp: true, // Necessário para pontuação
           objetivo_profissional: true,
           resumo_profissional: true,
           pretensao_salarial: true,
@@ -184,15 +170,23 @@ export class BancoTalentosService {
           data_nascimento: true,
           genero: true,
 
-          endereco: { select: { cidade: true, uf: true } },
+          // Busca de endereço expandida para validar campos
+          endereco: { 
+            select: { 
+              cep: true, 
+              logradouro: true, 
+              numero: true, 
+              bairro: true, 
+              cidade: true, 
+              uf: true 
+            } 
+          },
           areas_atuacao: {
             include: { area: { select: { nome: true } } },
           },
           experiencias: {
             take: 3,
-            select: {
-              cargo: true,
-            },
+            select: { cargo: true },
             orderBy: { data_inicio: "desc" },
           },
           formacoes: {
@@ -205,21 +199,41 @@ export class BancoTalentosService {
       }),
     ]);
 
-    // 5. Formatação Final
-    const dadosMascarados = candidatos.map((c) => {
-      const areaPrincipal = c.areas_atuacao[0]?.area.nome || "Profissional";
+    // 5. Cálculo da Porcentagem e Formatação
+    const candidatosAvaliados = candidatosBrutos.map((c) => {
+      let pontuacao = 0;
 
-      // Calcula a idade do candidato para mostrar no card da Vitrine
+      if (c.cpf) pontuacao += 10;
+      if (c.data_nascimento) pontuacao += 10;
+      if (c.whatsapp) pontuacao += 10;
+
+      if (c.endereco?.cep) pontuacao += 2.5;
+      if (c.endereco?.logradouro) pontuacao += 2.5;
+      if (c.endereco?.numero) pontuacao += 2.5;
+      if (c.endereco?.bairro) pontuacao += 2.5;
+      if (c.endereco?.cidade) pontuacao += 2.5;
+      if (c.endereco?.uf) pontuacao += 2.5;
+
+      if (c.areas_atuacao.length > 0) pontuacao += 15;
+      if (c.resumo_profissional) pontuacao += 5;
+      if (c.objetivo_profissional) pontuacao += 5;
+      
+      if (c.experiencias.length > 0 || c.primeiro_emprego) pontuacao += 15;
+      if (c.formacoes.length > 0) pontuacao += 10;
+      if (c.competencias.length > 0) pontuacao += 5;
+
+      const perfil_completo_pct = Math.round(pontuacao);
+
       let idade = null;
       if (c.data_nascimento) {
-        const diff =
-          new Date().getTime() - new Date(c.data_nascimento).getTime();
+        const diff = new Date().getTime() - new Date(c.data_nascimento).getTime();
         idade = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
       }
 
       return {
         id_candidato: c.id_usuario,
         identificacao_publica: `PERFIL BLOQUEADO`,
+        perfil_completo_pct, // ✨ Novo campo
 
         idade: idade,
         genero: c.genero,
@@ -239,8 +253,14 @@ export class BancoTalentosService {
       };
     });
 
+    // 6. Ordena pela maior porcentagem primeiro
+    candidatosAvaliados.sort((a, b) => b.perfil_completo_pct - a.perfil_completo_pct);
+
+    // 7. Paginação em memória (Fatia o array ordenado)
+    const dadosPaginados = candidatosAvaliados.slice(skip, skip + limite);
+
     return {
-      dados: dadosMascarados,
+      dados: dadosPaginados,
       paginacao: {
         total,
         pagina_atual: pagina,

@@ -855,7 +855,6 @@ routes.patch(
   candidatoController.uploadFoto,
 );
 
-// ✅ CORRETO: As rotas fixas (estáticas) vêm primeiro!
 routes.get(
   "/empresas/banco-talentos",
   authMiddleware(["EMPRESA"]),
