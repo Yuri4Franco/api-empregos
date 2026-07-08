@@ -23,6 +23,7 @@ import { AdminDashboardController } from "../controllers/AdminDashboardControlle
 import { MetricaController } from "../controllers/MetricaController.js";
 import { EmpresaCandidaturaController } from "../controllers/EmpresaCandidaturaController.js";
 import { EmpresaEntrevistaController } from "../controllers/EmpresaEntrevistaController.js";
+import { VagaSitemapController } from "../controllers/VagaSitemapController.js";
 import {
   uploadBanner,
   uploadLogo,
@@ -99,6 +100,8 @@ const adminDashboardController = new AdminDashboardController();
 const metricaController = new MetricaController();
 const empresaCandidaturaController = new EmpresaCandidaturaController();
 const empresaEntrevistaController = new EmpresaEntrevistaController();
+const vagaSitemapController = new VagaSitemapController();
+
 routes.post("/login", authLimiter, authController.login);
 
 routes.post(
@@ -996,5 +999,7 @@ routes.get("/vagas", vagaController.listarPublicas);
 routes.get("/vagas/filtros-disponiveis", vagaController.filtrosDisponiveis);
 
 routes.get("/vagas/:id", vagaController.detalharPublica);
+
+routes.get("/vagas/sitemap", vagaSitemapController.handle);
 
 export default routes;

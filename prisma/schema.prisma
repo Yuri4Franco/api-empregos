@@ -340,9 +340,11 @@ model Vaga {
   status                  StatusVaga      @default(RASCUNHO)
   data_publicacao         DateTime?
   data_encerramento       DateTime?
-  criada_em               DateTime         @default(now())
-  data_atualizacao        DateTime?        @updatedAt
-  observacoes_admin       String?          @db.Text
+  extender_encerramento   Boolean?        @default(false)
+  data_fechamento         DateTime?
+  criada_em               DateTime        @default(now())
+  data_atualizacao        DateTime?       @updatedAt
+  observacoes_admin       String?         @db.Text
   tipo_diversidade        TipoDiversidade @default(AMPLA_CONCORRENCIA)
 
   vaga_externa            Boolean? @default(false)

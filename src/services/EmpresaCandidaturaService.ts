@@ -443,7 +443,6 @@ export class EmpresaCandidaturaService {
           etapa_origem: c.id_etapa_atual,
           etapa_destino: c.id_etapa_atual,
           status_destino: "REPROVADO",
-          // ✨ Motivo padronizado caso não venha nada do frontend
           motivo: "A empresa optou por não seguir com sua candidatura nesta oportunidade.",
           notificacao_pendente: false,
         })),
