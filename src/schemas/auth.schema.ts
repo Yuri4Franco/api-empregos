@@ -42,6 +42,7 @@ const UsuarioBaseSchema = z.object({
 const SenhaForte = z
   .string()
   .min(8, "A senha deve ter no mínimo 8 caracteres")
+  .regex(/[a-z]/, "Deve conter ao menos uma letra minúscula")
   .regex(/[A-Z]/, "Deve conter ao menos uma letra maiúscula")
   .regex(/[0-9]/, "Deve conter ao menos um número")
   .regex(/[^a-zA-Z0-9]/, "Deve conter ao menos um caractere especial");
