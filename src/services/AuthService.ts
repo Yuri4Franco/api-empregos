@@ -128,34 +128,36 @@ export class AuthService {
     const senhaHash = await argon2.hash(senha);
     const tokenAtivacao = crypto.randomBytes(32).toString("hex");
 
-    const resultado = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const user = await tx.usuario.create({
-        data: {
-          nome,
-          email,
-          senha_hash: senhaHash,
-          tipo_usuario: "CANDIDATO",
-          status: "PENDENTE",
-          token_ativacao: tokenAtivacao,
-        },
-      });
+    const resultado = await prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const user = await tx.usuario.create({
+          data: {
+            nome,
+            email,
+            senha_hash: senhaHash,
+            tipo_usuario: "CANDIDATO",
+            status: "PENDENTE",
+            token_ativacao: tokenAtivacao,
+          },
+        });
 
-      await tx.candidato.create({
-        data: {
-          id_usuario: user.id_usuario,
-          turno_preferido: ["QUALQUER_TURNO"],
-          cnh: ["NAO_POSSUO"],
-          tipo_contato: ["WHATSAPP"],
-        },
-      });
+        await tx.candidato.create({
+          data: {
+            id_usuario: user.id_usuario,
+            turno_preferido: ["QUALQUER_TURNO"],
+            cnh: ["NAO_POSSUO"],
+            tipo_contato: ["WHATSAPP"],
+          },
+        });
 
-      return {
-        id: user.id_usuario,
-        email: user.email,
-        nome: user.nome,
-        token: tokenAtivacao,
-      };
-    });
+        return {
+          id: user.id_usuario,
+          email: user.email,
+          nome: user.nome,
+          token: tokenAtivacao,
+        };
+      },
+    );
 
     try {
       await emailService.enviarEmailAtivacao(
@@ -178,13 +180,21 @@ export class AuthService {
       throw new Error("Link de ativação inválido ou expirado.");
     }
 
-    return await prisma.usuario.update({
+    const usuarioAtualizado = await prisma.usuario.update({
       where: { id_usuario: usuario.id_usuario },
       data: {
         status: "ATIVO",
         token_ativacao: null,
       },
     });
+
+    return this.gerarToken(
+      usuarioAtualizado.id_usuario,
+      usuarioAtualizado.id_empresa,
+      usuarioAtualizado.tipo_usuario,
+      usuarioAtualizado.is_master,
+      usuarioAtualizado.exigir_troca_senha,
+    );
   }
 
   async reenviarLinkAtivacao(email: string) {
@@ -282,5 +292,5 @@ export class AuthService {
     });
 
     return true;
-  } 
+  }
 }

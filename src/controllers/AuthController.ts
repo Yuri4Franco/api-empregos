@@ -52,11 +52,12 @@ export class AuthController {
         throw new Error("Token de ativação não fornecido.");
       }
 
-      await authService.confirmarEmail(token);
+      const dadosAutenticacao = await authService.confirmarEmail(token);
 
       return res.status(200).json({
         success: true,
         message: "Sua conta foi ativada! Agora você pode entrar no sistema.",
+        data: dadosAutenticacao,
       });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
