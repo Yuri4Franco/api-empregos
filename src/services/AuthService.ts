@@ -185,6 +185,7 @@ export class AuthService {
       data: {
         status: "ATIVO",
         token_ativacao: null,
+        ultimo_login: new Date(),
       },
     });
 
@@ -198,7 +199,7 @@ export class AuthService {
   }
 
   async reenviarLinkAtivacao(email: string) {
-    // 1. Busca o usuário pelo e-mail
+
     const usuario = await prisma.usuario.findUnique({
       where: { email },
     });
@@ -207,20 +208,17 @@ export class AuthService {
       throw new Error("Usuário não encontrado.");
     }
 
-    // 2. Verifica se a conta já foi ativada
     if (usuario.status === "ATIVO") {
       throw new Error("Esta conta já está ativada. Você já pode fazer login.");
     }
 
     const novoToken = crypto.randomBytes(32).toString("hex");
 
-    // 4. Atualiza o banco com o novo token
     await prisma.usuario.update({
       where: { id_usuario: usuario.id_usuario },
       data: { token_ativacao: novoToken },
     });
 
-    // 5. Reenvia o e-mail
     try {
       await emailService.enviarEmailAtivacao(
         usuario.email,

@@ -74,8 +74,12 @@ import { TaxonomiaController } from "../controllers/TaxonomiaController.js";
 import { validatePhotoUpload } from "../middlewares/validatePhotoUpload.js";
 import { DashboardCandidatoController } from "../controllers/DashboardCandidatoController.js";
 import { authLimiter, emailLimiter } from "../middlewares/rateLimiter.js";
+import { registrarAtividadeMiddleware } from "../middlewares/atividadeMiddleware.js";
 
 const routes = Router();
+
+routes.use(registrarAtividadeMiddleware());
+
 const vagaController = new VagaController();
 const adminController = new AdminController();
 const authController = new AuthController();

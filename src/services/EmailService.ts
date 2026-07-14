@@ -274,4 +274,63 @@ export class EmailService {
 
     return await transporter.sendMail(mailOptions);
   }
+
+  async enviarEmailReprovacao(email: string, nome: string, tituloVaga: string, nomeEmpresa: string) {
+    const urlVagas = `${process.env.APP_URL}/vagas`;
+
+    const conteudo = `
+      <h2 style="color: #333333; margin-top: 0;">Atualização sobre sua candidatura 📄</h2>
+      <p>Olá, <strong>${nome}</strong>.</p>
+      <p>Gostaríamos de agradecer imensamente a sua participação no processo seletivo para a vaga de <strong>${tituloVaga}</strong> na empresa <strong>${nomeEmpresa}</strong>, bem como o tempo e o esforço dedicados em cada etapa.</p>
+      <p>Informamos que, neste momento, a empresa optou por seguir com outros profissionais cujas qualificações estão mais alinhadas com os requisitos específicos desta oportunidade atual.</p>
+      <p>Valorizamos muito o seu interesse e encorajamos que você continue acompanhando as novas oportunidades publicadas diariamente no nosso portal de talentos da região.</p>
+      
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="${urlVagas}" style="background-color: #0056b3; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px;">
+          Ver Novas Vagas Disponíveis
+        </a>
+      </div>
+
+      <p style="font-size: 13px; color: #64748b;">Desejamos muito sucesso em sua jornada profissional e esperamos ver sua candidatura em futuras oportunidades da ACI Vagas!</p>
+    `;
+
+    const mailOptions = {
+      from: `"ACI Vagas" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: `Atualização sobre o processo seletivo – ${tituloVaga}`,
+      html: this.gerarTemplateEmail(conteudo),
+    };
+
+    return await transporter.sendMail(mailOptions);
+  }
+
+  async enviarEmailAprovacao(email: string, nome: string, tituloVaga: string, nomeEmpresa: string) {
+    const urlMinhasCandidaturas = `${process.env.APP_URL}/candidato/minhas-candidaturas`;
+
+    const conteudo = `
+      <h2 style="color: #10b981; margin-top: 0;">Parabéns, ${nome}! 🎉</h2>
+      <p>Temos uma excelente notícia sobre a sua candidatura para a vaga de <strong>${tituloVaga}</strong> na empresa <strong>${nomeEmpresa}</strong>!</p>
+      <p>Você foi <strong>aprovado(a)</strong> na etapa final do nosso sistema! A empresa avaliou seu perfil de forma muito positiva e optou por selecionar a sua candidatura.</p>
+      <p>Fique atento(a) ao seu telefone, WhatsApp e e-mail nos próximos dias, pois a equipe da empresa entrará em contato direto para passar as orientações e os próximos passos.</p>
+      
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="${urlMinhasCandidaturas}" style="background-color: #10b981; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px;">
+          Acessar Minhas Candidaturas
+        </a>
+      </div>
+
+      <p style="font-size: 13px; color: #64748b;">A Associação Comercial e Industrial de Panambi parabeniza você por essa conquista profissional!</p>
+    `;
+
+    const mailOptions = {
+      from: `"ACI Vagas" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: `Parabéns! Você foi aprovado(a) na vaga de ${tituloVaga} 🎉`,
+      html: this.gerarTemplateEmail(conteudo),
+    };
+
+    return await transporter.sendMail(mailOptions);
+  }
+
+  
 }
