@@ -210,6 +210,7 @@ export class BaseUserService {
             id_empresa: true,
             nome_fantasia: true,
             status: true,
+            tipo_vinculo_aci: true,
             creditos_vagas: true,
             creditos_curriculos: true,
             slug: true,

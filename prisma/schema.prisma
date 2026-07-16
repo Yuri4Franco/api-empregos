@@ -691,3 +691,17 @@ model SolicitacaoMidia {
 
   @@map("solicitacoes_midia")
 }
+
+model ConfiguracaoPreco {
+  id                      Int      @id @default(1)
+  
+  preco_vaga_nao_associada Decimal  @default(70.00) @db.Decimal(10, 2)
+  preco_vaga_associada     Decimal  @default(0.00)  @db.Decimal(10, 2)
+  
+  preco_pacote_curriculo   Decimal  @default(50.00) @db.Decimal(10, 2)
+  qtd_curriculos_pacote    Int      @default(10) 
+  
+  atualizado_em            DateTime @updatedAt
+
+  @@map("configuracoes_precos")
+}

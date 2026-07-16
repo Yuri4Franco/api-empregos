@@ -24,6 +24,7 @@ import { MetricaController } from "../controllers/MetricaController.js";
 import { EmpresaCandidaturaController } from "../controllers/EmpresaCandidaturaController.js";
 import { EmpresaEntrevistaController } from "../controllers/EmpresaEntrevistaController.js";
 import { VagaSitemapController } from "../controllers/VagaSitemapController.js";
+import { ConfiguracaoPrecoController } from "../controllers/ConfiguracaoPrecoController.js";
 import {
   uploadBanner,
   uploadLogo,
@@ -105,6 +106,7 @@ const metricaController = new MetricaController();
 const empresaCandidaturaController = new EmpresaCandidaturaController();
 const empresaEntrevistaController = new EmpresaEntrevistaController();
 const vagaSitemapController = new VagaSitemapController();
+const configuracaoPrecoController = new ConfiguracaoPrecoController();
 
 routes.post("/login", authLimiter, authController.login);
 
@@ -143,6 +145,14 @@ routes.patch(
 );
 
 // Rotas de Admin
+
+//Atualizar preço
+routes.put(
+  "/admin/precos",
+  authMiddleware(["ADM"]),
+  configuracaoPrecoController.atualizar,
+);
+
 // Cadastrar nova empresa - OK
 routes.post(
   "/admin/cadastrar-empresa",
@@ -1005,5 +1015,7 @@ routes.get("/vagas/filtros-disponiveis", vagaController.filtrosDisponiveis);
 routes.get("/vagas/:id", vagaController.detalharPublica);
 
 routes.get("/vagas/sitemap", vagaSitemapController.handle);
+
+routes.get("/precos", configuracaoPrecoController.obter);
 
 export default routes;
