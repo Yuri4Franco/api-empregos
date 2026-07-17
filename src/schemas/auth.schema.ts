@@ -241,26 +241,26 @@ export const vagaSchema = z.object({
   ocultar_salario: z.boolean().default(false),
   empresa_confidencial: z.boolean().default(false),
 
-  ata_encerramento: z
-    .any()
-    .nullable()
+  data_encerramento: z
+    .string()
     .optional()
     .refine((val) => {
-      if (!val) return true; // Se não tiver data, deixa passar
-
-      // Se vier do HTML (YYYY-MM-DD), adiciona T12. Se vier do Front (ISO String), usa direto.
-      const dataString =
-        typeof val === "string" && !val.includes("T") ? `${val}T12:00:00` : val;
-
-      const dataEscolhida = new Date(dataString);
+      if (!val) return true;
+      const dataEscolhida = new Date(`${val}T12:00:00`);
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
-
       return dataEscolhida >= hoje;
     }, "A data de encerramento não pode estar no passado."),
-
-  vaga_externa: z.boolean().default(false).optional(),
-
+  data_fechamento: z
+    .string()
+    .optional()
+    .refine((val) => {
+      if (!val) return true;
+      const dataEscolhida = new Date(`${val}T12:00:00`);
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      return dataEscolhida >= hoje;
+    }, "A data de fechamento não pode estar no passado."),
   link_externo: z
     .string()
     .url("Insira um link válido (com https://)")

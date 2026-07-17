@@ -443,7 +443,6 @@ export class VagaService {
         });
       }
 
-      // Strings e Booleans
       const camposTextuais = [
         "titulo",
         "nivel_hierarquico",
@@ -476,6 +475,18 @@ export class VagaService {
         dadosVaga.faixa_salarial_ate = dados.salario_ate
           ? Number(dados.salario_ate)
           : null;
+
+      if (dados.data_fechamento !== undefined) {
+        dadosVaga.data_fechamento = dados.data_fechamento
+          ? new Date(dados.data_fechamento)
+          : null;
+      }
+
+      if (dados.data_encerramento !== undefined) {
+        dadosVaga.data_encerramento = dados.data_encerramento
+          ? new Date(dados.data_encerramento)
+          : null;
+      }
 
       // Status e Data de Publicação
       dadosVaga.status = novoStatus;
