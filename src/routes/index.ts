@@ -113,10 +113,11 @@ routes.post("/login", authLimiter, authController.login);
 routes.post(
   "/register",
   validate(RegistroUsuario),
+  authLimiter,
   authController.register,
 );
 
-routes.post("/ativar", authController.ativar);
+routes.post("/ativar", authLimiter, authController.ativar);
 
 routes.post(
   "/auth/reenviar-ativacao",
