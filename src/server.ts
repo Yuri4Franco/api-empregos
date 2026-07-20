@@ -60,14 +60,14 @@ app.get("/health", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT} 🚀`);
-});
-
 app.get("/debug-ip", (req, res) => {
   res.json({
     ipExpress: req.ip,
     xForwardedFor: req.headers["x-forwarded-for"] || "vazio",
     cfConnectingIp: req.headers["cf-connecting-ip"] || "vazio",
   });
+});
+
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT} 🚀`);
 });
