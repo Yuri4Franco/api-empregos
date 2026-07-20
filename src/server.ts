@@ -5,7 +5,6 @@ import routes from "./routes/index.js";
 import cors from "cors";
 import helmet from "helmet";
 
-
 import * as Sentry from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
 import { prisma } from "./config/prisma.js";
@@ -13,7 +12,7 @@ import { globalLimiter } from "./middlewares/rateLimiter.js";
 
 const app = express();
 
-app.set("trust proxy", 1); 
+app.set("trust proxy", 1);
 
 app.use(globalLimiter);
 
@@ -23,10 +22,10 @@ const origensPermitidas = [
   "https://acivagas.com.br",
   "http://acivagas.com.br",
   "https://www.acivagas.com.br",
-  "http://www.acivagas.com.br"
+  "http://www.acivagas.com.br",
 ];
 
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== "production") {
   origensPermitidas.push("http://localhost:3000");
 }
 
@@ -35,8 +34,8 @@ app.use(
     origin: origensPermitidas,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true
-  })
+    credentials: true,
+  }),
 );
 
 app.use(express.json());
@@ -65,3 +64,10 @@ app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT} 🚀`);
 });
 
+app.get("/debug-ip", (req, res) => {
+  res.json({
+    ipExpress: req.ip,
+    xForwardedFor: req.headers["x-forwarded-for"] || "vazio",
+    cfConnectingIp: req.headers["cf-connecting-ip"] || "vazio",
+  });
+});
