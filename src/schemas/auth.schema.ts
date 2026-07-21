@@ -245,17 +245,6 @@ export const vagaSchema = z.object({
   salario_a_combinar: z.boolean().default(false),
   ocultar_salario: z.boolean().default(false),
   empresa_confidencial: z.boolean().default(false),
-
-  data_encerramento: z
-    .string()
-    .optional()
-    .refine((val) => {
-      if (!val) return true;
-      const dataEscolhida = new Date(`${val}T12:00:00`);
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      return dataEscolhida >= hoje;
-    }, "A data de encerramento não pode estar no passado."),
   data_fechamento: z
     .string()
     .optional()
