@@ -63,7 +63,7 @@ export class AuthController {
 
   async registrarCandidatoCpf(req: Request, res: Response) {
     try {
-      const { nome, email, cpf, senha, recaptchaToken } = req.body;
+      const { nome, email, cpf, senha } = req.body;
 
       // Validação básica dos campos obrigatórios
       if (!nome || !email || !cpf || !senha) {
@@ -72,13 +72,6 @@ export class AuthController {
         });
       }
 
-      const isHuman = await validarRecaptcha(recaptchaToken, "register");
-      if (!isHuman) {
-        return res.status(400).json({
-          error:
-            "Falha na verificação de segurança (reCAPTCHA). Por favor, recarregue a página e tente novamente.",
-        });
-      }
 
       const resultado = await authService.registrarCandidatoComCpf({
         nome,
