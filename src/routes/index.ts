@@ -114,7 +114,7 @@ routes.post(
   "/register",
   validate(RegistroUsuario),
   authLimiter,
-  authController.register,
+  authController.registrarCandidatoCpf,
 );
 
 routes.post("/ativar", authLimiter, authController.ativar);

@@ -62,6 +62,10 @@ export const AtualizarNomeSchema = UsuarioBaseSchema.pick({
 
 export const RegistroUsuario = UsuarioBaseSchema.extend({
   senha: SenhaForte,
+  cpf: z
+    .string()
+    .transform((v) => v.replace(/\D/g, ""))
+    .refine((v) => v.length === 11, "CPF deve ter 11 dígitos"),
 });
 
 export const esqueciSenhaSchema = z.object({

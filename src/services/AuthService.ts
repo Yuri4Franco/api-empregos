@@ -4,6 +4,7 @@ import argon2 from "argon2";
 import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
 import { EmailService } from "./EmailService.js";
+import { validarRecaptcha } from "../utils/validarRecaptcha.js";
 
 const emailService = new EmailService();
 
@@ -47,41 +48,56 @@ export class AuthService {
   }
 
   // Login específico para empresas usando CNPJ
-  async loginEmpresa(cnpj: string, senha_pura: string) {
-    const cnpjLimpo = cnpj.replace(/\D/g, "");
+  async loginPorCpf(cpf: string, senha_pura: string) {
+    // 1. Remove pontos e traços do CPF
+    const cpfLimpo = cpf.replace(/\D/g, "");
 
-    const empresa = await prisma.empresa.findUnique({
-      where: { cnpj: cnpjLimpo },
+    if (cpfLimpo.length !== 11) {
+      throw new Error("CPF inválido. Informe os 11 dígitos.");
+    }
+
+    // 2. Busca o candidato pelo CPF e inclui o usuário relacional
+    const candidato = await prisma.candidato.findFirst({
+      where: { cpf: cpfLimpo },
       include: {
-        usuarios: true,
+        usuario: true,
       },
     });
 
-    if (!empresa || !empresa.usuarios || empresa.usuarios.length === 0) {
+    if (!candidato || !candidato.usuario) {
       throw new Error("Credenciais inválidas.");
     }
-    const usuarioPrincipal = empresa.usuarios[0];
 
-    if (!usuarioPrincipal) {
-      throw new Error("Nenhum usuário vinculado a esta empresa.");
+    const usuario = candidato.usuario;
+
+    // 3. Validações de status de conta
+    if (usuario.status == "PENDENTE") {
+      throw new Error(
+        "Verifique seu email e ative a sua conta. Contate a ACI.",
+      );
     }
 
-    if (usuarioPrincipal.status !== "ATIVO") {
+    if (usuario.status == "BLOQUEADO") {
       throw new Error("Acesso em análise ou suspenso. Contate a ACI.");
     }
 
-    const senhaValida = await argon2.verify(
-      usuarioPrincipal.senha_hash,
-      senha_pura,
-    );
+    // 4. Verificação criptográfica da senha com Argon2
+    const senhaValida = await argon2.verify(usuario.senha_hash, senha_pura);
     if (!senhaValida) throw new Error("Credenciais inválidas.");
 
+    // 5. Atualiza a data e hora do último login
+    await prisma.usuario.update({
+      where: { id_usuario: usuario.id_usuario },
+      data: { ultimo_login: new Date() },
+    });
+
+    // 6. Retorna o token JWT e dados de permissão
     return this.gerarToken(
-      usuarioPrincipal.id_usuario,
-      usuarioPrincipal.id_empresa,
-      usuarioPrincipal.tipo_usuario,
-      usuarioPrincipal.is_master,
-      usuarioPrincipal.exigir_troca_senha,
+      usuario.id_usuario,
+      usuario.id_empresa,
+      usuario.tipo_usuario,
+      usuario.is_master,
+      usuario.exigir_troca_senha,
     );
   }
 
@@ -171,6 +187,88 @@ export class AuthService {
     return { id: resultado.id, email: resultado.email };
   }
 
+  async registrarCandidatoComCpf(dados: {
+    nome: string;
+    email: string;
+    cpf: string;
+    senha: string;
+  }) {
+    const { nome, email, cpf, senha } = dados;
+    // 1. Limpa o CPF mantendo apenas números
+    const cpfLimpo = cpf.replace(/\D/g, "");
+
+    if (cpfLimpo.length !== 11) {
+      throw new Error("CPF inválido. Informe os 11 dígitos.");
+    }
+
+    // 2. Verifica se o e-mail já está em uso
+    const usuarioExistente = await prisma.usuario.findUnique({
+      where: { email },
+    });
+    if (usuarioExistente) {
+      throw new Error("Este e-mail já está cadastrado.");
+    }
+
+    // 3. Verifica se o CPF já está vinculado a algum candidato
+    const candidatoExistente = await prisma.candidato.findFirst({
+      where: { cpf: cpfLimpo },
+    });
+    if (candidatoExistente) {
+      throw new Error("Este CPF já está cadastrado no sistema.");
+    }
+
+    // 4. Gera o hash da senha
+    const senhaHash = await argon2.hash(senha);
+
+    // 5. Cria o usuário e o candidato em uma transação atômica
+    const novoUsuario = await prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const user = await tx.usuario.create({
+          data: {
+            nome,
+            email,
+            senha_hash: senhaHash,
+            tipo_usuario: "CANDIDATO",
+            status: "ATIVO",
+            ultimo_login: new Date(),
+          },
+        });
+
+        await tx.candidato.create({
+          data: {
+            id_usuario: user.id_usuario,
+            cpf: cpfLimpo,
+            turno_preferido: ["QUALQUER_TURNO"],
+            cnh: ["NAO_POSSUO"],
+            tipo_contato: ["WHATSAPP"],
+          },
+        });
+
+        return user;
+      },
+    );
+
+    // 6. Gera o token de autenticação instantaneamente
+    const dadosToken = this.gerarToken(
+      novoUsuario.id_usuario,
+      novoUsuario.id_empresa,
+      novoUsuario.tipo_usuario,
+      novoUsuario.is_master,
+      novoUsuario.exigir_troca_senha,
+    );
+
+    // 7. Retorna os dados do usuário junto com o token JWT
+    return {
+      usuario: {
+        id: novoUsuario.id_usuario,
+        nome: novoUsuario.nome,
+        email: novoUsuario.email,
+        tipo_usuario: novoUsuario.tipo_usuario,
+      },
+      ...dadosToken,
+    };
+  }
+
   async confirmarEmail(token: string) {
     const usuario = await prisma.usuario.findFirst({
       where: { token_ativacao: token },
@@ -199,7 +297,6 @@ export class AuthService {
   }
 
   async reenviarLinkAtivacao(email: string) {
-
     const usuario = await prisma.usuario.findUnique({
       where: { email },
     });

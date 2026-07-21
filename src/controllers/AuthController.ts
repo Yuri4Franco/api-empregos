@@ -1,17 +1,28 @@
 import type { Request, Response } from "express";
 import { AuthService } from "../services/AuthService.js";
+import { validarRecaptcha } from "../utils/validarRecaptcha.js";
 
 const authService = new AuthService();
 
 export class AuthController {
   async login(req: Request, res: Response) {
     try {
-      const { email, senha, cnpj } = req.body;
+      const { email, senha, cpf } = req.body;
+
+      // 🚨 1. Trava de segurança: Garante a presença da senha e de pelo menos um identificador
+      if (!senha || (!email && !cpf)) {
+        return res.status(400).json({
+          success: false,
+          error:
+            "Informe a senha e pelo menos um identificador (E-mail ou CPF).",
+        });
+      }
 
       let result;
-      if (cnpj) {
-        result = await authService.loginEmpresa(cnpj, senha);
+      if (cpf) {
+        result = await authService.loginPorCpf(cpf, senha);
       } else {
+        // Como passou pelo if inicial, temos certeza absoluta que 'email' existe aqui
         result = await authService.loginPorEmail(email, senha);
       }
 
@@ -20,7 +31,16 @@ export class AuthController {
         data: result,
       });
     } catch (error: any) {
-      return res.status(401).json({
+      console.error("Erro na tentativa de login:", error.message);
+
+      const isUnauthorized =
+        error.message.includes("Credenciais inválidas") ||
+        error.message.includes("Verifique seu email") ||
+        error.message.includes("Acesso em análise");
+
+      const statusCode = isUnauthorized ? 401 : 400;
+
+      return res.status(statusCode).json({
         success: false,
         error: error.message,
       });
@@ -29,8 +49,6 @@ export class AuthController {
 
   async register(req: Request, res: Response) {
     try {
-
-      
       const resultado = await authService.registrarCandidato(req.body);
 
       return res.status(201).json({
@@ -43,9 +61,51 @@ export class AuthController {
     }
   }
 
+  async registrarCandidatoCpf(req: Request, res: Response) {
+    try {
+      const { nome, email, cpf, senha, recaptchaToken } = req.body;
+
+      // Validação básica dos campos obrigatórios
+      if (!nome || !email || !cpf || !senha) {
+        return res.status(400).json({
+          erro: "Todos os campos (nome, email, cpf e senha) são obrigatórios.",
+        });
+      }
+
+      const isHuman = await validarRecaptcha(recaptchaToken, "register");
+      if (!isHuman) {
+        return res.status(400).json({
+          error:
+            "Falha na verificação de segurança (reCAPTCHA). Por favor, recarregue a página e tente novamente.",
+        });
+      }
+
+      const resultado = await authService.registrarCandidatoComCpf({
+        nome,
+        email,
+        cpf,
+        senha,
+      });
+
+      // Retorna 201 (Created) entregando o token para login imediato
+      return res.status(201).json({
+        mensagem: "Cadastro realizado com sucesso!",
+        ...resultado,
+      });
+    } catch (error: any) {
+      console.error("Erro no registro rápido de candidato:", error.message);
+
+      // Define 409 (Conflict) se for dado duplicado, ou 400 (Bad Request) para outros erros
+      const status = error.message.includes("já está cadastrado") ? 409 : 400;
+
+      return res.status(status).json({
+        erro: error.message || "Erro interno ao registrar candidato.",
+      });
+    }
+  }
+
   async ativar(req: Request, res: Response) {
     try {
-
       const { token } = req.body;
 
       if (!token) {
@@ -92,7 +152,7 @@ export class AuthController {
   async esqueciSenha(req: Request, res: Response) {
     try {
       const { email } = req.body;
-      
+
       await authService.solicitarRecuperacaoSenha(email);
 
       // Sempre retorna sucesso, mesmo se o email for inválido (medida de segurança)
@@ -102,12 +162,10 @@ export class AuthController {
           "Se o e-mail estiver cadastrado em nosso sistema, você receberá um link com as instruções para redefinir sua senha em instantes.",
       });
     } catch (error: any) {
-      return res
-        .status(500)
-        .json({
-          success: false,
-          error: "Erro interno ao processar a solicitação.",
-        });
+      return res.status(500).json({
+        success: false,
+        error: "Erro interno ao processar a solicitação.",
+      });
     }
   }
 
