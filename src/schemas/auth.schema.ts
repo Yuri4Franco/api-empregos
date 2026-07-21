@@ -66,6 +66,7 @@ export const RegistroUsuario = UsuarioBaseSchema.extend({
     .string()
     .transform((v) => v.replace(/\D/g, ""))
     .refine((v) => v.length === 11, "CPF deve ter 11 dígitos"),
+  recaptchaToken: z.string().min(1, "O token de recaptcha é obrigatório"),
 });
 
 export const esqueciSenhaSchema = z.object({
