@@ -6,7 +6,6 @@ import { agendarLimpezaContasPendentes } from "./jobs/LimpezaContasJob.js";
 console.log("Iniciando o Worker de Tarefas Agendadas da ACI Vagas...");
 
 agendarLimpezaContasPendentes();
-agendarLembretePerfilIncompleto();
 agendarInativacaoPorInatividade();
 agendarEncerramentoVagasAutomatico();
 
