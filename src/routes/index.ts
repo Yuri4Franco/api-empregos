@@ -638,6 +638,12 @@ routes.post(
   empresaCandidaturaController.reprovarEmLote,
 );
 
+routes.post(
+  "/empresa/candidaturas/perfil-lote",
+  authMiddleware(["EMPRESA"]),
+  empresaCandidaturaController.buscarCurriculosLote
+);
+
 // Perfil completo do candidato (Dados + Currículo + Agendamento + Avaliação)
 routes.get(
   "/empresa/candidaturas/:id_candidatura/perfil",

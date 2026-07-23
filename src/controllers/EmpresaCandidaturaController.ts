@@ -261,4 +261,53 @@ export class EmpresaCandidaturaController {
       return res.status(400).json({ success: false, error: error.message });
     }
   }
+
+  async buscarCurriculosLote(req: Request, res: Response) {
+    try {
+      const idEmpresa = req.user.id_empresa;
+
+      if (!idEmpresa) {
+        return res.status(403).json({
+          error:
+            "Acesso negado. Apenas empresas autenticadas podem buscar currículos em lote.",
+        });
+      }
+
+      // 2. Extrai o array de IDs do body: { "ids": [1, 2, 3] }
+      const { ids } = req.body;
+
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({
+          error: "Por favor, forneça um array de 'ids' válido e não vazio.",
+        });
+      }
+
+      // 3. Proteção contra ataques de negação de serviço (DoS) por excesso de carga
+      if (ids.length > 50) {
+        return res.status(400).json({
+          error:
+            "O lote excede o limite permitido de 50 currículos por requisição.",
+        });
+      }
+
+      // 4. Executa o serviço convertendo o ID para Number por segurança
+      const curriculos = await empresaCandidaturaService.obterCurriculosPorLote(
+        Number(idEmpresa),
+        ids,
+      );
+
+      // 5. Retorna 200 OK
+      return res.status(200).json({
+        total: curriculos.length,
+        data: curriculos,
+      });
+    } catch (error: any) {
+      console.error("Erro ao buscar currículos em lote:", error.message);
+      return res.status(500).json({
+        error:
+          error.message ||
+          "Ocorreu um erro interno ao processar o lote de currículos.",
+      });
+    }
+  }
 }

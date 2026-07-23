@@ -413,10 +413,7 @@ export class EmpresaCandidaturaService {
   // ==========================================
   // Reprovar em Massa ou apenas 1
   // ==========================================
-  async reprovarEmMassa(
-    id_candidaturas: any[],
-    id_empresa: number,
-  ) {
+  async reprovarEmMassa(id_candidaturas: any[], id_empresa: number) {
     const idsNumericos = id_candidaturas.map((id) => Number(id));
 
     return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -443,7 +440,8 @@ export class EmpresaCandidaturaService {
           etapa_origem: c.id_etapa_atual,
           etapa_destino: c.id_etapa_atual,
           status_destino: "REPROVADO",
-          motivo: "A empresa optou por não seguir com sua candidatura nesta oportunidade.",
+          motivo:
+            "A empresa optou por não seguir com sua candidatura nesta oportunidade.",
           notificacao_pendente: false,
         })),
       });
@@ -488,5 +486,87 @@ export class EmpresaCandidaturaService {
         tags_avaliacao: dados.tags_avaliacao ?? null,
       },
     });
+  }
+
+  async obterCurriculosPorLote(idEmpresa: number, idsCandidaturas: number[]) {
+    // 1. Validação defensiva no Service
+    if (!Array.isArray(idsCandidaturas) || idsCandidaturas.length === 0) {
+      throw new Error("O array de IDs de candidaturas não pode estar vazio.");
+    }
+
+    // 2. Busca otimizada em lote no Prisma (Evita N+1 queries)
+    const candidaturas = await prisma.candidatura.findMany({
+      where: {
+        id_candidatura: { in: idsCandidaturas },
+        // 🔒 SEGURANÇA: Garante que a vaga associada à candidatura pertence à empresa logada!
+        vaga: {
+          id_empresa: idEmpresa,
+        },
+      },
+      select: {
+        id_candidatura: true,
+        status_atual: true,
+        data_candidatura: true,
+        // Puxamos a relação diretamente do modelo Candidatura -> Candidato
+        candidato: {
+          include: {
+            usuario: {
+              select: {
+                nome: true,
+                email: true,
+                status: true,
+              },
+            },
+            endereco: true,
+            areas_atuacao: {
+              include: {
+                area: {
+                  select: {
+                    nome: true,
+                  },
+                },
+              },
+            },
+            experiencias: {
+              orderBy: {
+                data_inicio: "desc",
+              },
+            },
+            formacoes: {
+              orderBy: {
+                data_conclusao: "desc",
+              },
+            },
+            competencias: {
+              include: {
+                competencia: {
+                  select: {
+                    nome: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // 3. Formatação da resposta para facilitar o uso no Front-end (React/Next.js)
+    return candidaturas.map((item) => ({
+      id_candidatura: item.id_candidatura,
+      status_candidatura: item.status_atual,
+      data_candidatura: item.data_candidatura,
+      curriculo: {
+        ...item.candidato,
+        // Simplificando arrays que possuem relações intermediárias (opcional, melhora a UX do DEV no front):
+        areas_atuacao:
+          item.candidato?.areas_atuacao.map((a) => a.area.nome) || [],
+        competencias:
+          item.candidato?.competencias.map((c) => ({
+            nome: c.competencia.nome,
+            nivel: c.nivel,
+          })) || [],
+      },
+    }));
   }
 }
