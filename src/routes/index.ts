@@ -1016,11 +1016,13 @@ routes.post(
 
 routes.get("/vagas", vagaController.listarPublicas);
 
+routes.get("/vagas/sitemap", vagaSitemapController.handle);
+
 routes.get("/vagas/filtros-disponiveis", vagaController.filtrosDisponiveis);
 
 routes.get("/vagas/:id", vagaController.detalharPublica);
 
-routes.get("/vagas/sitemap", vagaSitemapController.handle);
+
 
 routes.get("/precos", configuracaoPrecoController.obter);
 

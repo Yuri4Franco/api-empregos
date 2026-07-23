@@ -7,7 +7,7 @@ export class VagaSitemapService {
       select: {
         id_vaga: true,
         data_atualizacao: true,
-        criada_em: true, // Fallback caso nunca tenha sido atualizada
+        criada_em: true,
       },
     });
 
