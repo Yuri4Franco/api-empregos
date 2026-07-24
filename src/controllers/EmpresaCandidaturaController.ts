@@ -283,10 +283,10 @@ export class EmpresaCandidaturaController {
       }
 
       // 3. Proteção contra ataques de negação de serviço (DoS) por excesso de carga
-      if (ids.length > 50) {
+      if (ids.length > 200) {
         return res.status(400).json({
           error:
-            "O lote excede o limite permitido de 50 currículos por requisição.",
+            "O lote excede o limite permitido de 200 currículos por requisição.",
         });
       }
 
