@@ -1,9 +1,11 @@
 import type { Prisma, StatusCandidatura } from "@prisma/client";
 import { prisma } from "../config/prisma.js";
 import { NotificacaoService } from "./NotificacaoService.js";
+import { EmailService } from "./EmailService.js";
 
 export class EmpresaCandidaturaService {
   private notificacaoService = new NotificacaoService();
+  private emailService = new EmailService();
 
   // ==========================================
   // GETS DO PAINEL E PERFIL
@@ -230,13 +232,25 @@ export class EmpresaCandidaturaService {
   }
 
   // ==========================================
-  // Avançar Candidato
+  // Avançar Candidato (Individual)
   // ==========================================
   async avancarCandidato(id_candidatura: number, id_empresa: number) {
+    // ✨ 1. Consulta corrigida: busca nome e email dentro da relação 'usuario'
     const candidatura = await prisma.candidatura.findUnique({
       where: { id_candidatura },
       include: {
-        vaga: { select: { id_empresa: true, titulo: true } },
+        candidato: {
+          select: {
+            usuario: { select: { nome: true, email: true } },
+          },
+        },
+        vaga: {
+          select: {
+            id_empresa: true,
+            titulo: true,
+            empresa: { select: { nome_fantasia: true } },
+          },
+        },
       },
     });
 
@@ -273,7 +287,7 @@ export class EmpresaCandidaturaService {
             etapa_destino: proximaEtapa.id_etapa,
             status_destino: novoStatus,
             motivo: `Avançou para a etapa: ${proximaEtapa.nome_etapa}`,
-            notificacao_pendente: false, // ✨ Sempre false, disparamos agora!
+            notificacao_pendente: false,
           },
         });
 
@@ -287,28 +301,68 @@ export class EmpresaCandidaturaService {
       },
     );
 
-    // ✨ Disparo IMEDIATO da notificação
+    // ✨ Disparo IMEDIATO em Background
     if (!proximaEtapa.requer_agendamento) {
-      await this.notificacaoService
+      // Acessando os dados corretamente pelo 'usuario'
+      const nomeCandidato = candidatura.candidato.usuario.nome;
+      const emailCandidato = candidatura.candidato.usuario.email;
+      const tituloVaga = candidatura.vaga.titulo;
+      const nomeEmpresa = candidatura.vaga.empresa?.nome_fantasia || "Empresa";
+
+      // A) Notificação Push Interna (tipagem err: any corrigida)
+      this.notificacaoService
         .enviar({
           id_usuario: candidatura.id_candidato,
-          titulo: "Parabéns, você avançou de etapa! 🎉",
-          mensagem: `Sua candidatura para a vaga "${candidatura.vaga.titulo}" avançou para a etapa: ${proximaEtapa.nome_etapa}. Fique de olho no painel para os próximos passos.`,
+          titulo:
+            novoStatus === "APROVADO"
+              ? "Parabéns, você foi APROVADO! 🏆"
+              : "Parabéns, você avançou de etapa! 🎉",
+          mensagem:
+            novoStatus === "APROVADO"
+              ? `Você foi selecionado na vaga "${tituloVaga}". A empresa entrará em contato em breve.`
+              : `Sua candidatura para a vaga "${tituloVaga}" avançou para a etapa: ${proximaEtapa.nome_etapa}. Fique de olho nos seus contatos!`,
           tipo: "INFO",
-          link_acao: `/candidato/candidaturas/${id_candidatura}`, // Ajuste o link se necessário
+          link_acao: `/candidato/minhas-candidaturas`,
         })
-        .catch((err) =>
+        .catch((err: any) =>
           console.error("Erro ao enviar notificação de avanço:", err),
         );
+
+      // B) E-mail Inteligente (tipagem err: any corrigida)
+      if (novoStatus === "APROVADO") {
+        this.emailService
+          .enviarEmailAprovacao(
+            emailCandidato,
+            nomeCandidato,
+            tituloVaga,
+            nomeEmpresa,
+          )
+          .catch((err: any) =>
+            console.error("Erro ao enviar e-mail de aprovação:", err),
+          );
+      } else {
+        this.emailService
+          .enviarEmailAvanço(
+            emailCandidato,
+            nomeCandidato,
+            tituloVaga,
+            nomeEmpresa,
+            proximaEtapa.nome_etapa,
+          )
+          .catch((err: any) =>
+            console.error("Erro ao enviar e-mail de avanço:", err),
+          );
+      }
     }
 
     return resultado;
   }
 
   // ==========================================
-  // Avançar em Massa
+  // Avançar em Massa (Lote)
   // ==========================================
   async avancarEmMassa(id_candidaturas: number[], id_empresa: number) {
+    // ✨ Consulta corrigida: buscando a relação 'usuario' no select do candidato
     const candidaturas = await prisma.candidatura.findMany({
       where: {
         id_candidatura: { in: id_candidaturas },
@@ -320,6 +374,11 @@ export class EmpresaCandidaturaService {
         id_etapa_atual: true,
         id_vaga: true,
         id_candidato: true,
+        candidato: {
+          select: {
+            usuario: { select: { nome: true, email: true } },
+          },
+        },
       },
     });
 
@@ -334,8 +393,14 @@ export class EmpresaCandidaturaService {
 
     const vagaDados = await prisma.vaga.findUnique({
       where: { id_vaga: idVaga },
-      select: { titulo: true },
+      select: {
+        titulo: true,
+        empresa: { select: { nome_fantasia: true } },
+      },
     });
+    const nomeEmpresa = vagaDados?.empresa?.nome_fantasia || "Empresa";
+    const tituloVaga = vagaDados?.titulo || "Vaga";
+
     const etapasVaga = await prisma.etapaProcesso.findMany({
       where: { id_vaga: idVaga },
       orderBy: { ordem: "asc" },
@@ -343,7 +408,7 @@ export class EmpresaCandidaturaService {
 
     const movimentosParaCriar = [];
     const candidaturasParaAtualizar = [];
-    const notificacoesParaEnviar: any[] = []; // ✨ Array para guardar os envios
+    const tarefasAssincronas: any[] = [];
 
     for (const c of candidaturas) {
       const etapaAtual = etapasVaga.find(
@@ -378,18 +443,61 @@ export class EmpresaCandidaturaService {
         }),
       );
 
-      // ✨ Prepara o disparo para depois da transação
+      // ✨ Disparo assíncrono para cada candidato com caminhos e tipagens corrigidos
       if (!proximaEtapa.requer_agendamento) {
-        notificacoesParaEnviar.push(
+        const nomeCandidato = c.candidato.usuario.nome;
+        const emailCandidato = c.candidato.usuario.email;
+
+        // A) Notificação Push Interna
+        tarefasAssincronas.push(
           this.notificacaoService
             .enviar({
               id_usuario: c.id_candidato,
-              titulo: "Sua candidatura avançou! 🎉",
-              mensagem: `Ótimas notícias! Você avançou para a etapa "${proximaEtapa.nome_etapa}" na vaga ${vagaDados?.titulo}.`,
+              titulo:
+                novoStatus === "APROVADO"
+                  ? "Sua candidatura foi APROVADA! 🏆"
+                  : "Sua candidatura avançou! 🎉",
+              mensagem:
+                novoStatus === "APROVADO"
+                  ? `Você foi aprovado na vaga "${tituloVaga}". A empresa entrará em contato em breve.`
+                  : `Ótimas notícias! Você avançou para a etapa "${proximaEtapa.nome_etapa}" na vaga ${tituloVaga}.`,
               tipo: "INFO",
+              link_acao: `/candidato/minhas-candidaturas`,
             })
-            .catch((err) => console.error(err)),
+            .catch((err: any) =>
+              console.error("Erro na notificação em massa:", err),
+            ),
         );
+
+        // B) E-mail Inteligente
+        if (novoStatus === "APROVADO") {
+          tarefasAssincronas.push(
+            this.emailService
+              .enviarEmailAprovacao(
+                emailCandidato,
+                nomeCandidato,
+                tituloVaga,
+                nomeEmpresa,
+              )
+              .catch((err: any) =>
+                console.error("Erro no e-mail de aprovação em massa:", err),
+              ),
+          );
+        } else {
+          tarefasAssincronas.push(
+            this.emailService
+              .enviarEmailAvanço(
+                emailCandidato,
+                nomeCandidato,
+                tituloVaga,
+                nomeEmpresa,
+                proximaEtapa.nome_etapa,
+              )
+              .catch((err: any) =>
+                console.error("Erro no e-mail de avanço em massa:", err),
+              ),
+          );
+        }
       }
     }
 
@@ -399,8 +507,7 @@ export class EmpresaCandidaturaService {
         ...candidaturasParaAtualizar,
       ]);
 
-      // Dispara todas as notificações em paralelo sem bloquear a resposta do servidor
-      Promise.all(notificacoesParaEnviar);
+      Promise.all(tarefasAssincronas);
     }
 
     return {
