@@ -94,6 +94,8 @@ model Usuario {
   id_usuario      Int           @id @default(autoincrement())
   nome            String
   email           String        @unique
+  email_confirmado Boolean      @default(false)
+  email_pendente  String?
   senha_hash      String
   tipo_usuario    TipoUsuario
   status          StatusGeral   @default(PENDENTE)
