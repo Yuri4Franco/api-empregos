@@ -1,6 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "./config/prisma.js";
 
-const prisma = new PrismaClient();
 
 async function main() {
   console.log("Iniciando atualização da base de candidatos ativos...");
