@@ -27,8 +27,6 @@ export const agendarLembretePerfilIncompleto = () => {
         // Se o candidato cair em QUALQUER UMA das condições abaixo, ele será notificado
         OR: [
           { cpf: null }, // Sem CPF
-          { objetivo_profissional: null }, // Sem objetivo
-          { resumo_profissional: null }, // Sem resumo
           { areas_atuacao: { none: {} } }, // Nenhuma área de atuação
           { formacoes: { none: {} } }, // Sem histórico escolar/acadêmico
           { competencias: { none: {} } }, // Sem nenhuma habilidade

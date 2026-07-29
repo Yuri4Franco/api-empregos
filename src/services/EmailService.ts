@@ -85,7 +85,7 @@ export class EmailService {
   }
 
   async enviarEmailRecuperacao(email: string, nome: string, token: string) {
-    return await filaEmails.add("email-recuperacao", { email, nome, token });
+    return await filaEmails.add("email-recuperacao", { email, nome, token }, { priority: 1 });
   }
 
   async enviarEmailLembretePerfil(email: string, nome: string) {
