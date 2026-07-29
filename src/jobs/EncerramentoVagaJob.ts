@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { prisma } from "../config/prisma.js";
 import { Prisma } from "@prisma/client";
-import { EmailService } from "../services/EmailService.js"; // ✨ Importando o serviço
+import { EmailService } from "../services/EmailService.js";
 
 const emailService = new EmailService();
 
@@ -14,8 +14,10 @@ export function agendarEncerramentoVagasAutomatico() {
 
     try {
       const hoje = new Date();
+      // Zera as horas, minutos e segundos para garantir precisão à meia-noite local
+      hoje.setHours(0, 0, 0, 0);
+
       const limite15Dias = new Date(hoje.getTime() - 15 * 24 * 60 * 60 * 1000);
-      const limite30Dias = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
       const limite45Dias = new Date(hoje.getTime() - 45 * 24 * 60 * 60 * 1000);
 
       // ======================================================================
@@ -25,8 +27,10 @@ export function agendarEncerramentoVagasAutomatico() {
         where: {
           status: "ATIVA",
           OR: [
-            { data_fechamento: { not: null, lte: hoje } },
-            { data_fechamento: null, data_publicacao: { lte: limite15Dias } },
+            // Usamos 'lt' (menor que). Se a vaga fecha dia 15, no dia 15 ela NÃO é menor que hoje.
+            // Quando o cron rodar dia 16 às 00:00, o dia 15 passa a ser menor, e a vaga fecha.
+            { data_fechamento: { not: null, lt: hoje } },
+            { data_fechamento: null, data_publicacao: { lt: limite15Dias } },
           ],
         },
         include: {
@@ -71,24 +75,13 @@ export function agendarEncerramentoVagasAutomatico() {
       }
 
       // ======================================================================
-      // 2. ROTINA DE ENCERRAMENTO DEFINITIVO (REPROVAÇÃO EM MASSA)
+      // 2. ROTINA DE ENCERRAMENTO DEFINITIVO (45 DIAS CRAVADOS)
       // ======================================================================
       const vagasParaEncerrar = await prisma.vaga.findMany({
         where: {
           status: { in: ["ATIVA", "PAUSADA"] },
-          OR: [
-            { data_encerramento: { not: null, lte: hoje } },
-            {
-              data_encerramento: null,
-              extender_encerramento: true,
-              data_publicacao: { lte: limite45Dias },
-            },
-            {
-              data_encerramento: null,
-              extender_encerramento: { not: true },
-              data_publicacao: { lte: limite30Dias },
-            },
-          ],
+          // Regra limpa e implacável: bateu 45 dias de publicação, encerra.
+          data_publicacao: { lte: limite45Dias },
         },
         include: {
           empresa: {
@@ -108,9 +101,14 @@ export function agendarEncerramentoVagasAutomatico() {
             include: {
               candidato: {
                 include: {
-                  // ✨ Adicionado o campo "email" na busca!
                   usuario: {
-                    select: { id_usuario: true, nome: true, email: true },
+                    // ✨ Trouxemos o email_confirmado para validar o disparo!
+                    select: {
+                      id_usuario: true,
+                      nome: true,
+                      email: true,
+                      email_confirmado: true,
+                    },
                   },
                 },
               },
@@ -128,7 +126,6 @@ export function agendarEncerramentoVagasAutomatico() {
           const nomeEmpresa =
             vaga.empresa.nome_fantasia || vaga.empresa.razao_social;
 
-          // ✨ Lista temporária para guardar quem vai receber e-mail
           const emailsParaEnviar: Array<{
             email: string;
             nome: string;
@@ -150,7 +147,7 @@ export function agendarEncerramentoVagasAutomatico() {
                   data: {
                     id_usuario: u.id_usuario,
                     titulo: "Vaga Encerrada Automaticamente",
-                    mensagem: `O ciclo de vida da vaga "${vaga.titulo}" chegou ao fim. Os candidatos pendentes receberam um feedback automático de encerramento.`,
+                    mensagem: `A vaga "${vaga.titulo}" atingiu o limite de 45 dias no ar e foi encerrada automaticamente. Os candidatos pendentes receberam um feedback de encerramento.`,
                     tipo: "INFO",
                     link_acao: `/empresa/vagas`,
                   },
@@ -170,7 +167,7 @@ export function agendarEncerramentoVagasAutomatico() {
                   etapa_destino: c.id_etapa_atual,
                   status_destino: "REPROVADO",
                   motivo:
-                    "A vaga foi encerrada e a candidatura não avançou para a etapa final.",
+                    "A vaga foi encerrada por tempo expirado na plataforma (45 dias).",
                   notificacao_pendente: false,
                 })),
               });
@@ -193,8 +190,11 @@ export function agendarEncerramentoVagasAutomatico() {
                   }),
                 );
 
-                // ✨ Alimenta a lista de envio em memória
-                if (c.candidato.usuario.email) {
+                // ✨ Validação de segurança: Só enfileira o e-mail se estiver confirmado
+                if (
+                  c.candidato.usuario.email &&
+                  c.candidato.usuario.email_confirmado
+                ) {
                   emailsParaEnviar.push({
                     email: c.candidato.usuario.email,
                     nome: c.candidato.usuario.nome,
@@ -210,8 +210,6 @@ export function agendarEncerramentoVagasAutomatico() {
             }
           });
 
-          // ✨ A transação no banco terminou e liberou as tabelas!
-          // Agora disparamos os e-mails com segurança de rede:
           if (emailsParaEnviar.length > 0) {
             console.log(
               `[CRON] Disparando ${emailsParaEnviar.length} e-mail(s) de reprovação da vaga "${vaga.titulo}"...`,
