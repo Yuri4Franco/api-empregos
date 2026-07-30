@@ -70,8 +70,7 @@ export class AdminService {
         where: onde,
         skip,
         take: limit,
-        orderBy: { criado_em: "desc" },
-        // ✨ A MÁGICA DA SEGURANÇA: Oculta senha_hash, tokens e dados sensíveis
+        orderBy: { ultima_atividade: "desc" },
         select: {
           id_usuario: true,
           nome: true,
@@ -81,6 +80,12 @@ export class AdminService {
           is_master: true,
           ultimo_login: true,
           criado_em: true,
+          ultima_atividade: true,
+          candidato: {
+            select: {
+              perfil_visivel_empresas: true,
+            },
+          },
           empresa: {
             select: {
               id_empresa: true,
