@@ -322,7 +322,7 @@ export class EmpresaCandidaturaService {
               ? `Você foi selecionado na vaga "${tituloVaga}". A empresa entrará em contato em breve.`
               : `Sua candidatura para a vaga "${tituloVaga}" avançou para a etapa: ${proximaEtapa.nome_etapa}. Fique de olho nos seus contatos!`,
           tipo: "INFO",
-          link_acao: `/candidato/minhas-candidaturas`,
+          link_acao: `/candidato/candidaturas`,
         })
         .catch((err: any) =>
           console.error("Erro ao enviar notificação de avanço:", err),
@@ -462,7 +462,7 @@ export class EmpresaCandidaturaService {
                   ? `Você foi aprovado na vaga "${tituloVaga}". A empresa entrará em contato em breve.`
                   : `Ótimas notícias! Você avançou para a etapa "${proximaEtapa.nome_etapa}" na vaga ${tituloVaga}.`,
               tipo: "INFO",
-              link_acao: `/candidato/minhas-candidaturas`,
+              link_acao: `/candidato/candidaturas`,
             })
             .catch((err: any) =>
               console.error("Erro na notificação em massa:", err),

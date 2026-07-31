@@ -339,7 +339,7 @@ export class EmailService {
       }
 
       case "email-avanco": {
-        const urlMinhasCandidaturas = `${process.env.APP_URL}/candidato/minhas-candidaturas`;
+        const urlMinhasCandidaturas = `${process.env.APP_URL}/candidato/candidaturas`;
         subject = `🎉 Parabéns! Você avançou na vaga de ${dados.tituloVaga}`;
         conteudoHtml = `
           <h2 style="color: #059669; font-size: 24px; font-weight: 800; margin-top: 0; margin-bottom: 16px;">
@@ -391,7 +391,7 @@ export class EmailService {
       }
 
       case "email-aprovacao": {
-        const urlMinhasCandidaturas = `${process.env.APP_URL}/candidato/minhas-candidaturas`;
+        const urlMinhasCandidaturas = `${process.env.APP_URL}/candidato/candidaturas`;
         subject = `🏆 Parabéns! Você foi aprovado(a) na vaga de ${dados.tituloVaga} 🎉`;
         conteudoHtml = `
           <h2 style="color: #059669; font-size: 24px; font-weight: 800; margin-top: 0; margin-bottom: 16px;">
@@ -461,7 +461,7 @@ export class EmailService {
       }
 
       case "email-agendamento": {
-        const urlMinhasCandidaturas = `${process.env.APP_URL}/candidato/minhas-candidaturas`;
+        const urlMinhasCandidaturas = `${process.env.APP_URL}/candidato/candidaturas`;
         subject = `📅 Entrevista Agendada: ${dados.tituloVaga}`;
 
         // Formata as observações condicionalmente
