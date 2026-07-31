@@ -70,7 +70,9 @@ export class AdminService {
         where: onde,
         skip,
         take: limit,
-        orderBy: { ultima_atividade: "asc" },
+        orderBy: {
+          ultima_atividade: { sort: "desc", nulls: "last" },
+        },
         select: {
           id_usuario: true,
           nome: true,
