@@ -85,7 +85,11 @@ export class EmailService {
   }
 
   async enviarEmailRecuperacao(email: string, nome: string, token: string) {
-    return await filaEmails.add("email-recuperacao", { email, nome, token }, { priority: 1 });
+    return await filaEmails.add(
+      "email-recuperacao",
+      { email, nome, token },
+      { priority: 1 },
+    );
   }
 
   async enviarEmailLembretePerfil(email: string, nome: string) {
@@ -148,6 +152,30 @@ export class EmailService {
       assunto,
       mensagem,
     });
+  }
+
+  async enviarEmailAgendamento(
+    email: string,
+    nome: string,
+    tituloVaga: string,
+    nomeEmpresa: string,
+    dataFormatada: string,
+    localLink: string,
+    observacoes?: string,
+  ) {
+    return await filaEmails.add(
+      "email-agendamento",
+      {
+        email,
+        nome,
+        tituloVaga,
+        nomeEmpresa,
+        dataFormatada,
+        localLink,
+        observacoes,
+      },
+      { priority: 2 },
+    );
   }
 
   // ============================================================================
@@ -428,6 +456,66 @@ export class EmailService {
             <p style="margin-top: 0; font-weight: bold; color: #475569; font-size: 14px;">Mensagem:</p>
             <p style="white-space: pre-wrap; margin-bottom: 0; color: #334155;">${dados.mensagem}</p>
           </div>
+        `;
+        break;
+      }
+
+      case "email-agendamento": {
+        const urlMinhasCandidaturas = `${process.env.APP_URL}/candidato/minhas-candidaturas`;
+        subject = `📅 Entrevista Agendada: ${dados.tituloVaga}`;
+
+        // Formata as observações condicionalmente
+        const htmlObservacoes = dados.observacoes
+          ? `<div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 4px; margin-top: 20px;">
+               <p style="margin: 0; font-size: 13px; font-weight: bold; color: #b45309; text-transform: uppercase;">Observações do Recrutador:</p>
+               <p style="margin: 8px 0 0 0; font-size: 14px; color: #451a03; white-space: pre-wrap;">${dados.observacoes}</p>
+             </div>`
+          : "";
+
+        conteudoHtml = `
+          <h2 style="color: #0f172a; font-size: 22px; font-weight: 800; margin-top: 0; margin-bottom: 16px;">
+            Olá, ${dados.nome}!
+          </h2>
+          
+          <p style="font-size: 16px; color: #334155; line-height: 1.6; margin-bottom: 24px;">
+            A empresa <strong style="color: #0f172a;">${dados.nomeEmpresa}</strong> tem interesse em conhecer mais sobre você e agendou uma entrevista para a vaga de <strong style="color: #0f172a;">${dados.tituloVaga}</strong>.
+          </p>
+
+          <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; padding: 24px; border-radius: 12px; margin: 24px 0;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding-bottom: 12px;">
+                  <span style="display: block; font-size: 12px; font-weight: bold; color: #0369a1; text-transform: uppercase;">Data e Horário</span>
+                  <span style="display: block; font-size: 16px; font-weight: bold; color: #0f172a; margin-top: 4px;">🗓️ ${dados.dataFormatada}</span>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding-top: 12px; border-top: 1px solid #e0f2fe;">
+                  <span style="display: block; font-size: 12px; font-weight: bold; color: #0369a1; text-transform: uppercase;">Local ou Link da Reunião</span>
+                  <span style="display: block; font-size: 15px; color: #0f172a; margin-top: 4px; word-break: break-word;">📍 ${dados.localLink}</span>
+                </td>
+              </tr>
+            </table>
+            
+            ${htmlObservacoes}
+          </div>
+          
+          <p style="font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 24px;">
+            Recomendamos que você se planeje com antecedência e, caso seja uma entrevista presencial, verifique o trajeto. Se for online, teste sua conexão e câmera minutos antes.
+          </p>
+          
+          <div style="text-align: center; margin: 35px 0;">
+            <a href="${urlMinhasCandidaturas}" style="background-color: #0ea5e9; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 10px; display: inline-block; font-weight: 800; font-size: 15px; box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.2);">
+              Acessar Painel da Vaga
+            </a>
+          </div>
+
+          <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;" />
+
+          <p style="font-size: 12px; color: #64748b; text-align: center; line-height: 1.5; margin: 0;">
+            Desejamos uma excelente entrevista! Mostre o seu potencial e sucesso!<br>
+            <strong>Equipe ACI Vagas</strong>
+          </p>
         `;
         break;
       }
