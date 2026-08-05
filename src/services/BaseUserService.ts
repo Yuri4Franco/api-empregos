@@ -29,8 +29,8 @@ export class BaseUserService {
 
     const usuarioAtualizado = await prisma.usuario.update({
       where: { id_usuario },
-      data: { nome: novo_nome }, 
-      select: { id_usuario: true, nome: true }, 
+      data: { nome: novo_nome },
+      select: { id_usuario: true, nome: true },
     });
 
     return usuarioAtualizado;
@@ -205,6 +205,9 @@ export class BaseUserService {
         email: true,
         tipo_usuario: true,
         exigir_troca_senha: true,
+        email_confirmado: true,
+        email_pendente: true,
+        token_confirmar_email: true,
         empresa: {
           select: {
             id_empresa: true,
@@ -221,7 +224,12 @@ export class BaseUserService {
 
     if (!usuario) throw new Error("Usuário não encontrado.");
 
-    return usuario;
+    const { token_confirmar_email, ...dadosSeguros } = usuario;
+
+    return {
+      ...dadosSeguros,
+      link_enviado: !!token_confirmar_email, // O '!!' transforma a string em 'true' e o 'null' em 'false'
+    };
   }
 
   async excluirConta(id_usuario: number, senha_confirmacao: string) {

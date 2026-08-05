@@ -100,7 +100,8 @@ model Usuario {
   tipo_usuario    TipoUsuario
   status          StatusGeral   @default(PENDENTE)
 
-  token_troca_email String?     @unique 
+  token_troca_email String?     @unique
+  token_confirmar_email String?     @unique
   token_ativacao  String?       @unique 
   token_recuperar String?       @unique 
   expira_token    DateTime?

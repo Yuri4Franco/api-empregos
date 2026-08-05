@@ -63,16 +63,13 @@ export class AuthController {
 
   async registrarCandidatoCpf(req: Request, res: Response) {
     try {
-      const { nome, email, cpf, senha, recaptchaToken } = req.body;
+      const { nome, email, cpf, senha, whatsapp, recaptchaToken } = req.body;
 
-      // Validação básica dos campos obrigatórios
       if (!nome || !email || !cpf || !senha) {
         return res.status(400).json({
           erro: "Todos os campos (nome, email, cpf e senha) são obrigatórios.",
         });
       }
-
-      console.log("Token do reCAPTCHA recebido do front-end:", recaptchaToken);
 
       const isHuman = await validarRecaptcha(recaptchaToken, "register");
       if (!isHuman) {
@@ -87,6 +84,7 @@ export class AuthController {
         email,
         cpf,
         senha,
+        whatsapp,
       });
 
       // Retorna 201 (Created) entregando o token para login imediato
@@ -106,12 +104,12 @@ export class AuthController {
     }
   }
 
-  async ativar(req: Request, res: Response) {
+  async confirmarEmail(req: Request, res: Response) {
     try {
       const { token } = req.body;
 
       if (!token) {
-        throw new Error("Token de ativação não fornecido.");
+        throw new Error("Token de confirmação não fornecido.");
       }
 
       const dadosAutenticacao = await authService.confirmarEmail(token);
@@ -126,8 +124,9 @@ export class AuthController {
     }
   }
 
-  async reenviarAtivacao(req: Request, res: Response) {
+  async enviarLinkConfirmacao(req: Request, res: Response) {
     try {
+      console.log("📍 [1] Chegou no Controller");
       const { email } = req.body;
 
       if (!email) {
@@ -137,16 +136,18 @@ export class AuthController {
         });
       }
 
-      await authService.reenviarLinkAtivacao(email);
+      console.log("📍 [2] Vai chamar o Service");
+      await authService.enviarLinkConfirmacao(email);
 
+      console.log("📍 [5] Voltou do Service com sucesso. Enviando 200...");
       return res.status(200).json({
         success: true,
-        message: "Um novo link de ativação foi enviado para o seu e-mail.",
+        message: "Um novo link de confirmação foi enviado para o seu e-mail.",
       });
     } catch (error: any) {
+      console.log("🚨 Caiu no Catch do Controller!", error);
       return res.status(400).json({
-        success: false,
-        error: error.message,
+        error: error.message || "Erro ao processar o envio do e-mail.",
       });
     }
   }

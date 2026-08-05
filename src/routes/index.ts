@@ -117,12 +117,12 @@ routes.post(
   authController.registrarCandidatoCpf,
 );
 
-routes.post("/ativar", authLimiter, authController.ativar);
+routes.post("/confirmar-email", authLimiter, authController.confirmarEmail);
 
 routes.post(
-  "/auth/reenviar-ativacao",
+  "/auth/validar-email",
   authLimiter,
-  authController.reenviarAtivacao,
+  authController.enviarLinkConfirmacao,
 );
 
 routes.post(

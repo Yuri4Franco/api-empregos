@@ -68,8 +68,8 @@ export class EmailService {
   // MÉTODOS PÚBLICOS (Enfileiramento Instantâneo no Redis)
   // ============================================================================
 
-  async enviarEmailAtivacao(email: string, nome: string, token: string) {
-    return await filaEmails.add("email-ativacao", { email, nome, token });
+  async enviarEmailConfirmacao(email: string, nome: string, token: string) {
+    return await filaEmails.add("email-confirmacao", { email, nome, token });
   }
 
   async enviarEmailAvisoExclusao(email: string, nome: string, token: string) {
@@ -90,6 +90,7 @@ export class EmailService {
       { email, nome, token },
       { priority: 1 },
     );
+    
   }
 
   async enviarEmailLembretePerfil(email: string, nome: string) {
@@ -189,17 +190,16 @@ export class EmailService {
     let replyTo: string | undefined = undefined;
 
     switch (nomeJob) {
-      case "email-ativacao": {
-        const urlAtivacao = `${process.env.APP_URL}/ativar/${dados.token}`;
-        subject = "Ative sua conta - ACI Vagas";
+      case "email-confirmacao": {
+        const urlAtivacao = `${process.env.APP_URL}/confirmar-email/${dados.token}`;
+        subject = "Confirmação de E-mail - ACI Vagas";
         conteudoHtml = `
           <h2 style="color: #003366; margin-top: 0;">Olá, ${dados.nome}!</h2>
           <p>Seja bem-vindo à plataforma <strong>ACI Vagas</strong>.</p>
-          <p>Para concluir seu cadastro de forma segura e começar a se candidatar às vagas exclusivas da nossa região, clique no botão abaixo:</p>
-          
+          <p>Confirme o seu e-mail clicando no botão abaixo! Assim, você garante que as empresas consigam falar com você e ainda pode receber avisos sobre novas vagas e convites para entrevistas diretamente na sua caixa de entrada.</p>
           <div style="text-align: center; margin: 35px 0;">
             <a href="${urlAtivacao}" style="background-color: #0056b3; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px;">
-              Ativar Minha Conta
+              Confirmar E-mail
             </a>
           </div>
 
@@ -210,7 +210,7 @@ export class EmailService {
       }
 
       case "email-aviso-exclusao": {
-        const urlAtivacao = `${process.env.APP_URL}/ativar/${dados.token}`;
+        const urlAtivacao = `${process.env.APP_URL}/confirmar-email/${dados.token}`;
         subject = "Aviso: Sua conta será excluída em 5 dias";
         conteudoHtml = `
           <h2 style="color: #003366; margin-top: 0;">Olá, ${dados.nome}!</h2>
