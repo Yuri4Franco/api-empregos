@@ -69,7 +69,7 @@ export class EmailService {
   // ============================================================================
 
   async enviarEmailConfirmacao(email: string, nome: string, token: string) {
-    return await filaEmails.add("email-confirmacao", { email, nome, token });
+    return await filaEmails.add("email-confirmacao", { email, nome, token }, { priority: 1 },);
   }
 
   async enviarEmailAvisoExclusao(email: string, nome: string, token: string) {
