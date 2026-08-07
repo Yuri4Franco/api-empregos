@@ -327,6 +327,7 @@ export class CandidatoService {
       select: {
         cpf: true,
         whatsapp: true,
+        telefone: true,
         data_nascimento: true,
         resumo_profissional: true,
         objetivo_profissional: true,

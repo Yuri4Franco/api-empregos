@@ -6,7 +6,7 @@ export function calcularPontuacaoCandidato(c: any): number {
   // 📌 1. Dados Básicos e Contato (15 pontos)
   if (c.cpf) pontuacao += 5;
   if (c.data_nascimento) pontuacao += 5;
-  if (c.whatsapp) pontuacao += 5;
+  if (c.whatsapp || c.telefone) pontuacao += 5;
 
   // 📌 2. Endereço Completo (15 pontos - 2.5 cada)
   if (c.endereco?.cep) pontuacao += 2.5;
