@@ -1,13 +1,27 @@
 import { prisma } from "../config/prisma.js";
+import { CandidatoService } from "./CandidatoService.js";
+
+const candidatoService = new CandidatoService();
 
 export class FormacaoService {
   async criar(id_usuario: number, dados: any) {
-    return await prisma.formacaoAcademica.create({
+    // 1. Salva no banco e guarda o resultado
+    const novaFormacao = await prisma.formacaoAcademica.create({
       data: {
         ...dados,
         id_candidato: id_usuario,
       },
     });
+
+    // 2. Dispara o gatilho DEPOIS de salvar, mas ANTES do return
+    const novaNota =
+      await candidatoService.atualizarPorcentagemCurriculo(id_usuario);
+
+    // 3. Retorna o resultado para quem chamou a função
+    return {
+      formacao: novaFormacao,
+      porcentagem_curriculo: novaNota,
+    };
   }
 
   async atualizar(id_formacao: number, id_usuario: number, dados: any) {
@@ -19,10 +33,21 @@ export class FormacaoService {
     if (!formacao)
       throw new Error("Formação não encontrada ou permissão negada.");
 
-    return await prisma.formacaoAcademica.update({
+    // 1. Atualiza no banco
+    const formacaoAtualizada = await prisma.formacaoAcademica.update({
       where: { id_formacao },
       data: dados,
     });
+
+    // 2. Dispara o gatilho para garantir que a nota reflita a edição
+    const novaNota =
+      await candidatoService.atualizarPorcentagemCurriculo(id_usuario);
+
+    // 3. Retorna
+    return {
+      formacao: formacaoAtualizada,
+      porcentagem_curriculo: novaNota,
+    };
   }
 
   async deletar(id_formacao: number, id_usuario: number) {
@@ -34,8 +59,18 @@ export class FormacaoService {
     if (!formacao)
       throw new Error("Formação não encontrada ou permissão negada.");
 
-    return await prisma.formacaoAcademica.delete({
+    // 1. Deleta do banco
+    const formacaoDeletada = await prisma.formacaoAcademica.delete({
       where: { id_formacao },
     });
+
+    // 2. Dispara o gatilho (Se ele deletou a última formação, ele perde os 10 pontos)
+    const novaNota =
+      await candidatoService.atualizarPorcentagemCurriculo(id_usuario);
+
+    return {
+      formacao: formacaoDeletada,
+      porcentagem_curriculo: novaNota,
+    };
   }
 }

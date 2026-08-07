@@ -83,6 +83,7 @@ export class AdminService {
           ultimo_login: true,
           criado_em: true,
           ultima_atividade: true,
+          email_confirmado: true,
           candidato: {
             select: {
               perfil_visivel_empresas: true,
@@ -992,6 +993,7 @@ export class AdminService {
       return empresaAtualizada;
     });
   }
+  
   async listarRelatosOuvidoria(filtros: any) {
     const { page = 1, limit = 10 } = filtros;
     const skip = (page - 1) * limit;

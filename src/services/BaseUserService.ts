@@ -101,7 +101,6 @@ export class BaseUserService {
     return { message: "Senha definida com sucesso!" };
   }
 
-  // Função única de atualização para a tabela 'Usuario'
   async atualizarUsuario(id_usuario: number, dados: any, id_autor: number) {
     const usuarioExistente = await prisma.usuario.findUnique({
       where: { id_usuario },

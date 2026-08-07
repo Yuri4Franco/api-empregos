@@ -1,20 +1,20 @@
 import { prisma } from "../config/prisma.js";
+import { CandidatoService } from "./CandidatoService.js";
 
+const candidatoService = new CandidatoService();
 
 export class CompetenciaService {
   async adicionar(id_usuario: number, dados: any) {
-    // 1. REGRA DE NEGÓCIO: Checar o limite de 10 competências
     const totalCompetencias = await prisma.candidatoCompetencia.count({
       where: { id_candidato: id_usuario },
     });
 
     if (totalCompetencias >= 10) {
-      throw new Error(
+      throw new Error(  
         "Você atingiu o limite máximo de 10 competências no seu currículo.",
       );
     }
 
-    // 2. Verificar se o candidato já tem essa competência (para não duplicar)
     const competenciaExistente = await prisma.candidatoCompetencia.findUnique({
       where: {
         id_candidato_id_competencia: {
@@ -28,8 +28,7 @@ export class CompetenciaService {
       throw new Error("Você já adicionou esta competência ao seu currículo.");
     }
 
-    // 3. Adiciona a competência
-    return await prisma.candidatoCompetencia.create({
+    const competenciaAdicionada = await prisma.candidatoCompetencia.create({
       data: {
         id_candidato: id_usuario,
         id_competencia: dados.id_competencia,
@@ -39,12 +38,19 @@ export class CompetenciaService {
         competencia: true,
       },
     });
+
+    const novaNota =
+      await candidatoService.atualizarPorcentagemCurriculo(id_usuario);
+
+    return {
+      competencia: competenciaAdicionada,
+      porcentagem_curriculo: novaNota,
+    };
   }
 
   async deletar(id_usuario: number, id_competencia: number) {
-    // Tenta deletar usando a chave composta (ID do Candidato + ID da Competência)
     try {
-      return await prisma.candidatoCompetencia.delete({
+      const competenciaDeletada = await prisma.candidatoCompetencia.delete({
         where: {
           id_candidato_id_competencia: {
             id_candidato: id_usuario,
@@ -52,20 +58,31 @@ export class CompetenciaService {
           },
         },
       });
+
+      const novaNota =
+        await candidatoService.atualizarPorcentagemCurriculo(id_usuario);
+
+      return {
+        competencia: competenciaDeletada,
+        porcentagem_curriculo: novaNota,
+      };
     } catch (error) {
       throw new Error("Competência não encontrada no seu currículo.");
     }
   }
 
-  async sugerirOuVincularCompetencia(id_candidato: number, nome_sugerido: string, nivel: string) {
+  async sugerirOuVincularCompetencia(
+    id_candidato: number,
+    nome_sugerido: string,
+    nivel: string,
+  ) {
     // 1. Trim e Case Insensitive (Sanitização)
-    // Transforma "  java   script " em "Java Script"
     const nomeSanitizado = nome_sugerido
       .trim()
-      .replace(/\s+/g, ' ') // Remove espaços duplos
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ');
+      .replace(/\s+/g, " ")
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
 
     if (nomeSanitizado.length < 2) {
       throw new Error("O nome da habilidade é muito curto.");
@@ -76,13 +93,12 @@ export class CompetenciaService {
       where: {
         nome: {
           equals: nomeSanitizado,
-          mode: 'insensitive' // Ignora maiúsculas e minúsculas na busca!
-        }
-      }
+          mode: "insensitive",
+        },
+      },
     });
 
     let idCompetenciaAlvo: number;
-    let competenciaRetorno;
 
     // 3. Avalia o Status se ela já existir
     if (competenciaExistente) {
@@ -91,17 +107,15 @@ export class CompetenciaService {
       }
       // Se for APROVADA ou PENDENTE, nós reaproveitamos
       idCompetenciaAlvo = competenciaExistente.id_competencia;
-      competenciaRetorno = competenciaExistente;
     } else {
       // 4. Se não existir nada parecido, cria a nova sugestão como PENDENTE
       const novaCompetencia = await prisma.competencia.create({
         data: {
           nome: nomeSanitizado,
-          status: "PENDENTE"
-        }
+          status: "PENDENTE",
+        },
       });
       idCompetenciaAlvo = novaCompetencia.id_competencia;
-      competenciaRetorno = novaCompetencia;
     }
 
     // 5. Verifica se o candidato já não tem essa competência vinculada ao currículo
@@ -109,30 +123,37 @@ export class CompetenciaService {
       where: {
         id_candidato_id_competencia: {
           id_candidato,
-          id_competencia: idCompetenciaAlvo
-        }
-      }
+          id_competencia: idCompetenciaAlvo,
+        },
+      },
     });
 
     if (jaVinculado) {
-      throw new Error("Você já possui esta habilidade cadastrada em seu currículo.");
+      throw new Error(
+        "Você já possui esta habilidade cadastrada em seu currículo.",
+      );
     }
 
-    // 6. Finalmente, vincula a competência ao candidato
-    await prisma.candidatoCompetencia.create({
+    // ✨ 6. Finalmente, vincula a competência ao candidato e PEDE O JOIN DO PRISMA
+    const competenciaSugerida = await prisma.candidatoCompetencia.create({
       data: {
         id_candidato,
         id_competencia: idCompetenciaAlvo,
-        nivel: nivel as any
-      }
+        nivel: nivel as any,
+      },
+      include: {
+        competencia: true, // <-- Isso faz o Prisma trazer o nome e o status junto!
+      },
     });
 
-    // Retorna a competência para o front-end conseguir renderizar a "tag" na tela na hora
+    // 7. Gatilho da nota
+    const novaNota =
+      await candidatoService.atualizarPorcentagemCurriculo(id_candidato);
+
+    // 8. Retorno perfeito para o front-end
     return {
-      id_competencia: idCompetenciaAlvo,
-      nome: competenciaRetorno.nome,
-      nivel: nivel,
-      status: competenciaRetorno.status
+      competencia: competenciaSugerida,
+      porcentagem_curriculo: novaNota,
     };
   }
 }

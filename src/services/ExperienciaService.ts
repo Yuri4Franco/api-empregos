@@ -1,17 +1,27 @@
 import { prisma } from "../config/prisma.js";
+import { CandidatoService } from "./CandidatoService.js";
+
+const candidatoService = new CandidatoService();
 
 export class ExperienciaService {
   async criar(id_usuario: number, dados: any) {
-    return await prisma.experienciaProfissional.create({
+    const novaExperiencia = await prisma.experienciaProfissional.create({
       data: {
         ...dados,
         id_candidato: id_usuario,
       },
     });
+
+    const novaNota =
+      await candidatoService.atualizarPorcentagemCurriculo(id_usuario);
+
+    return {
+      experiencia: novaExperiencia,
+      porcentagem_curriculo: novaNota,
+    };
   }
 
   async atualizar(id_experiencia: number, id_usuario: number, dados: any) {
-    // Verificamos se a experiência pertence ao usuário antes de atualizar
     const experiencia = await prisma.experienciaProfissional.findFirst({
       where: { id_experiencia, id_candidato: id_usuario },
     });
@@ -19,10 +29,18 @@ export class ExperienciaService {
     if (!experiencia)
       throw new Error("Experiência não encontrada ou permissão negada.");
 
-    return await prisma.experienciaProfissional.update({
+    const experienciaAtualizada = await prisma.experienciaProfissional.update({
       where: { id_experiencia },
       data: dados,
     });
+
+    const novaNota =
+      await candidatoService.atualizarPorcentagemCurriculo(id_usuario);
+
+    return {
+      experiencia: experienciaAtualizada,
+      porcentagem_curriculo: novaNota,
+    };
   }
 
   async deletar(id_experiencia: number, id_usuario: number) {
@@ -33,8 +51,16 @@ export class ExperienciaService {
     if (!experiencia)
       throw new Error("Experiência não encontrada ou permissão negada.");
 
-    return await prisma.experienciaProfissional.delete({
+    const experienciaDeletada = await prisma.experienciaProfissional.delete({
       where: { id_experiencia },
     });
+
+    const novaNota =
+      await candidatoService.atualizarPorcentagemCurriculo(id_usuario);
+
+    return {
+      experiencia: experienciaDeletada,
+      porcentagem_curriculo: novaNota,
+    };
   }
 }

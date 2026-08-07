@@ -3,7 +3,7 @@ import { prisma } from "../config/prisma.js";
 import { Prisma } from "@prisma/client";
 
 export class BancoTalentosService {
-async listarVitrine(filtros: {
+  async listarVitrine(filtros: {
     competencia?: number[] | undefined;
     id_area?: number | undefined;
     turno?: string[] | undefined;
@@ -157,10 +157,14 @@ async listarVitrine(filtros: {
       prisma.candidato.count({ where: whereClause }),
       prisma.candidato.findMany({
         where: whereClause,
+        skip: skip,
+        take: limite,
+        orderBy: {
+          porcentagem_curriculo: "desc", // Ordenação feita direto no banco de dados (muito mais rápido)
+        },
         select: {
           id_usuario: true,
-          cpf: true, // Necessário para pontuação
-          whatsapp: true, // Necessário para pontuação
+          porcentagem_curriculo: true, // Trazemos a nota oficial
           objetivo_profissional: true,
           resumo_profissional: true,
           pretensao_salarial: true,
@@ -170,16 +174,12 @@ async listarVitrine(filtros: {
           data_nascimento: true,
           genero: true,
 
-          // Busca de endereço expandida para validar campos
-          endereco: { 
-            select: { 
-              cep: true, 
-              logradouro: true, 
-              numero: true, 
-              bairro: true, 
-              cidade: true, 
-              uf: true 
-            } 
+          // Buscamos apenas o que a vitrine precisa exibir
+          endereco: {
+            select: {
+              cidade: true,
+              uf: true,
+            },
           },
           areas_atuacao: {
             include: { area: { select: { nome: true } } },
@@ -199,41 +199,18 @@ async listarVitrine(filtros: {
       }),
     ]);
 
-    // 5. Cálculo da Porcentagem e Formatação
-    const candidatosAvaliados = candidatosBrutos.map((c) => {
-      let pontuacao = 0;
-
-      if (c.cpf) pontuacao += 10;
-      if (c.data_nascimento) pontuacao += 10;
-      if (c.whatsapp) pontuacao += 10;
-
-      if (c.endereco?.cep) pontuacao += 2.5;
-      if (c.endereco?.logradouro) pontuacao += 2.5;
-      if (c.endereco?.numero) pontuacao += 2.5;
-      if (c.endereco?.bairro) pontuacao += 2.5;
-      if (c.endereco?.cidade) pontuacao += 2.5;
-      if (c.endereco?.uf) pontuacao += 2.5;
-
-      if (c.areas_atuacao.length > 0) pontuacao += 15;
-      if (c.resumo_profissional) pontuacao += 5;
-      if (c.objetivo_profissional) pontuacao += 5;
-      
-      if (c.experiencias.length > 0 || c.primeiro_emprego) pontuacao += 15;
-      if (c.formacoes.length > 0) pontuacao += 10;
-      if (c.competencias.length > 0) pontuacao += 5;
-
-      const perfil_completo_pct = Math.round(pontuacao);
-
+    const dadosPaginados = candidatosBrutos.map((c) => {
       let idade = null;
       if (c.data_nascimento) {
-        const diff = new Date().getTime() - new Date(c.data_nascimento).getTime();
+        const diff =
+          new Date().getTime() - new Date(c.data_nascimento).getTime();
         idade = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
       }
 
       return {
         id_candidato: c.id_usuario,
         identificacao_publica: `PERFIL BLOQUEADO`,
-        perfil_completo_pct, // ✨ Novo campo
+        perfil_completo_pct: c.porcentagem_curriculo || 0, // ✨ Lê direto do banco
 
         idade: idade,
         genero: c.genero,
@@ -252,12 +229,6 @@ async listarVitrine(filtros: {
         formacoes: c.formacoes,
       };
     });
-
-    // 6. Ordena pela maior porcentagem primeiro
-    candidatosAvaliados.sort((a, b) => b.perfil_completo_pct - a.perfil_completo_pct);
-
-    // 7. Paginação em memória (Fatia o array ordenado)
-    const dadosPaginados = candidatosAvaliados.slice(skip, skip + limite);
 
     return {
       dados: dadosPaginados,

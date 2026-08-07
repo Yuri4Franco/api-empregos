@@ -211,6 +211,8 @@ model Candidato {
   areas_atuacao           CandidatoAreaAtuacao[]
   disponibilidade_sabados  Boolean   @default(false)
 
+  porcentagem_curriculo   Int       @default(0)
+
   experiencias            ExperienciaProfissional[]
   formacoes               FormacaoAcademica[]
   competencias            CandidatoCompetencia[]

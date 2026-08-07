@@ -1,6 +1,7 @@
 import { prisma } from "../config/prisma.js";
 import { Prisma } from "@prisma/client";
 import { StatusCandidatura } from "@prisma/client";
+import { calcularPontuacaoCandidato } from "../utils/candidato.js";
 
 export class CandidatoService {
   async inscrever(
@@ -132,48 +133,55 @@ export class CandidatoService {
   async actualizarDadosGerais(id_usuario: number, dados: any) {
     const { endereco, ...dadosCandidato } = dados;
 
-    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // 1. VERIFICAÇÃO DE DUPLICIDADE DE CPF
-      if (dadosCandidato.cpf) {
-        const candidatoExistente = await tx.candidato.findUnique({
-          where: { cpf: dadosCandidato.cpf },
-          select: { id_usuario: true }, // Trazemos só o ID para economizar memória
-        });
+    const candidatoAtualizado = await prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        if (dadosCandidato.cpf) {
+          const candidatoExistente = await tx.candidato.findUnique({
+            where: { cpf: dadosCandidato.cpf },
+            select: { id_usuario: true },
+          });
 
-        // Se encontrou alguém com esse CPF e o ID for diferente do usuário atual logado
-        if (
-          candidatoExistente &&
-          candidatoExistente.id_usuario !== id_usuario
-        ) {
-          throw new Error(
-            "Este CPF já está cadastrado em outra conta. Por favor, acesse sua conta original ou entre em contato com a ACI-Panambi para suporte.",
-          );
+          if (
+            candidatoExistente &&
+            candidatoExistente.id_usuario !== id_usuario
+          ) {
+            throw new Error(
+              "Este CPF já está cadastrado em outra conta. Por favor, acesse sua conta original ou entre em contato com a ACI-Panambi para suporte.",
+            );
+          }
         }
-      }
 
-      // 2. ATUALIZAÇÃO DOS DADOS
-      return await tx.candidato.update({
-        where: { id_usuario },
-        data: {
-          ...dadosCandidato,
+        return await tx.candidato.update({
+          where: { id_usuario },
+          data: {
+            ...dadosCandidato,
 
-          ...(endereco && {
-            endereco: {
-              upsert: {
-                create: endereco,
-                update: endereco,
+            ...(endereco && {
+              endereco: {
+                upsert: {
+                  create: endereco,
+                  update: endereco,
+                },
               },
-            },
-          }),
-        },
-        include: {
-          endereco: true,
-          areas_atuacao: {
-            include: { area: { select: { nome: true } } },
+            }),
           },
-        },
-      });
-    });
+          include: {
+            endereco: true,
+            areas_atuacao: {
+              include: { area: { select: { nome: true } } },
+            },
+          },
+        });
+      },
+    );
+    
+    const novaNota =
+      await this.atualizarPorcentagemCurriculo(id_usuario);
+
+    return {
+      candidato: candidatoAtualizado,
+      porcentagem_curriculo: novaNota,
+    };
   }
 
   async atualizarVisibilidade(id_usuario: number, visivel: boolean) {
@@ -232,12 +240,21 @@ export class CandidatoService {
     id_candidato: number,
     primeiro_emprego: boolean,
   ) {
-    return await prisma.candidato.update({
+    const togglePrimeiroEmprego = await prisma.candidato.update({
       where: { id_usuario: id_candidato },
       data: { primeiro_emprego },
-      select: { primeiro_emprego: true }, // Retorna apenas o que mudou para economizar tráfego
+      select: { primeiro_emprego: true }, 
     });
+
+    const novaNota = await this.atualizarPorcentagemCurriculo(id_candidato);
+
+    return {
+      primeiro_emprego: togglePrimeiroEmprego,
+      porcentagem_curriculo: novaNota,
+    };
   }
+
+  
 
   async listarMeusAgendamentos(id_usuario: number) {
     // 🕒 Lógica para pegar o início do dia atual (00:00:00)
@@ -302,5 +319,44 @@ export class CandidatoService {
         status_candidatura: ag.candidatura.status_atual,
       };
     });
+  }
+
+  async atualizarPorcentagemCurriculo(id_usuario: number) {
+    const candidato = await prisma.candidato.findUnique({
+      where: { id_usuario },
+      select: {
+        cpf: true,
+        whatsapp: true,
+        data_nascimento: true,
+        resumo_profissional: true,
+        objetivo_profissional: true,
+        primeiro_emprego: true,
+        endereco: {
+          select: {
+            cep: true,
+            logradouro: true,
+            numero: true,
+            bairro: true,
+            cidade: true,
+            uf: true,
+          },
+        },
+        areas_atuacao: { select: { id_area: true }, take: 1 },
+        experiencias: { select: { id_experiencia: true }, take: 1 },
+        formacoes: { select: { id_formacao: true }, take: 1 },
+        competencias: { select: { id_competencia: true }, take: 1 },
+      },
+    });
+
+    if (!candidato) return null;
+
+    const novaPontuacao = calcularPontuacaoCandidato(candidato);
+
+    await prisma.candidato.update({
+      where: { id_usuario },
+      data: { porcentagem_curriculo: novaPontuacao },
+    });
+
+    return novaPontuacao;
   }
 }

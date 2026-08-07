@@ -33,8 +33,8 @@ export class ExperienciaController {
     try {
       const { id } = req.params;
       const id_usuario = (req.user as any).id;
-      await experienciaService.deletar(Number(id), id_usuario);
-      return res.json({ success: true, message: "Experiência removida." });
+      const experienciaDeletada = await experienciaService.deletar(Number(id), id_usuario);
+      return res.json({ success: true, message: "Experiência removida.", data: experienciaDeletada });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
     }

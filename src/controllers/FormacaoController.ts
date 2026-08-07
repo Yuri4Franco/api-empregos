@@ -33,8 +33,8 @@ export class FormacaoController {
     try {
       const { id } = req.params;
       const id_usuario = (req.user as any).id;
-      await formacaoService.deletar(Number(id), id_usuario);
-      return res.json({ success: true, message: "Formação removida." });
+      const formacaoDeletada = await formacaoService.deletar(Number(id), id_usuario);
+      return res.json({ success: true, message: "Formação removida.", data: formacaoDeletada });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
     }

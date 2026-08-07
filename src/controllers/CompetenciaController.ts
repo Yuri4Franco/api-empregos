@@ -27,9 +27,9 @@ export class CompetenciaController {
       const { id_competencia } = req.params;
       const id_usuario = (req.user as any).id;
 
-      await competenciaService.deletar(id_usuario, Number(id_competencia));
+      const competenciaDeletada = await competenciaService.deletar(id_usuario, Number(id_competencia));
 
-      return res.json({ success: true, message: "Competência removida." });
+      return res.json({ success: true, message: "Competência removida.", data: competenciaDeletada });
     } catch (error: any) {
       return res.status(400).json({ success: false, error: error.message });
     }
