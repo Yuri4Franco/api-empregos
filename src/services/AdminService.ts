@@ -39,6 +39,7 @@ export class AdminService {
     busca?: string | undefined;
     page?: number | undefined;
     limit?: number | undefined;
+    visivel?: boolean | undefined; // ✨ Adicionado na tipagem
   }) {
     const page = filtros.page || 1;
     const limit = filtros.limit || 20;
@@ -60,6 +61,14 @@ export class AdminService {
         { nome: { contains: filtros.busca, mode: "insensitive" } },
         { email: { contains: filtros.busca, mode: "insensitive" } },
       ];
+    }
+
+    // ✨ 3. Filtro de Visibilidade (Busca dentro da relação Candidato)
+    if (filtros.visivel !== undefined) {
+      onde.tipo_usuario = "CANDIDATO"; // Força buscar apenas candidatos
+      onde.candidato = {
+        perfil_visivel_empresas: filtros.visivel,
+      };
     }
 
     // 🚀 Consultas em paralelo para performance
@@ -87,6 +96,7 @@ export class AdminService {
           candidato: {
             select: {
               perfil_visivel_empresas: true,
+              porcentagem_curriculo: true,
             },
           },
           empresa: {
@@ -993,7 +1003,7 @@ export class AdminService {
       return empresaAtualizada;
     });
   }
-  
+
   async listarRelatosOuvidoria(filtros: any) {
     const { page = 1, limit = 10 } = filtros;
     const skip = (page - 1) * limit;

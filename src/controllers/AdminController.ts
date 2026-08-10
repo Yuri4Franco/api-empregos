@@ -207,13 +207,19 @@ export class AdminController {
   async listarUsuarios(req: Request, res: Response) {
     try {
       // Extrai os filtros da Query String da URL
-      const { tipo, busca, page, limit } = req.query;
+      const { tipo, busca, page, limit, visivel } = req.query;
+
+      // Converte a string "true" ou "false" da URL para booleano real
+      let visivelBooleano: boolean | undefined = undefined;
+      if (visivel === "true") visivelBooleano = true;
+      if (visivel === "false") visivelBooleano = false;
 
       const resultado = await adminService.listarUsuarios({
         tipo: tipo as string,
         busca: busca as string,
         page: page ? Number(page) : undefined,
         limit: limit ? Number(limit) : undefined,
+        visivel: visivelBooleano, // ✨ Novo parâmetro enviado ao service
       });
 
       return res.status(200).json({
@@ -292,7 +298,7 @@ export class AdminController {
 
   async listarAdmins(req: Request, res: Response) {
     try {
-      const {id} = req.user;
+      const { id } = req.user;
       if (!req.user.is_master) {
         return res
           .status(403)
@@ -316,12 +322,15 @@ export class AdminController {
       return res.status(400).json({ error: "ID da empresa inválido." });
     }
 
-
     try {
-      const resultado = await adminService.atualizarEmpresa(id_empresa, dados, id_autor);
-      return res.status(200).json({ 
-        message: "Empresa atualizada com sucesso.", 
-        dados: resultado 
+      const resultado = await adminService.atualizarEmpresa(
+        id_empresa,
+        dados,
+        id_autor,
+      );
+      return res.status(200).json({
+        message: "Empresa atualizada com sucesso.",
+        dados: resultado,
       });
     } catch (error: any) {
       return res.status(400).json({ error: error.message });
@@ -545,9 +554,9 @@ export class AdminController {
       const id_empresa = Number(req.params.id);
 
       if (!id_empresa || isNaN(id_empresa)) {
-        return res.status(400).json({ 
-          success: false, 
-          error: "ID da empresa inválido." 
+        return res.status(400).json({
+          success: false,
+          error: "ID da empresa inválido.",
         });
       }
 
@@ -558,9 +567,9 @@ export class AdminController {
         data: vagas,
       });
     } catch (error: any) {
-      return res.status(400).json({ 
-        success: false, 
-        error: error.message 
+      return res.status(400).json({
+        success: false,
+        error: error.message,
       });
     }
   }
@@ -569,12 +578,12 @@ export class AdminController {
     try {
       const id_usuario = Number(req.params.id);
 
-      console.log(id_usuario, "ID DO USUARIO")
+      console.log(id_usuario, "ID DO USUARIO");
 
       if (!id_usuario || isNaN(id_usuario)) {
-        return res.status(400).json({ 
-          success: false, 
-          error: "ID de usuário inválido." 
+        return res.status(400).json({
+          success: false,
+          error: "ID de usuário inválido.",
         });
       }
 
@@ -586,9 +595,9 @@ export class AdminController {
       });
     } catch (error: any) {
       console.error("Erro ao puxar raio-x do usuário:", error);
-      return res.status(400).json({ 
-        success: false, 
-        error: error.message 
+      return res.status(400).json({
+        success: false,
+        error: error.message,
       });
     }
   }
