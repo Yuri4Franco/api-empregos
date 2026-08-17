@@ -7,14 +7,14 @@ export class MetricaService {
       where: {
         status: "ATIVA",
         OR: [
-          { data_encerramento: { gte: hoje } },
-          { data_encerramento: null },
+          { data_fechamento: { gte: hoje } },
+          { data_fechamento: null },
         ],
       },
       select: {
         id_vaga: true,
         titulo: true,
-        data_encerramento: true,
+        data_fechamento: true,
         empresa: {
           select: {
             nome_fantasia: true,
@@ -23,7 +23,7 @@ export class MetricaService {
         },
       },
       orderBy: {
-        data_encerramento: "asc",
+        data_fechamento: "asc",
       },
     });
 
@@ -31,7 +31,7 @@ export class MetricaService {
       id_vaga: vaga.id_vaga,
       titulo: vaga.titulo,
       empresa: vaga.empresa.nome_fantasia || vaga.empresa.razao_social,
-      data_encerramento: vaga.data_encerramento,
+      data_fechamento: vaga.data_fechamento,
     }));
   }
 }

@@ -13,9 +13,14 @@ const fileFilter = (req: any, file: any, cb: any) => {
   }
 };
 
+const limits = {
+  fileSize: 5 * 1024 * 1024,
+};
+
 export const uploadBanner = multer({ storage: bannerStorage, fileFilter });
 export const uploadLogo = multer({ storage: logoStorage, fileFilter });
 export const uploadCandidato = multer({
   storage: candidateStorage,
   fileFilter,
+  limits
 });
