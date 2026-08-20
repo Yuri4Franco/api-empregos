@@ -159,9 +159,10 @@ export class BancoTalentosService {
         where: whereClause,
         skip: skip,
         take: limite,
-        orderBy: {
-          porcentagem_curriculo: "desc", // Ordenação feita direto no banco de dados (muito mais rápido)
-        },
+        orderBy: [
+          { porcentagem_curriculo: "desc" }, // 1º critério: Quem tem maior porcentagem
+          { id_usuario: "desc" }, // 2º critério (Desempate): Quem se cadastrou por último
+        ],
         select: {
           id_usuario: true,
           porcentagem_curriculo: true, // Trazemos a nota oficial
