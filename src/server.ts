@@ -49,7 +49,7 @@ app.use((err: any, req: any, res: any, next: any) => {
   res.status(500).json({ error: "Erro interno do servidor" });
 });
 
-const PORT = process.env.PORT || 3333;
+
 
 app.get("/health", async (req, res) => {
   try {
@@ -60,6 +60,9 @@ app.get("/health", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT} 🚀`);
+const port = Number(process.env.PORT) || 3333;
+const host = process.env.HOST || '0.0.0.0';
+
+app.listen(port, host, () => {
+  console.log(`Servidor rodando em http://${host}:${port}`);
 });
