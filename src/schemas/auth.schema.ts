@@ -68,7 +68,7 @@ export const RegistroUsuario = UsuarioBaseSchema.extend({
     .refine((v) => v.length === 11, "CPF deve ter 11 dígitos"),
   whatsapp: z.string().optional().nullable(),
   recaptchaToken: z.string().min(1, "O token de recaptcha é obrigatório"),
-});
+}).strict();
 
 export const esqueciSenhaSchema = z.object({
   email: z.string().email("Por favor, insira um e-mail válido."),
