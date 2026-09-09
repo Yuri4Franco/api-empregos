@@ -420,8 +420,6 @@ routes.get(
 routes.put(
   "/admin/vagas/:id",
   authMiddleware(["ADM"]),
-  validate(IdParamSchema, "params"),
-  validate(vagaSchema, "body"),
   adminVagaController.adminAtualizarVaga,
 );
 

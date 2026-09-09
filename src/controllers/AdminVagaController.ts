@@ -3,7 +3,6 @@ import { VagaService } from "../services/VagaService.js";
 import { AdminService } from "../services/AdminService.js";
 import { vagaSchema } from "../schemas/auth.schema.js";
 
-
 const vagaService = new VagaService();
 const adminService = new AdminService();
 
@@ -49,14 +48,14 @@ export class AdminVagaController {
   async adminAtualizarVaga(req: Request, res: Response) {
     try {
       const { id } = req.params as any;
-      const dadosValidados = vagaSchema.parse(req.body);
+      const dadosValidados = vagaSchema.partial().parse(req.body);
 
       const vaga = await vagaService.atualizarVaga(
         Number(id),
         null, // Admin ignora trava de dono da empresa
         dadosValidados,
         true, // is_admin = true
-        req.user.id,
+        req.user?.id, // Garantir que req.user exista, dependendo do seu middleware
       );
 
       return res.status(200).json({
@@ -65,6 +64,7 @@ export class AdminVagaController {
         data: vaga,
       });
     } catch (error: any) {
+      console.error("Erro no adminAtualizarVaga:", error);
       return res.status(400).json({ success: false, error: error.message });
     }
   }
@@ -113,11 +113,11 @@ export class AdminVagaController {
   async confirmarPagamento(req: Request, res: Response) {
     try {
       const { id } = req.params as any;
-      console.log("Fazendo confirmação de pagamento para vaga ID")
+      console.log("Fazendo confirmação de pagamento para vaga ID");
       console.log("ID da vaga para confirmação de pagamento:", id);
 
       const id_admin = req.user.id;
-      
+
       console.log("ID do admin que está confirmando o pagamento:", id_admin);
 
       if (!id || isNaN(Number(id))) {
@@ -155,5 +155,4 @@ export class AdminVagaController {
       return res.status(404).json({ error: error.message });
     }
   }
-  
 }

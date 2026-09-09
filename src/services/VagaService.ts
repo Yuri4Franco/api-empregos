@@ -357,24 +357,20 @@ export class VagaService {
     // 3. REGRA DE NEGÓCIO: Verificação de Créditos ao Submeter
     let novoStatus = vagaExistente.status;
     let cobrarCredito = false;
-    let limparObservacoes = false; // ✨ Flag para limpar o recado do admin
+    let limparObservacoes = false;
 
     if (is_admin && dados.status) {
       novoStatus = dados.status;
     } else if (
       dados.enviar_para_aprovacao &&
       (vagaExistente.status === "RASCUNHO" ||
-        vagaExistente.status === "REPROVADA") // ✨ Aceita Reprovada
+        vagaExistente.status === "REPROVADA")
     ) {
-      // Se está re-enviando uma reprovada, limpa o recado antigo do admin
       if (vagaExistente.status === "REPROVADA") {
         limparObservacoes = true;
       }
 
-      // Aplica a regra da ACI
       if (vagaExistente.empresa.tipo_vinculo_aci === "NAO_ASSOCIADA") {
-        // Se for rascunho e não tiver crédito, barra.
-        // Se for reprovada, deixa passar (pois já pagou no primeiro envio)
         if (
           vagaExistente.empresa.creditos_vagas <= 0 &&
           vagaExistente.status === "RASCUNHO"
@@ -382,13 +378,12 @@ export class VagaService {
           novoStatus = "AGUARDANDO_PAGAMENTO";
         } else {
           novoStatus = "EM_ANALISE";
-          // ✨ Só cobra o crédito se for o primeiro envio (Rascunho)
           if (vagaExistente.status === "RASCUNHO") {
             cobrarCredito = true;
           }
         }
       } else {
-        novoStatus = "EM_ANALISE"; // Associadas têm passe livre
+        novoStatus = "EM_ANALISE";
       }
     }
 
@@ -401,7 +396,7 @@ export class VagaService {
         });
       }
 
-      // 5. Atualizar Endereço
+      // 5. Atualizar Endereço (✨ CORRIGIDO PARA EVITAR ERRO DE OBJETO VAZIO)
       if (vagaExistente.id_endereco) {
         const dadosEndereco: any = {};
         if (dados.logradouro !== undefined)
@@ -409,11 +404,15 @@ export class VagaService {
         if (dados.numero !== undefined) dadosEndereco.numero = dados.numero;
         if (dados.cidade !== undefined) dadosEndereco.cidade = dados.cidade;
         if (dados.uf !== undefined) dadosEndereco.uf = dados.uf;
+        if (dados.bairro !== undefined) dadosEndereco.bairro = dados.bairro;
 
-        await tx.endereco.update({
-          where: { id_endereco: vagaExistente.id_endereco },
-          data: dadosEndereco,
-        });
+        // Só faz a query no banco se realmente enviaram algum campo de endereço para alterar
+        if (Object.keys(dadosEndereco).length > 0) {
+          await tx.endereco.update({
+            where: { id_endereco: vagaExistente.id_endereco },
+            data: dadosEndereco,
+          });
+        }
       }
 
       // 6. Atualizar a Vaga (Limpando Undefineds e Protegendo Números)
@@ -456,6 +455,9 @@ export class VagaService {
         "requisitos_obrigatorios",
         "diferenciais",
         "empresa_confidencial",
+        "vaga_externa",
+        "link_externo",
+        "instrucoes_candidatura",
       ];
 
       camposTextuais.forEach((campo) => {
@@ -467,10 +469,12 @@ export class VagaService {
         dadosVaga.id_area_atuacao = dados.id_area_atuacao
           ? Number(dados.id_area_atuacao)
           : null;
+
       if (dados.salario_de !== undefined)
         dadosVaga.faixa_salarial_de = dados.salario_de
           ? Number(dados.salario_de)
           : null;
+
       if (dados.salario_ate !== undefined)
         dadosVaga.faixa_salarial_ate = dados.salario_ate
           ? Number(dados.salario_ate)
@@ -489,20 +493,33 @@ export class VagaService {
       }
 
       // Status e Data de Publicação
-      dadosVaga.status = novoStatus;
+      if (dadosVaga.status === undefined) {
+        dadosVaga.status = novoStatus;
+      }
+
       if (novoStatus === "ATIVA" && !vagaExistente.data_publicacao) {
         dadosVaga.data_publicacao = new Date();
       }
 
-      // ✨ Limpa as observações do admin se a vaga foi reenviada após reprovação
+      // Limpa as observações do admin se a vaga foi reenviada após reprovação
       if (limparObservacoes) {
         dadosVaga.observacoes_admin = null;
       }
 
-      const vaga = await tx.vaga.update({
-        where: { id_vaga },
-        data: dadosVaga,
-      });
+      // Se não houver nada para atualizar na tabela principal, pulamos o update
+      let vaga = vagaExistente;
+      if (Object.keys(dadosVaga).length > 0) {
+        vaga = (await tx.vaga.update({
+          where: { id_vaga },
+          data: dadosVaga,
+          include: {
+            endereco: true,
+            empresa: {
+              select: { tipo_vinculo_aci: true, creditos_vagas: true },
+            },
+          },
+        })) as any;
+      }
 
       // 7. Sincronizar Etapas (Com Trava de Segurança)
       if (dados.etapas && Array.isArray(dados.etapas)) {
@@ -570,7 +587,11 @@ export class VagaService {
             acao: "ADM_EDITAR_VAGA",
             entidade: "Vaga",
             id_entidade: id_vaga,
-            detalhes: { alterado_por: id_autor, data: new Date() },
+            detalhes: {
+              alterado_por: id_autor,
+              campos_alterados: Object.keys(dados),
+              data: new Date(),
+            },
           },
         });
       }
@@ -578,7 +599,7 @@ export class VagaService {
       return vaga;
     });
   }
-
+  
   async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
     // 1. Forçamos a conversão para número e definimos valores padrão caso venham nulos
     const page = Number(filtros.page) || 1;
