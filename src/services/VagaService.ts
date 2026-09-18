@@ -599,7 +599,7 @@ export class VagaService {
       return vaga;
     });
   }
-  
+
   async listarVagasPorEmpresa(id_empresa: number, filtros: any) {
     // 1. Forçamos a conversão para número e definimos valores padrão caso venham nulos
     const page = Number(filtros.page) || 1;
@@ -1247,9 +1247,13 @@ export class VagaService {
   // 2. ATIVAR VAGA (RETORNAR DA PAUSA)
   // =========================================================
   async ativarVaga(id_vaga: number, id_empresa: number, id_autor: number) {
+    // 1. Buscamos o status e a data de fechamento atual
     const vaga = await prisma.vaga.findFirst({
       where: { id_vaga, id_empresa },
-      select: { status: true },
+      select: {
+        status: true,
+        data_fechamento: true, // ✨ Adicionado para calcularmos a extensão
+      },
     });
 
     if (!vaga) throw new Error("Vaga não encontrada ou acesso negado.");
@@ -1257,19 +1261,42 @@ export class VagaService {
       throw new Error("Apenas vagas pausadas podem ser reativadas.");
     }
 
+    // 2. Lógica para adicionar 7 dias
+    const hoje = new Date();
+    let novaDataFechamento = new Date();
+
+    if (vaga.data_fechamento && vaga.data_fechamento > hoje) {
+      // Se ainda tem prazo no futuro, soma 7 dias em cima do prazo existente
+      novaDataFechamento = new Date(vaga.data_fechamento);
+      novaDataFechamento.setDate(novaDataFechamento.getDate() + 7);
+    } else {
+      // Se a data já tinha vencido (ou era nula), dá 7 dias a partir de AGORA
+      novaDataFechamento.setDate(hoje.getDate() + 7);
+    }
+
     return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // 3. Atualiza o status e a nova data
       const atualizada = await tx.vaga.update({
         where: { id_vaga },
-        data: { status: "ATIVA" },
+        data: {
+          status: "ATIVA",
+          data_fechamento: novaDataFechamento, // ✨ Salva a nova data no banco
+        },
       });
 
+      // 4. Registra no Log
       await tx.logAuditoria.create({
         data: {
           id_usuario: id_autor,
           acao: "ATIVAR_VAGA",
           entidade: "Vaga",
           id_entidade: id_vaga,
-          detalhes: { status_anterior: "PAUSADA", novo_status: "ATIVA" },
+          detalhes: {
+            status_anterior: "PAUSADA",
+            novo_status: "ATIVA",
+            dias_adicionados: 7,
+            nova_data_fechamento: novaDataFechamento,
+          },
         },
       });
 

@@ -268,7 +268,7 @@ export const vagaSchema = z.object({
   // Textos
   descricao: z.string().min(10),
   responsabilidades: z.string().min(5),
-  requisitos_obrigatorios: z.string().min(5),
+  requisitos_obrigatorios: z.string().optional().default(""),
   diferenciais: z.string().optional().default(""),
 
   // Endereço
