@@ -7,9 +7,13 @@ const authService = new AuthService();
 export class AuthController {
   async login(req: Request, res: Response) {
     try {
-      const { email, senha, cpf } = req.body;
+      let { email, senha, cpf } = req.body;
 
-      // 🚨 1. Trava de segurança: Garante a presença da senha e de pelo menos um identificador
+      // Padroniza o e-mail removendo espaços e passando para minúsculo (igual ao Zod)
+      if (email) {
+        email = email.trim().toLowerCase();
+      }
+
       if (!senha || (!email && !cpf)) {
         return res.status(400).json({
           success: false,
@@ -22,7 +26,6 @@ export class AuthController {
       if (cpf) {
         result = await authService.loginPorCpf(cpf, senha);
       } else {
-        // Como passou pelo if inicial, temos certeza absoluta que 'email' existe aqui
         result = await authService.loginPorEmail(email, senha);
       }
 
@@ -154,11 +157,21 @@ export class AuthController {
 
   async esqueciSenha(req: Request, res: Response) {
     try {
-      const { email } = req.body;
+      let { email } = req.body;
+
+      // Valida se o e-mail foi enviado na requisição
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          error: "Informe o e-mail para recuperar a senha.",
+        });
+      }
+
+      // Padroniza o e-mail (remove espaços em branco e passa para minúsculo)
+      email = email.trim().toLowerCase();
 
       await authService.solicitarRecuperacaoSenha(email);
 
-      // Sempre retorna sucesso, mesmo se o email for inválido (medida de segurança)
       return res.status(200).json({
         success: true,
         message:
@@ -184,7 +197,6 @@ export class AuthController {
           "Sua senha foi redefinida com sucesso! Você já pode fazer login.",
       });
     } catch (error: any) {
-      // Vai capturar o erro de "Token inválido ou expirado" lá do Service
       return res.status(400).json({ success: false, error: error.message });
     }
   }
