@@ -41,11 +41,11 @@ export class EmailService {
                     <img src="${logoAciPanambi}" alt="ACI Panambi" style="max-height: 40px; width: auto; margin-bottom: 20px; display: inline-block;" />
                     
                     <p style="margin: 0 0 10px 0; font-weight: bold; color: #334155;">Associação Comercial e Industrial de Panambi</p>
-                    <p style="margin: 0 0 5px 0;">R. Konrad Adenauer, 555 - Sala B - Centro</p>
+                    <p style="margin: 0 0 5px 0;">Av. Konrad Adenauer - Centro</p>
                     <p style="margin: 0 0 15px 0;">Panambi - RS, 98280-000</p>
                     
                     <p style="margin: 0 0 20px 0;">
-                      <a href="mailto:recepcao@aci.panambi.com.br" style="color: #0056b3; text-decoration: none;">recepcao@aci.panambi.com.br</a><br>
+                      <a href="mailto:recepcao@acipanambi.com.br" style="color: #0056b3; text-decoration: none;">recepcao@acipanambi.com.br</a><br>
                       (55) 3375-9350
                     </p>
 
