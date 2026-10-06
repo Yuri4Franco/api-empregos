@@ -1,6 +1,7 @@
 import { prisma } from "../config/prisma.js";
 import { Prisma } from "@prisma/client";
 import { ModeloTrabalho, StatusVaga } from "@prisma/client";
+import { GoogleIndexingService } from "./GoogleIndexingService.js";
 
 export class VagaService {
   async criarVaga(dados: any, id_empresa: number, is_admin: boolean = false) {
@@ -735,40 +736,48 @@ export class VagaService {
       );
     }
 
-    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const vagaAtualizada = await tx.vaga.update({
-        where: { id_vaga },
-        data: {
-          status: novoStatus,
-          data_publicacao: novoStatus === "ATIVA" ? new Date() : null,
-          observacoes_admin: motivo,
-        },
-      });
-
-      // 2. Lógica de Estorno: Se reprovada e for empresa não-associada, devolve 1 crédito
-      if (
-        novoStatus === "REPROVADA" &&
-        vaga.empresa.tipo_vinculo_aci === "NAO_ASSOCIADA"
-      ) {
-        await tx.empresa.update({
-          where: { id_empresa: vaga.id_empresa },
-          data: { creditos_vagas: { increment: 1 } },
+    const resultado = await prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const vagaAtualizada = await tx.vaga.update({
+          where: { id_vaga },
+          data: {
+            status: novoStatus,
+            data_publicacao: novoStatus === "ATIVA" ? new Date() : null,
+            observacoes_admin: motivo,
+          },
         });
-      }
 
-      // 3. Log de Auditoria
-      await tx.logAuditoria.create({
-        data: {
-          id_usuario: id_autor,
-          acao: novoStatus === "ATIVA" ? "APROVAR_VAGA" : "REPROVAR_VAGA",
-          entidade: "Vaga",
-          id_entidade: id_vaga,
-          detalhes: { motivo },
-        },
-      });
+        // 2. Lógica de Estorno: Se reprovada e for empresa não-associada, devolve 1 crédito
+        if (
+          novoStatus === "REPROVADA" &&
+          vaga.empresa.tipo_vinculo_aci === "NAO_ASSOCIADA"
+        ) {
+          await tx.empresa.update({
+            where: { id_empresa: vaga.id_empresa },
+            data: { creditos_vagas: { increment: 1 } },
+          });
+        }
 
-      return vagaAtualizada;
-    });
+        // 3. Log de Auditoria
+        await tx.logAuditoria.create({
+          data: {
+            id_usuario: id_autor,
+            acao: novoStatus === "ATIVA" ? "APROVAR_VAGA" : "REPROVAR_VAGA",
+            entidade: "Vaga",
+            id_entidade: id_vaga,
+            detalhes: { motivo },
+          },
+        });
+
+        return vagaAtualizada;
+      },
+    );
+
+    if (novoStatus === "ATIVA") {
+      GoogleIndexingService.notificarGoogle(id_vaga, "URL_UPDATED");
+    }
+
+    return resultado;
   }
 
   async confirmarPagamento(id_vaga: number, id_admin: number) {
@@ -1223,7 +1232,7 @@ export class VagaService {
       throw new Error("Apenas vagas ativas podem ser pausadas.");
     }
 
-    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const resultado = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const atualizada = await tx.vaga.update({
         where: { id_vaga },
         data: { status: "PAUSADA" },
@@ -1241,6 +1250,10 @@ export class VagaService {
 
       return atualizada;
     });
+
+    GoogleIndexingService.notificarGoogle(id_vaga, "URL_DELETED");
+
+    return resultado;
   }
 
   // =========================================================
@@ -1274,7 +1287,7 @@ export class VagaService {
       novaDataFechamento.setDate(hoje.getDate() + 7);
     }
 
-    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const resultado = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 3. Atualiza o status e a nova data
       const atualizada = await tx.vaga.update({
         where: { id_vaga },
@@ -1302,6 +1315,10 @@ export class VagaService {
 
       return atualizada;
     });
+
+    GoogleIndexingService.notificarGoogle(id_vaga, "URL_UPDATED");
+
+    return resultado;
   }
 
   // =========================================================
@@ -1313,7 +1330,8 @@ export class VagaService {
     id_autor: number,
     motivo: string,
   ) {
-    return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    
+    const resultado = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Validar a vaga
       const vaga = await tx.vaga.findFirst({
         where: { id_vaga, id_empresa },
@@ -1385,5 +1403,9 @@ export class VagaService {
 
       return vagaEncerrada;
     });
+
+    GoogleIndexingService.notificarGoogle(id_vaga, "URL_DELETED");
+
+    return resultado;
   }
 }
