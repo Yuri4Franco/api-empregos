@@ -8,6 +8,7 @@ class EstatisticasService {
       totalEmpresas,
       totalVagasDivulgadas,
       totalCandidaturas,
+      totalCandidatos,
     ] = await Promise.all([
       // 1. Currículos ativos (Visíveis no banco e com conta ATIVA)
       prisma.candidato.count({
@@ -33,6 +34,13 @@ class EstatisticasService {
 
       // 4. Quantidade de candidaturas (Total histórico)
       prisma.candidatura.count(),
+
+      // 5. Total de candidatos ativos
+      prisma.candidato.count({
+        where: {
+          usuario: { status: "ATIVO" },
+        },
+      }),
     ]);
 
     return {
@@ -40,6 +48,7 @@ class EstatisticasService {
       empresas_cadastradas: totalEmpresas,
       vagas_divulgadas: totalVagasDivulgadas,
       candidaturas_realizadas: totalCandidaturas,
+      candidatos_ativos: totalCandidatos,
     };
   }
 }
