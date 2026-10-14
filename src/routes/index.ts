@@ -76,6 +76,7 @@ import { validatePhotoUpload } from "../middlewares/validatePhotoUpload.js";
 import { DashboardCandidatoController } from "../controllers/DashboardCandidatoController.js";
 import { authLimiter, emailLimiter } from "../middlewares/rateLimiter.js";
 import { registrarAtividadeMiddleware } from "../middlewares/atividadeMiddleware.js";
+import { estatisticasController } from "../controllers/EstatisticasController.js";
 
 const routes = Router();
 
@@ -639,7 +640,7 @@ routes.post(
 routes.post(
   "/empresa/candidaturas/perfil-lote",
   authMiddleware(["EMPRESA"]),
-  empresaCandidaturaController.buscarCurriculosLote
+  empresaCandidaturaController.buscarCurriculosLote,
 );
 
 // Perfil completo do candidato (Dados + Currículo + Agendamento + Avaliação)
@@ -1020,8 +1021,8 @@ routes.get("/vagas/filtros-disponiveis", vagaController.filtrosDisponiveis);
 
 routes.get("/vagas/:id", vagaController.detalharPublica);
 
-
-
 routes.get("/precos", configuracaoPrecoController.obter);
+
+routes.get("/metricas-gerais", estatisticasController.obterMetricasHome);
 
 export default routes;
