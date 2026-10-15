@@ -1,5 +1,36 @@
 import { z } from "zod";
 import { validarCPF } from "../types/validarCpf.js";
+import sanitizeHtml from "sanitize-html";
+
+const sanitizeConfig = {
+  allowedTags: [
+    "b",
+    "i",
+    "em",
+    "strong",
+    "a",
+    "p",
+    "br",
+    "ul",
+    "ol",
+    "li",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "u",
+  ],
+  allowedAttributes: {
+    a: ["href", "target", "rel"],
+  },
+  allowedSchemes: ["http", "https", "mailto"],
+};
+
+const htmlSeguro = z
+  .string()
+  .transform((val) => sanitizeHtml(val, sanitizeConfig));
 
 // --- ÁTOMOS  ---
 const UsuarioBaseSchema = z.object({
@@ -266,10 +297,18 @@ export const vagaSchema = z.object({
   instrucoes_candidatura: z.string().nullable().optional().or(z.literal("")),
 
   // Textos
-  descricao: z.string().min(10),
-  responsabilidades: z.string().min(5),
-  requisitos_obrigatorios: z.string().optional().default(""),
-  diferenciais: z.string().optional().default(""),
+  descricao: htmlSeguro.refine(
+    (val) => val.length >= 10,
+    "A descrição deve ter no mínimo 10 caracteres",
+  ),
+  responsabilidades: htmlSeguro
+    .refine(
+      (val) => val.length >= 5,
+      "As responsabilidades devem ter no mínimo 5 caracteres",
+    )
+    .optional(),
+  requisitos_obrigatorios: htmlSeguro.optional().default(""),
+  diferenciais: htmlSeguro.optional().default(""),
 
   // Endereço
   logradouro: z.string().optional(),
